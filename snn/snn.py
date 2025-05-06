@@ -15,9 +15,10 @@ class SNN:
     synapse_layers: List[SynapseLayer]
 
     def __init__(self, input_size: int, hidden_size: list[int] | int | None, output_size: int, dt, *, 
-                 learning_rule: LearningRule = None, synapse_params: dict = None,
-                 tau_mem: float | List[float] = 5e-3, tau_trace: float | List[float] = 1e-1, threshold: float | List[float] = 1.0, 
-                 membrane_start: float = 0.0, reset_mechanism = "subtract"):
+                 learning_rule: LearningRule = None, synapse_params: dict = None, neuron_params: dict = None,
+                #  tau_mem: float | List[float] = 5e-3, tau_trace: float | List[float] = 1e-1, threshold: float | List[float] = 1.0, 
+                #  membrane_start: float = 0.0, reset_mechanism = "subtract"
+                 ):
         # Network architecture parameters
         self.input_size = input_size
         self.hidden_size = hidden_size
@@ -41,21 +42,27 @@ class SNN:
         self.dt = dt
 
         # Store neuron and synapse parameters
-        self.tau_mem = tau_mem
-        self.tau_trace = tau_trace
-        self.threshold = threshold
-        self.membrane_start = membrane_start
-        self.reset_mechanism = reset_mechanism
+        # self.tau_mem = tau_mem
+        # self.tau_trace = tau_trace
+        # self.threshold = threshold
+        # self.membrane_start = membrane_start
+        # self.reset_mechanism = reset_mechanism
+        self.neuron_params = [
+            {k: v if not isinstance(v, list | tuple) else v[(self.num_layers + i) % len(v)] for k, v in neuron_params.items()} \
+            for i in range(self.num_layers)
+        ]
+
         self.synapse_params = synapse_params if synapse_params is not None else {}
 
         # Create each neuron layers
         self.neuron_layers = []
         for i, layer_size in enumerate(self.layer_sizes_active):
-            layer = NeuronLayer(layer_size, dt=self.dt, 
-                                tau_mem=tau_mem if isinstance(tau_mem, float) else tau_mem[i],
-                                tau_trace=tau_trace if isinstance(tau_trace, float) else tau_trace[i],
-                                threshold=threshold if isinstance(threshold, float) else threshold[i],
-                                membrane_start=membrane_start, reset_mechanism=reset_mechanism)
+            layer = NeuronLayer(layer_size, dt=self.dt, **self.neuron_params[i]
+                                # tau_mem=tau_mem if isinstance(tau_mem, float) else tau_mem[i],
+                                # tau_trace=tau_trace if isinstance(tau_trace, float) else tau_trace[i],
+                                # threshold=threshold if isinstance(threshold, float) else threshold[i],
+                                # membrane_start=membrane_start, reset_mechanism=reset_mechanism
+                                )
             self.neuron_layers.append(layer)
 
         # Create synapse layers
@@ -63,7 +70,7 @@ class SNN:
         for i in range(self.num_layers - 1):
             pre_layer = self.neuron_layers[i]
             post_layer = self.neuron_layers[i + 1]
-            synapse = SynapseLayer(pre_layer, post_layer, learning_rule=learning_rule, **self.synapse_params)
+            synapse = SynapseLayer(pre_layer, post_layer, learning_rule=self.learning_rule, **self.synapse_params)
             self.synapse_layers.append(synapse)
     
     def forward(self, spike_in):

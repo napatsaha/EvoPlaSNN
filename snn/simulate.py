@@ -8,14 +8,17 @@ from .spikegen import SpikeGenerator
 
 
 class SNNSimulator:
-    def __init__(self, network: SNN, num_steps: int, spike_generator: SpikeGenerator, learning_rule: LearningRule = None):
+    def __init__(self, network: SNN, num_steps: int, spike_generator: SpikeGenerator, *, record_membrane: bool = True, record_spikes: bool = True, record_traces: bool = True):
         self.network = network
         self.num_steps = num_steps
         self.spike_generator = spike_generator
-        self.learning_rule = learning_rule
-        self.mem_recorder = LayerRecorder(network.layer_sizes_active, num_steps)
-        self.spk_recorder = LayerRecorder(network.layer_sizes, num_steps, dtype=np.int8)
-        self.trace_recorder = LayerRecorder(network.layer_sizes, num_steps, dtype=np.float32)
+        self.learning_rule = network.learning_rule
+        self.record_membrane = record_membrane
+        self.record_spikes = record_spikes
+        self.record_traces = record_traces
+        self.mem_recorder = LayerRecorder(network.layer_sizes_active, num_steps) if self.record_membrane else None
+        self.spk_recorder = LayerRecorder(network.layer_sizes, num_steps, dtype=np.int8) if self.record_spikes else None
+        self.trace_recorder = LayerRecorder(network.layer_sizes, num_steps, dtype=np.float32) if self.record_traces else None
 
     def run(self):
         for t in range(self.num_steps):
@@ -30,16 +33,19 @@ class SNNSimulator:
                 self.network.update_synapses()
             
             # Record membrane potentials
-            for i, membrane in enumerate(self.network.membranes):
-                self.mem_recorder.record(i, t, membrane)
+            if self.record_membrane:
+                for i, membrane in enumerate(self.network.membranes):
+                    self.mem_recorder.record(i, t, membrane)
 
             # Record spikes
-            for i, spikes in enumerate(self.network.spikes):
-                self.spk_recorder.record(i, t, spikes)
+            if self.record_spikes:
+                for i, spikes in enumerate(self.network.spikes):
+                    self.spk_recorder.record(i, t, spikes)
 
             # Record traces
-            for i, traces in enumerate(self.network.traces):
-                self.trace_recorder.record(i, t, traces)
+            if self.record_traces:
+                for i, traces in enumerate(self.network.traces):
+                    self.trace_recorder.record(i, t, traces)
 
 
 

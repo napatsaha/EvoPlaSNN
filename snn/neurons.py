@@ -83,6 +83,8 @@ class NeuronLayer:
         self.spike = (self.membrane >= self.threshold)
         # Update the time since last spike
         self.tssp = np.where(self.spike, 0, self.tssp + 1)
+        # Update trace
+        self.update_trace()
 
         return self.spike.astype(np.int8)
 
@@ -91,11 +93,11 @@ class NeuronLayer:
         Update the trace based on the time since last spike and the trace type.
         """
         if self.trace_type == "dx1":
-            self.trace += trace_dx1(self.trace, self.tau_trace/self.dt, self.spike, self.trace_amp)
+            self.trace = self.trace + trace_dx1(self.trace, self.tau_trace/self.dt, self.spike, self.trace_amp)
         elif self.trace_type == "dx2":
-            self.trace += trace_dx2(self.trace, self.tau_trace/self.dt, self.spike, self.trace_amp)
+            self.trace = self.trace + trace_dx2(self.trace, self.tau_trace/self.dt, self.spike, self.trace_amp)
         elif self.trace_type == "dx3":
-            self.trace += trace_dx3(self.trace, self.tau_trace/self.dt, self.spike)
+            self.trace = self.trace + trace_dx3(self.trace, self.tau_trace/self.dt, self.spike)
 
         return self.trace
 
