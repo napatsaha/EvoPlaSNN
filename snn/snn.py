@@ -100,6 +100,10 @@ class SNN:
     @property
     def weights(self):
         return [synapse.weights for synapse in self.synapse_layers]
+    
+    @property
+    def thresholds(self):
+        return [layer.threshold for layer in self.neuron_layers]
 
     def __repr__(self):
         return f"SpikingNetwork(input_size={self.input_size}, hidden_size={self.hidden_size}, output_size={self.output_size})"
