@@ -1,0 +1,14 @@
+name: snn-test
+channels:
+  - https://repo.anaconda.com/pkgs/main
+  - https://repo.anaconda.com/pkgs/r
+dependencies:
+  - sympy=1.13.3
+  - pandas=2.2.3
+  - python=3.12.9
+  - ipykernel=6.29.5
+  - seaborn=0.13.2
+  - numpy=2.2.4
+  - matplotlib=3.10.1
+  - scipy=1.15.2
+prefix: /Users/90961365/miniconda3/envs/snn-test

@@ -1,0 +1,13 @@
+*.ipynb
+
+old/
+
+media/
+
+.vscode/
+
+__pycache__/
+
+.DS_Store
+
+*_old.py
