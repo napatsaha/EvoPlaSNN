@@ -7,7 +7,7 @@ from .utils import LayerRecorder, MatrixRecorder
 from .utils import plot_neuron
 from .snn import SNN
 from .lrule import LearningRule
-from .spikegen import SpikeGenerator
+from .spikegen import BinaryClassGenerator, SpikeGenerator
 
 
 class SNNSimulator:
@@ -32,12 +32,16 @@ class SNNSimulator:
         for t in range(self.num_steps):
             # Random input spikes
             spk_in = self.spike_generator.generate()
+            if isinstance(self.spike_generator, BinaryClassGenerator):
+                can_update = self.spike_generator.ready
+            else:
+                can_update = True
 
             # Forward pass
             spk_out = self.network.forward(spk_in)
 
             # Update synaptic weights
-            if self.learning_rule is not None:
+            if can_update and self.learning_rule is not None:
                 self.network.update_synapses()
             
             # Record membrane potentials
