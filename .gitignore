@@ -2,10 +2,10 @@ jupyter/
 *.ipynb
 
 old/
-
 media/
 
 .vscode/
+build/
 
 __pycache__/
 
