@@ -1,7 +1,9 @@
 from pathlib import Path
 from typing import List, Literal
+from matplotlib import ticker
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib as mpl
 
 from .utils import LayerRecorder, MatrixRecorder
 from .utils import plot_neuron
@@ -27,6 +29,8 @@ class SNNSimulator:
         self.spk_recorder = LayerRecorder(network.layer_sizes, num_steps, dtype=np.int8) if self.record_spikes else None
         self.trace_recorder = LayerRecorder(network.layer_sizes, num_steps, dtype=np.float32) if self.record_traces else None
         self.weight_recorder = MatrixRecorder([synapse.weights.shape for synapse in network.synapse_layers], num_steps) if self.record_weights else None
+
+        self.dt = network.dt
 
     def run(self):
         for t in range(self.num_steps):
@@ -105,6 +109,44 @@ class SNNSimulator:
         if show:
             plt.show()
         plt.close(fig)
+
+
+    def plot_spikes(self, x_scale: float = 0.2, y_scale: float = 0.5,
+                    y_eps: float = 0.5, x_eps: float = 0.02, spk_eps: float = 0.25, cmap = "viridis",
+                    savepath: str | Path = None, show: bool = True):
+        """
+        Plot spike trains with time on x-axis and neuron index on y-axis.
+        """
+        # x_scale = 0.2
+        # y_scale = 0.5
+        # y_eps = 0.5
+        x_eps = x_eps * self.num_steps
+        # spk_eps = 0.25
+        num_layers = self.network.num_layers
+        layer_sizes = self.network.layer_sizes
+        fig, axs = plt.subplots(num_layers, 1, gridspec_kw={"hspace": 0.0}, sharex=True, height_ratios=layer_sizes[::-1], 
+                               figsize=(self.num_steps * x_scale, sum(layer_sizes) * y_scale), layout="constrained")
+        for i, layer_spikes in enumerate(reversed(self.spk_recorder.values)):
+            ax = axs[i]
+            n_neurons = layer_spikes.shape[0]
+            n_id, t_spk = np.where(layer_spikes)
+            # ax.scatter(t_spk, n_id, marker="|")
+            cm = mpl.colormaps[cmap]
+            ax.vlines(t_spk, n_id - spk_eps, n_id + spk_eps, color=cm(n_id / (n_neurons - 1)), alpha=1.0, linewidth=2)
+            # ax.vlines(spike_times, i, i+1, color='black', alpha=0.5)
+            ax.set_ylim(0 - y_eps, n_neurons - 1 + y_eps)
+            ax.set_xlim(0 - x_eps, self.num_steps + x_eps)
+            ax.set_yticks(np.arange(n_neurons))
+            ax.set_yticklabels(np.arange(n_neurons))
+            ax.set_ylabel(f"Layer {i}", rotation=90, ha="center")
+            # X Grid
+            ax.xaxis.set_minor_locator(ticker.MultipleLocator(1))
+            ax.xaxis.grid(visible=True, which="both", color="gray", linewidth=0.5, alpha=0.2)
+        ax.set_xlabel(f"Time ({self.dt} s)")
+        # ax.set_ylabel("Neuron Index")
+        fig.suptitle("Spike Trains")
+        fig.supylabel("Neuron Index")
+        plt.show()
 
 
 
