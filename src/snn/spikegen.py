@@ -1,4 +1,5 @@
 
+from typing import Literal
 import numpy as np
 
 from abc import ABC, abstractmethod
@@ -120,14 +121,15 @@ class BinaryClassGenerator(SpikeGenerator):
     """
     A SpikeGenerator that alternates between two classes of PatternSpikeGenerators with opposite directions.
     """
-    def __init__(self, input_size, interval: int, *, spacing: int = None, p: float = 0.5, start_spike: bool = True, seed=None):
+    def __init__(self, input_size, interval: int, *, starting_class: Literal["ascending", "descending"] = "ascending",
+                 spacing: int = None, p: float = 0.5, start_spike: bool = True, seed=None):
         super().__init__(input_size, seed)
         self.p = p
         self.generators = [
             PatternSpikeGenerator(input_size, interval, spacing=spacing, ascending=True, start_spike=start_spike),
             PatternSpikeGenerator(input_size, interval, spacing=spacing, ascending=False, start_spike=start_spike)
         ]
-        self.current_class = 0
+        self.current_class = 0 if starting_class == "ascending" else 1
         self.count = 0
         self.switch = False
         self.finished = False
@@ -148,7 +150,9 @@ class BinaryClassGenerator(SpikeGenerator):
     
     def _switch_class(self):
         r = np.random.rand()
-        self.current_class = int(r < self.p)
+        if r < self.p:
+            self.current_class = 1 - self.current_class
+        # self.current_class = int(r < self.p)
     
     def generate(self) -> np.ndarray:
         spikes, finished = self._generate_spikes()
