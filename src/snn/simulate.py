@@ -82,7 +82,8 @@ class SNNSimulator:
                 tf_spikes.append(tf_layer)
             return tf_spikes
 
-    def plot_membranes(self, col_width: float = 5.0, row_height: float = 2.5,
+    def plot_membranes(self, col_width: float = 10.0, row_height: float = 2.5,
+                          title: str = None,
              savepath: str | Path = None, show: bool = True):
         
         thr = self.network.thresholds
@@ -99,9 +100,9 @@ class SNNSimulator:
                             threshold=thr[i], tf_post=spike_times[i][j])
                 
         # Labelling
-        fig.supxlabel("Time (ms)", fontsize=8)
-        fig.supylabel("Membrane Potential", fontsize=8)
-        fig.suptitle("Membrane Potentials", fontsize=20)
+        fig.supxlabel(f"Time ({self.dt} s)", fontsize=16, y=0.07)
+        fig.supylabel("Membrane Potential", fontsize=16, ha='center', x=0.1)
+        fig.suptitle(title if title is not None else "Membrane Potentials", fontsize=20, y=0.9)
         
         if savepath is not None:
             plt.savefig(savepath, bbox_inches='tight')
@@ -112,7 +113,8 @@ class SNNSimulator:
 
 
     def plot_spikes(self, x_scale: float = 0.2, y_scale: float = 0.5,
-                    y_eps: float = 0.5, x_eps: float = 0.02, spk_eps: float = 0.25, cmap = "viridis",
+                    y_eps: float = 0.5, x_eps: float = 0.02, spk_eps: float = 0.25, cmap = None,
+                    title: str = None,
                     savepath: str | Path = None, show: bool = True):
         """
         Plot spike trains with time on x-axis and neuron index on y-axis.
@@ -131,8 +133,11 @@ class SNNSimulator:
             n_neurons = layer_spikes.shape[0]
             n_id, t_spk = np.where(layer_spikes)
             # ax.scatter(t_spk, n_id, marker="|")
-            cm = mpl.colormaps[cmap]
-            ax.vlines(t_spk, n_id - spk_eps, n_id + spk_eps, color=cm(n_id / (n_neurons - 1)), alpha=1.0, linewidth=2)
+            if cmap is None:
+                cm = "black"
+            else:
+                cm = mpl.colormaps[cmap](n_id / (n_neurons - 1))
+            ax.vlines(t_spk, n_id - spk_eps, n_id + spk_eps, color=cm, alpha=1.0, linewidth=2)
             # ax.vlines(spike_times, i, i+1, color='black', alpha=0.5)
             ax.set_ylim(0 - y_eps, n_neurons - 1 + y_eps)
             ax.set_xlim(0 - x_eps, self.num_steps + x_eps)
@@ -144,8 +149,37 @@ class SNNSimulator:
             ax.xaxis.grid(visible=True, which="both", color="gray", linewidth=0.5, alpha=0.2)
         ax.set_xlabel(f"Time ({self.dt} s)")
         # ax.set_ylabel("Neuron Index")
-        fig.suptitle("Spike Trains")
+        fig.suptitle(title if title is not None else "Spike Trains", fontsize=20)
         fig.supylabel("Neuron Index")
+        plt.show()
+
+    def plot_weights(self, div: int = 5, col_width: float = 6.0, row_height: float = 8.0,
+                    title: str = None, cmap: str = "gray",
+                    savepath: str | Path = None, show: bool = True):
+        num_layers = len(self.network.synapse_layers)
+
+        ts = np.linspace(0, self.num_steps-1, div+1).astype(int)
+
+        fig, axs = plt.subplots(num_layers, div+1, figsize=(col_width*div, row_height))
+
+        mpl.rcParams.update({"font.size": np.prod(fig.get_size_inches())/16})
+
+        cmap = mpl.colormaps[cmap].reversed()
+
+        for l in range(num_layers):
+            for i, t in enumerate(ts):
+                im = self.weight_recorder.values[l][:, :, t]
+                ax = axs[i]
+                ax.imshow(im, cmap=cmap, vmin=0, vmax=1)
+                ax.set_title(f"t={t}")
+                ax.set(xticks=[], yticks=[])
+
+        fig.supxlabel("Post-synaptic Neuron", y=0.2)
+        fig.supylabel("Pre-synaptic Neuron", x=0.1)
+        fig.suptitle(title if title is not None else "Synaptic Weights", fontsize=20, y=0.995)
+        fig.colorbar(mpl.cm.ScalarMappable(norm=mpl.colors.Normalize(vmin=0, vmax=1), cmap=cmap), ax=axs,  
+                     orientation="horizontal", fraction=0.05, aspect=100, label="Weight")
+        fig.subplots_adjust(wspace=0.0, left=0.1, bottom=0.2)
         plt.show()
 
 
