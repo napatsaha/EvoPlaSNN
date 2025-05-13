@@ -73,7 +73,7 @@ class SNN:
             synapse = SynapseLayer(pre_layer, post_layer, learning_rule=self.learning_rule, **self.synapse_params)
             self.synapse_layers.append(synapse)
     
-    def forward(self, spike_in):
+    def forward(self, spike_in:np.array) -> np.ndarray:
         curr = spike_in
         for i in range(self.num_layers - 1):
             spk = self.neuron_layers[i].forward(curr)

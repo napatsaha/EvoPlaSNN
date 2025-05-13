@@ -19,10 +19,16 @@ def trace_dx2(x, tau, spk, A):
     dx = - x / tau + spk * A * (1 - x)
     return dx
 
-def trace_dx3(x, tau, spk):
+# def trace_dx3(x, tau, spk):
+#     "Goes up to a fixed value 1"
+#     dx = trace_dx2(x, tau, spk, A=1.0)
+#     return dx
+
+def trace_x3(t, dt, tau, A):
     "Goes up to a fixed value 1"
-    dx = trace_dx2(x, tau, spk, A=1.0)
-    return dx
+    t = t * dt
+    x = A * np.exp(-t / tau)
+    return x
 
 
 class NeuronLayer:
@@ -97,9 +103,9 @@ class NeuronLayer:
         elif self.trace_type == "dx2":
             self.trace = self.trace + trace_dx2(self.trace, self.tau_trace/self.dt, self.spike, self.trace_amp)
         elif self.trace_type == "dx3":
-            self.trace = self.trace + trace_dx3(self.trace, self.tau_trace/self.dt, self.spike)
+            self.trace = trace_x3(self.tssp, self.dt, self.tau_trace, self.trace_amp)
 
-        return self.trace
+        # return self.trace
 
     # def get_trace(self):
     #     """
