@@ -33,13 +33,13 @@ def plot_membranes(ax: Axes, mem: np.ndarray, *, threshold: float = None, tf_pre
     ymid = (ymax + ymin) / 2
     eps = (ymax - ymin) * 0.1
 
-    ax.plot(mem, color='blue', **kwargs)
+    ax.plot(mem, **kwargs)
     if tf_pre is not None:
         ax.vlines(x=tf_pre, ymin=ymin-eps, ymax=ymid - 2*eps, color='gray', alpha=0.5, linestyles='dotted')
     if tf_post is not None:
-        ax.vlines(x=tf_post, ymin=ymid + 2*eps, ymax=ymax+eps, color='gray', alpha=0.7, linestyles='--')
+        ax.vlines(x=tf_post, ymin=ymid + 2*eps, ymax=ymax+eps, color='gray', alpha=0.7, linestyles='dotted')
     if threshold is not None:
-        ax.axhline(y=threshold, color='blue', linestyle='--', alpha=0.5)
+        ax.axhline(y=threshold, color='black', linestyle='--', alpha=0.5)
     ax.set_xlim(0, T)
     ax.xaxis.set_minor_locator(ticker.MultipleLocator(1))
     ax.set_ylim(ymin - eps, ymax + eps)

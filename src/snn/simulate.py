@@ -68,13 +68,13 @@ class SNNSimulator:
                 for i, weights in enumerate(self.network.weights):
                     self.weight_recorder.record(i, t, weights)
 
-    def get_spike_times(self) -> List[List[np.ndarray]] | None:
+    def get_spike_times(self, start=0, end=None) -> List[List[np.ndarray]] | None:
         if self.spk_recorder is None:
             Warning("Spike recording is not enabled.")
             return None
         else:
             tf_spikes = []
-            for layer_spikes in self.spk_recorder.values:
+            for layer_spikes in self.spk_recorder.values[start:end]:
                 tf_layer = []
                 for neuron in range(layer_spikes.shape[0]):
                     tf_neuron = np.where(layer_spikes[neuron, :])[0]
@@ -82,22 +82,41 @@ class SNNSimulator:
                 tf_spikes.append(tf_layer)
             return tf_spikes
 
-    def plot_membranes(self, col_width: float = 10.0, row_height: float = 2.5,
-                          title: str = None,
-             savepath: str | Path = None, show: bool = True):
-        
-        thr = self.network.thresholds
-        spike_times = self.get_spike_times()
+    def plot_membranes(self, col_width: float = 10.0, row_height: float = 2.5, title: str = None, plot_inputs: bool = True, 
+                       color: str = "blue", cmap: str = None, cmap_range: tuple = (0, 1),
+                    savepath: str | Path = None, show: bool = True):
+        """
+        Plot membrane potentials of all neurons in the network.
+        """
+        assert self.record_membrane, "Membrane recording is not enabled."
+        assert self.record_spikes, "Spike recording is not enabled."
 
-        nrows = max(self.mem_recorder.layer_sizes)
-        ncols = len(self.mem_recorder.layer_sizes)
+        if cmap is None:
+            cm = color
+        else:
+            cm = mpl.colormaps[cmap]
+
+        thr = self.network.thresholds if plot_inputs else self.network.thresholds[1:]
+        spike_times = self.get_spike_times() if plot_inputs else self.get_spike_times(start=1)
+        mem_values = self.mem_recorder.values if plot_inputs else self.mem_recorder.values[1:]
+
+        layer_sizes = self.mem_recorder.layer_sizes if plot_inputs else self.mem_recorder.layer_sizes[1:]
+        nrows = max(layer_sizes)
+        ncols = len(layer_sizes)
         fig = plt.figure(figsize=(col_width*ncols, row_height*nrows))
         gs = fig.add_gridspec(nrows, ncols)
 
-        for i, layer_mem in enumerate(self.mem_recorder.values):
-            for j in range(layer_mem.shape[0]):
+        for i in range(ncols):
+            layer_mem = mem_values[i]
+            n_neurons = layer_mem.shape[0]
+            for j in range(n_neurons):
+                if cmap is None:
+                    c = cm
+                else:
+                    c = np.interp(j / (n_neurons - 1), (0, 1), cmap_range)
+                    c = cm(c)
                 plot_neuron(fig, gs[j, i], mem=layer_mem[j, :],
-                            threshold=thr[i], tf_post=spike_times[i][j])
+                            threshold=thr[i], tf_post=spike_times[i][j], color=c)
                 
         # Labelling
         fig.supxlabel(f"Time ({self.dt} s)", fontsize=16, y=0.07)
@@ -113,17 +132,21 @@ class SNNSimulator:
 
 
     def plot_spikes(self, x_scale: float = 0.2, y_scale: float = 0.5,
-                    y_eps: float = 0.5, x_eps: float = 0.02, spk_eps: float = 0.25, cmap = None,
-                    title: str = None,
-                    savepath: str | Path = None, show: bool = True):
+                    y_eps: float = 0.5, x_eps: float = 0.02, spk_eps: float = 0.25, 
+                    title: str = None, cmap = None, color: str = "black", cmap_range: tuple = (0, 1),
+                    linewidth=2,
+                    savepath: str | Path = None, show: bool = True, **kwargs):
         """
         Plot spike trains with time on x-axis and neuron index on y-axis.
         """
-        # x_scale = 0.2
-        # y_scale = 0.5
-        # y_eps = 0.5
+        assert self.record_spikes, "Spike recording is not enabled."
+
         x_eps = x_eps * self.num_steps
-        # spk_eps = 0.25
+        if cmap is None:
+            cm = color
+        else:
+            cm = mpl.colormaps[cmap]        
+
         num_layers = self.network.num_layers
         layer_sizes = self.network.layer_sizes
         fig, axs = plt.subplots(num_layers, 1, gridspec_kw={"hspace": 0.0}, sharex=True, height_ratios=layer_sizes[::-1], 
@@ -133,11 +156,16 @@ class SNNSimulator:
             n_neurons = layer_spikes.shape[0]
             n_id, t_spk = np.where(layer_spikes)
             # ax.scatter(t_spk, n_id, marker="|")
+            # if cmap is None:
+            #     cm = "black"
+            # else:
+            #     cm = mpl.colormaps[cmap](n_id / (n_neurons - 1))
             if cmap is None:
-                cm = "black"
+                c = cm
             else:
-                cm = mpl.colormaps[cmap](n_id / (n_neurons - 1))
-            ax.vlines(t_spk, n_id - spk_eps, n_id + spk_eps, color=cm, alpha=1.0, linewidth=2)
+                c = np.interp(n_id / (n_neurons - 1), (0, 1), cmap_range)
+                c = cm(c)
+            ax.vlines(t_spk, n_id - spk_eps, n_id + spk_eps, color=c, linewidth=linewidth, **kwargs)
             # ax.vlines(spike_times, i, i+1, color='black', alpha=0.5)
             ax.set_ylim(0 - y_eps, n_neurons - 1 + y_eps)
             ax.set_xlim(0 - x_eps, self.num_steps + x_eps)
@@ -145,13 +173,71 @@ class SNNSimulator:
             ax.set_yticklabels(np.arange(n_neurons))
             ax.set_ylabel(f"Layer {i}", rotation=90, ha="center")
             # X Grid
+            ax.xaxis.set_major_locator(ticker.MultipleLocator(10))
             ax.xaxis.set_minor_locator(ticker.MultipleLocator(1))
             ax.xaxis.grid(visible=True, which="both", color="gray", linewidth=0.5, alpha=0.2)
         ax.set_xlabel(f"Time ({self.dt} s)")
         # ax.set_ylabel("Neuron Index")
         fig.suptitle(title if title is not None else "Spike Trains", fontsize=20)
         fig.supylabel("Neuron Index")
-        plt.show()
+        if savepath is not None:
+            plt.savefig(savepath)
+        if show:
+            plt.show()
+        plt.close(fig)
+
+    def plot_traces(self, x_scale: float = 0.2, y_scale: float = 1.0,
+                    y_eps: float = 0.1, x_eps: float = 0.0, trace_scale: float = 0.8, 
+                    title: str = None, cmap = None, color: str = "black", cmap_range: tuple = (0, 1),
+                    savepath: str | Path = None, show: bool = True, **kwargs):
+        """
+        Plot traces
+        """
+        assert self.record_traces, "Trace recording is not enabled."
+
+        x_eps = x_eps * self.num_steps
+        if cmap is None:
+            cm = color
+        else:
+            cm = mpl.colormaps[cmap]
+
+        num_layers = self.network.num_layers
+        layer_sizes = self.network.layer_sizes
+        fig, axs = plt.subplots(num_layers, 1, gridspec_kw={"hspace": 0.0}, sharex=True, height_ratios=layer_sizes[::-1], 
+                               figsize=(self.num_steps * x_scale, sum(layer_sizes) * y_scale), layout="constrained")
+        for i, layer_traces in enumerate(reversed(self.trace_recorder.values)):
+            ax = axs[i]
+            n_neurons = layer_traces.shape[0]
+
+            for j in range(n_neurons):
+                if cmap is None:
+                    c = cm
+                else:
+                    c = np.interp(j / (n_neurons - 1), (0, 1), cmap_range)
+                    c = cm(c)
+                y = layer_traces[j, :]
+                y = np.interp(y, (0, y.max()), (j, j + trace_scale))
+                ax.plot(y, color=c, alpha=1.0, drawstyle='steps-post', **kwargs)
+
+            ax.set_ylim(0 - y_eps, n_neurons + y_eps)
+            ax.set_xlim(0 - x_eps, self.num_steps + x_eps)
+            ax.set_yticks(np.arange(n_neurons))
+            ax.set_yticklabels(np.arange(n_neurons))
+            ax.set_ylabel(f"Layer {i}", rotation=90, ha="center")
+            # X Grid
+            ax.xaxis.set_major_locator(ticker.MultipleLocator(10))
+            ax.xaxis.set_minor_locator(ticker.MultipleLocator(1))
+            ax.xaxis.grid(visible=True, which="both", color="gray", linewidth=0.5, alpha=0.2)
+
+        ax.set_xlabel(f"Time ({self.dt} s)", fontsize=16)
+        # ax.set_ylabel("Neuron Index")
+        fig.suptitle(title if title is not None else "Neuron Traces", fontsize=20)
+        fig.supylabel("Neuron Index", fontsize=16)
+        if savepath is not None:
+            plt.savefig(savepath)
+        if show:
+            plt.show()
+        plt.close(fig)
 
     def plot_weights(self, div: int = 5, col_width: float = 6.0, row_height: float = 8.0,
                     title: str = None, cmap: str = "gray",
@@ -160,23 +246,23 @@ class SNNSimulator:
 
         ts = np.linspace(0, self.num_steps-1, div+1).astype(int)
 
-        fig, axs = plt.subplots(num_layers, div+1, figsize=(col_width*div, row_height))
-
-        mpl.rcParams.update({"font.size": np.prod(fig.get_size_inches())/16})
+        fig, axs = plt.subplots(num_layers, div+1, figsize=(col_width*div, row_height), squeeze=False)
+        fs = np.prod(fig.get_size_inches())/16
+        # mpl.rcParams.update({"font.size": np.prod(fig.get_size_inches())/16})
 
         cmap = mpl.colormaps[cmap].reversed()
 
         for l in range(num_layers):
             for i, t in enumerate(ts):
                 im = self.weight_recorder.values[l][:, :, t]
-                ax = axs[i]
+                ax = axs[l, i]
                 ax.imshow(im, cmap=cmap, vmin=0, vmax=1)
-                ax.set_title(f"t={t}")
+                ax.set_title(f"t={t}", fontsize=fs*0.8)
                 ax.set(xticks=[], yticks=[])
 
-        fig.supxlabel("Post-synaptic Neuron", y=0.2)
-        fig.supylabel("Pre-synaptic Neuron", x=0.1)
-        fig.suptitle(title if title is not None else "Synaptic Weights", fontsize=20, y=0.995)
+        fig.supxlabel("Post-synaptic Neuron", y=0.2, fontsize=fs)
+        fig.supylabel("Pre-synaptic Neuron", x=0.1, fontsize=fs)
+        fig.suptitle(title if title is not None else "Synaptic Weights", fontsize=1.2*fs, y=0.995)
         fig.colorbar(mpl.cm.ScalarMappable(norm=mpl.colors.Normalize(vmin=0, vmax=1), cmap=cmap), ax=axs,  
                      orientation="horizontal", fraction=0.05, aspect=100, label="Weight")
         fig.subplots_adjust(wspace=0.0, left=0.1, bottom=0.2)
