@@ -25,6 +25,12 @@ class SpikeGenerator(ABC):
         """
         return np.zeros(self.input_size, dtype=np.int8)
 
+    def return_signal(self) -> bool | int:
+        """
+        Depending on subclass, returns a signal that would help in updating synapses.
+        """
+        return False
+
 
 class RandomSpikeGenerator(SpikeGenerator):
     """
@@ -54,10 +60,13 @@ class PatternSpikeGenerator(SpikeGenerator):
     Generates a pattern of sequential spikes for each neuron in the input layer.
     Delays between spikes can be specified by the interval argument.
     """
-    def __init__(self, input_size: int, interval: float, *, spacing: int = None, ascending: bool = True, start_spike: bool = True, seed=None):
+    def __init__(self, input_size: int, interval: float, *, spacing: int = None, 
+                 signal_on_end: bool = False,
+                 ascending: bool = True, start_spike: bool = True, seed=None):
         super().__init__(input_size, seed)
         self.interval = np.abs(interval).item()
         self.spacing = spacing if spacing is not None else interval
+        self.signal_on_end = signal_on_end
         self.ascending = ascending
         self.start_spike = start_spike
         self.delay_count = self.interval if start_spike else 0
@@ -111,6 +120,18 @@ class PatternSpikeGenerator(SpikeGenerator):
 
                 return spikes
 
+    def return_signal(self) -> bool | int:
+        """
+        Returns a signal that indicates whether the pattern is finished.
+        """
+        if self.signal_on_end:
+            if self.finished:
+                return True
+            else:
+                return False
+        else:
+            return True
+
     def __len__(self):
         return self.interval * (self.input_size - 1) + self.spacing
 
@@ -132,8 +153,8 @@ class BinaryClassGenerator(SpikeGenerator):
         self.current_class = 0 if starting_class == "ascending" else 1
         self.count = 0
         self.switch = False
-        self.finished = False
-        self.ready = False
+        self._finished = False
+        self._ready = False
 
     def _generate_spikes(self):
         self.count += 1
@@ -156,13 +177,16 @@ class BinaryClassGenerator(SpikeGenerator):
     
     def generate(self) -> np.ndarray:
         spikes, finished = self._generate_spikes()
-        self.ready = finished and not self.finished
-        self.finished = finished
+        self._ready = finished and not self._finished
+        self._finished = finished
 
         return spikes
         
+    def return_signal(self):
+        return self._ready
+
     def get_label(self) -> None | int:
-        if not self.ready:
+        if not self._ready:
             return None
         else:
             return self.current_class

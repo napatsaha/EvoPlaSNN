@@ -81,9 +81,9 @@ class SNN:
         spike_out = self.neuron_layers[-1].forward(curr)
         return spike_out
 
-    def update_synapses(self):
+    def update_synapses(self, reward=None):
         for synapse in self.synapse_layers:
-            synapse.update()
+            synapse.update(reward)
 
     @property
     def membranes(self):

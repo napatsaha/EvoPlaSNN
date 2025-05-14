@@ -36,17 +36,16 @@ class SNNSimulator:
         for t in range(self.num_steps):
             # Random input spikes
             spk_in = self.spike_generator.generate()
-            if isinstance(self.spike_generator, BinaryClassGenerator):
-                can_update = self.spike_generator.ready
-            else:
-                can_update = True
+            update_signal = self.spike_generator.return_signal()
+
 
             # Forward pass
             spk_out = self.network.forward(spk_in)
 
             # Update synaptic weights
-            if can_update and self.learning_rule is not None:
-                self.network.update_synapses()
+            if self.learning_rule is not None:
+                if update_signal:
+                    self.network.update_synapses(update_signal)
             
             # Record membrane potentials
             if self.record_membrane:

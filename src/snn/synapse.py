@@ -1,6 +1,6 @@
 import numpy as np
 from .neurons import NeuronLayer
-from .lrule import LearningRule, Empty_Rule, STDP_Rule
+from .lrule import ANN_Rule, LearningRule, Empty_Rule, STDP_Rule
 
 
 class SynapseLayer:
@@ -24,6 +24,7 @@ class SynapseLayer:
         self.pre_layer = pre_layer
         self.post_layer = post_layer
         self.learning_rule = learning_rule if learning_rule is not None else Empty_Rule()
+        self._learning_rule_type = self._get_lrule_type()
 
         # Initialize weights
         self.weight_init = weight_init
@@ -36,6 +37,14 @@ class SynapseLayer:
             self.weights = np.random.uniform(low, high, size=(self.pre_layer.size, self.post_layer.size))
         else:
             raise NotImplementedError("Other weight initialisation methods not implemented yet")
+
+    def _get_lrule_type(self):
+        if isinstance(self.learning_rule, STDP_Rule):
+            return "STDP"
+        elif isinstance(self.learning_rule, ANN_Rule):
+            return "ANN"
+        elif isinstance(self.learning_rule, Empty_Rule):
+            return None
 
     def _tile(self, vec_in: np.ndarray, vec_out: np.ndarray) -> np.ndarray:
         """
@@ -58,14 +67,16 @@ class SynapseLayer:
         output_current = np.dot(spike_input, self.weights)
         return output_current
     
-    def update(self):
+    def update(self, reward=None):
         """
         Update the synaptic weights based on the learning rule.
         """
-        if isinstance(self.learning_rule, STDP_Rule):
+        if self._learning_rule_type == "STDP":
+            # For STDP Rule
             trace_pre, trace_post = self._tile(self.pre_layer.get_trace(), self.post_layer.get_trace())
             spk_pre, spk_post = self._tile(self.pre_layer.spike, self.post_layer.spike)
-            self.weights = self.learning_rule.update(self.weights, spk_pre, spk_post, trace_pre, trace_post)
-        else:
+            self.weights = self.learning_rule.update(self.weights, spk_pre, spk_post, trace_pre, trace_post, reward=reward)
+        elif self._learning_rule_type is None:
             # For Empty Rule
-            self.weights = self.learning_rule.update(self.weights)
+            return 
+            # self.weights = self.learning_rule.update(self.weights)
