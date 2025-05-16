@@ -83,9 +83,11 @@ class STDP_Rule(LearningRule):
             else:
                 dw = 0
 
+        w = w + dw        
+
         # Clip the weights
         if self.clip_w:
-            w = np.clip(w + dw, self.w_min, self.w_max)
+            w = np.clip(w, self.w_min, self.w_max)
         return w
 
 
