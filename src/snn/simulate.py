@@ -13,10 +13,10 @@ from .spikegen import BinaryClassGenerator, SpikeGenerator
 
 
 class SNNSimulator:
-    def __init__(self, network: SNN, num_steps: int, spike_generator: SpikeGenerator, *, 
+    def __init__(self, network: SNN, spike_generator: SpikeGenerator, *, 
                  record_membrane: bool = True, record_spikes: bool = True, record_traces: bool = True, record_weights: bool = False):
         self.network = network
-        self.num_steps = num_steps
+        self.num_steps = 0
         self.spike_generator = spike_generator
         self.learning_rule = network.learning_rule
 
@@ -25,15 +25,17 @@ class SNNSimulator:
         self.record_spikes = record_spikes
         self.record_traces = record_traces
         self.record_weights = record_weights
-        self.mem_recorder = LayerRecorder(network.layer_sizes_active, num_steps) if self.record_membrane else None
-        self.spk_recorder = LayerRecorder(network.layer_sizes, num_steps, dtype=np.int8) if self.record_spikes else None
-        self.trace_recorder = LayerRecorder(network.layer_sizes, num_steps, dtype=np.float32) if self.record_traces else None
-        self.weight_recorder = MatrixRecorder([synapse.weights.shape for synapse in network.synapse_layers], num_steps) if self.record_weights else None
+        self.mem_recorder = LayerRecorder(network.layer_sizes_active) if self.record_membrane else None
+        self.spike_recorder = LayerRecorder(network.layer_sizes, dtype=np.int8) if self.record_spikes else None
+        self.trace_recorder = LayerRecorder(network.layer_sizes, dtype=np.float32) if self.record_traces else None
+        self.weight_recorder = MatrixRecorder([synapse.weights.shape for synapse in network.synapse_layers]) if self.record_weights else None
 
         self.dt = network.dt
 
-    def run(self):
-        for t in range(self.num_steps):
+    def run(self, num_steps: int):
+        t_start = self.num_steps
+        self._setup_run(num_steps)
+        for t in range(t_start, self.num_steps):
             # Random input spikes
             spk_in = self.spike_generator.generate()
             update_signal = self.spike_generator.return_signal()
@@ -55,7 +57,7 @@ class SNNSimulator:
             # Record spikes
             if self.record_spikes:
                 for i, spikes in enumerate(self.network.spikes):
-                    self.spk_recorder.record(i, t, spikes)
+                    self.spike_recorder.record(i, t, spikes)
 
             # Record traces
             if self.record_traces:
@@ -68,12 +70,12 @@ class SNNSimulator:
                     self.weight_recorder.record(i, t, weights)
 
     def get_spike_times(self, start=0, end=None) -> List[List[np.ndarray]] | None:
-        if self.spk_recorder is None:
+        if self.spike_recorder is None:
             Warning("Spike recording is not enabled.")
             return None
         else:
             tf_spikes = []
-            for layer_spikes in self.spk_recorder.values[start:end]:
+            for layer_spikes in self.spike_recorder.values[start:end]:
                 tf_layer = []
                 for neuron in range(layer_spikes.shape[0]):
                     tf_neuron = np.where(layer_spikes[neuron, :])[0]
@@ -81,8 +83,22 @@ class SNNSimulator:
                 tf_spikes.append(tf_layer)
             return tf_spikes
 
+    def _setup_run(self, num_steps: int):
+        """
+        Setup the run by initializing the recorders.
+        """
+        self.num_steps += num_steps
+        if self.record_membrane:
+            self.mem_recorder.setup(num_steps)
+        if self.record_spikes:
+            self.spike_recorder.setup(num_steps)
+        if self.record_traces:
+            self.trace_recorder.setup(num_steps)
+        if self.record_weights:
+            self.weight_recorder.setup(num_steps)
+
     def plot_membranes(self, col_width: float = 10.0, row_height: float = 2.5, title: str = None, plot_inputs: bool = True, 
-                       color: str = "blue", cmap: str = None, cmap_range: tuple = (0, 1),
+                       color: str = "blue", cmap: str = None, cmap_range: tuple = (0, 1), ylim = None,
                     savepath: str | Path = None, show: bool = True):
         """
         Plot membrane potentials of all neurons in the network.
@@ -133,7 +149,7 @@ class SNNSimulator:
     def plot_spikes(self, x_scale: float = 0.2, y_scale: float = 0.5,
                     y_eps: float = 0.5, x_eps: float = 0.02, spk_eps: float = 0.25, 
                     title: str = None, cmap = None, color: str = "black", cmap_range: tuple = (0, 1),
-                    linewidth=2,
+                    linewidth=2, x_min = 0,
                     savepath: str | Path = None, show: bool = True, **kwargs):
         """
         Plot spike trains with time on x-axis and neuron index on y-axis.
@@ -149,8 +165,8 @@ class SNNSimulator:
         num_layers = self.network.num_layers
         layer_sizes = self.network.layer_sizes
         fig, axs = plt.subplots(num_layers, 1, gridspec_kw={"hspace": 0.0}, sharex=True, height_ratios=layer_sizes[::-1], 
-                               figsize=(self.num_steps * x_scale, sum(layer_sizes) * y_scale), layout="constrained")
-        for i, layer_spikes in enumerate(reversed(self.spk_recorder.values)):
+                               figsize=((self.num_steps - x_min) * x_scale, sum(layer_sizes) * y_scale), layout="constrained")
+        for i, layer_spikes in enumerate(reversed(self.spike_recorder.values)):
             ax = axs[i]
             n_neurons = layer_spikes.shape[0]
             n_id, t_spk = np.where(layer_spikes)
@@ -167,7 +183,7 @@ class SNNSimulator:
             ax.vlines(t_spk, n_id - spk_eps, n_id + spk_eps, color=c, linewidth=linewidth, **kwargs)
             # ax.vlines(spike_times, i, i+1, color='black', alpha=0.5)
             ax.set_ylim(0 - y_eps, n_neurons - 1 + y_eps)
-            ax.set_xlim(0 - x_eps, self.num_steps + x_eps)
+            ax.set_xlim(x_min - x_eps, self.num_steps + x_eps)
             ax.set_yticks(np.arange(n_neurons))
             ax.set_yticklabels(np.arange(n_neurons))
             ax.set_ylabel(f"Layer {i}", rotation=90, ha="center")
@@ -186,7 +202,7 @@ class SNNSimulator:
         plt.close(fig)
 
     def plot_traces(self, x_scale: float = 0.2, y_scale: float = 1.0,
-                    y_eps: float = 0.1, x_eps: float = 0.0, trace_scale: float = 0.8, 
+                    y_eps: float = 0.1, x_eps: float = 0.0, trace_scale: float = 0.8, x_min = 0,
                     title: str = None, cmap = None, color: str = "black", cmap_range: tuple = (0, 1),
                     savepath: str | Path = None, show: bool = True, **kwargs):
         """
@@ -203,7 +219,7 @@ class SNNSimulator:
         num_layers = self.network.num_layers
         layer_sizes = self.network.layer_sizes
         fig, axs = plt.subplots(num_layers, 1, gridspec_kw={"hspace": 0.0}, sharex=True, height_ratios=layer_sizes[::-1], 
-                               figsize=(self.num_steps * x_scale, sum(layer_sizes) * y_scale), layout="constrained")
+                               figsize=((self.num_steps - x_min) * x_scale, sum(layer_sizes) * y_scale), layout="constrained")
         for i, layer_traces in enumerate(reversed(self.trace_recorder.values)):
             ax = axs[i]
             n_neurons = layer_traces.shape[0]
@@ -219,7 +235,7 @@ class SNNSimulator:
                 ax.plot(y, color=c, alpha=1.0, drawstyle='steps-post', **kwargs)
 
             ax.set_ylim(0 - y_eps, n_neurons + y_eps)
-            ax.set_xlim(0 - x_eps, self.num_steps + x_eps)
+            ax.set_xlim(x_min - x_eps, self.num_steps + x_eps)
             ax.set_yticks(np.arange(n_neurons))
             ax.set_yticklabels(np.arange(n_neurons))
             ax.set_ylabel(f"Layer {i}", rotation=90, ha="center")

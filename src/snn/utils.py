@@ -82,13 +82,27 @@ def plot_neuron(fig: Figure, gs: gridspec.GridSpec, mem: np.ndarray, *, tf_pre: 
 
 
 class MatrixRecorder:
-    def __init__(self, layer_shapes: List[tuple], total_timesteps: int, dtype=np.float32):
-        self.layer_shapes = layer_shapes
+    def __init__(self, layer_shapes: List[tuple], total_timesteps: int = 0, dtype=np.float32):
+        self.layer_shapes: List[tuple] = layer_shapes
         self.total_timesteps = total_timesteps
         self.dtype = dtype
         self.values = [np.zeros((layer_shape[0], layer_shape[1], total_timesteps), dtype=dtype) for layer_shape in layer_shapes]
     
+    def setup(self, num_steps: int):
+        self.total_timesteps += num_steps
+        # Concatenate the existing values with new zeros
+        for i, layer_shape in enumerate(self.layer_shapes):
+            z = np.zeros((layer_shape[0], layer_shape[1], num_steps), dtype=self.dtype)
+            self.values[i] = np.concatenate((self.values[i], z), axis=2)
+
+    def reset(self):
+        self.total_timesteps = 0
+        for i, layer_shape in enumerate(self.layer_shapes):
+            self.values[i] = np.zeros((layer_shape[0], layer_shape[1], self.total_timesteps), dtype=self.dtype)
+
     def record(self, layer_index: int, timestep: int, value: np.ndarray):
+        if self.total_timesteps == 0:
+            raise ValueError("Recorder has not been initialized with total_timesteps.")
         assert value.shape == (self.layer_shapes[layer_index][0], self.layer_shapes[layer_index][1]), \
             f"Expected shape {(self.layer_shapes[layer_index][0], self.layer_shapes[layer_index][1])}, got {value.shape}"
         assert 0 <= layer_index < len(self.layer_shapes), \
@@ -100,11 +114,23 @@ class MatrixRecorder:
 
 
 class LayerRecorder:
-    def __init__(self, layer_sizes: List[int], total_timesteps: int, dtype=np.float32):
+    def __init__(self, layer_sizes: List[int], total_timesteps: int = 0, dtype=np.float32):
         self.layer_sizes = layer_sizes
         self.total_timesteps = total_timesteps
         self.dtype = dtype
         self.values = [np.zeros((layer_size, total_timesteps), dtype=dtype) for layer_size in layer_sizes]
+    
+    def setup(self, num_steps: int):
+        self.total_timesteps += num_steps
+        # Concatenate the existing values with new zeros
+        for i, layer_size in enumerate(self.layer_sizes):
+            z = np.zeros((layer_size, num_steps), dtype=self.dtype)
+            self.values[i] = np.concatenate((self.values[i], z), axis=1)
+
+    def reset(self):
+        self.total_timesteps = 0
+        for i, layer_size in enumerate(self.layer_sizes):
+            self.values[i] = np.zeros((layer_size, self.total_timesteps), dtype=self.dtype)
 
     def record(self, layer_index: int, timestep: int, value: np.ndarray):
         assert value.shape == (self.layer_sizes[layer_index],), \
