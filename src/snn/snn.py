@@ -16,6 +16,7 @@ class SNN:
 
     def __init__(self, input_size: int, hidden_size: list[int] | int | None, output_size: int, dt, *, 
                  learning_rule: LearningRule = None, synapse_params: dict = None, neuron_params: dict = None,
+                 winner_take_all: bool = False,
                 #  tau_mem: float | List[float] = 5e-3, tau_trace: float | List[float] = 1e-1, threshold: float | List[float] = 1.0, 
                 #  membrane_start: float = 0.0, reset_mechanism = "subtract"
                  ):
@@ -42,11 +43,7 @@ class SNN:
         self.dt = dt
 
         # Store neuron and synapse parameters
-        # self.tau_mem = tau_mem
-        # self.tau_trace = tau_trace
-        # self.threshold = threshold
-        # self.membrane_start = membrane_start
-        # self.reset_mechanism = reset_mechanism
+        self.winner_take_all = winner_take_all
         self.neuron_params = [
             {k: v if not isinstance(v, list | tuple) else v[(self.num_layers + i) % len(v)] for k, v in neuron_params.items()} \
             for i in range(self.num_layers)
@@ -57,6 +54,10 @@ class SNN:
         # Create each neuron layers
         self.neuron_layers = []
         for i, layer_size in enumerate(self.layer_sizes_active):
+            if self.winner_take_all and i > 0:
+                self.neuron_params[i]["wta"] = True
+            else:
+                self.neuron_params[i]["wta"] = False
             layer = NeuronLayer(layer_size, dt=self.dt, **self.neuron_params[i]
                                 # tau_mem=tau_mem if isinstance(tau_mem, float) else tau_mem[i],
                                 # tau_trace=tau_trace if isinstance(tau_trace, float) else tau_trace[i],
@@ -110,8 +111,10 @@ class SNN:
 
     def __str__(self):
         s = "SpikingNetwork(\n"
-        for w in self.weights:
-            s += f"  {w.shape}\n"
+        for i in range(self.num_layers):
+            s += f"  {self.neuron_layers[i]},\n"
+            if i < self.num_layers - 1:
+                s += f"  {self.synapse_layers[i]},\n"
         s += ")\n"
         return s
    

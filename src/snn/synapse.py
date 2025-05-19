@@ -112,3 +112,7 @@ class SynapseLayer:
                 self.weights = self.weights / np.linalg.norm(self.weights, ord=p, axis=0, keepdims=True)
             else:
                 raise ValueError(f"Normalisation method {self.normalise_method} not recognised.")
+            
+
+    def __repr__(self):
+        return f"SynapseLayer({self.weights.shape})"

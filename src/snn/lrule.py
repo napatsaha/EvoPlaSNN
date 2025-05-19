@@ -33,7 +33,7 @@ class Empty_Rule(LearningRule):
 
 class STDP_Rule(LearningRule):
     def __init__(self, mu, lambd, alpha, dt, *,
-                 w_min: float = 0.0, w_max: float = 1.0, clip_w: bool = True,
+                #  w_min: float = 0.0, w_max: float = 1.0, clip_w: bool = True,
                   condition: Literal["on-spike", "on-reward"] = "on-spike"):
         super().__init__()
         self.mu = mu
@@ -41,9 +41,9 @@ class STDP_Rule(LearningRule):
         self.alpha = alpha
         # self.tau_trace = tau_trace
         self.dt = dt
-        self.w_min = w_min
-        self.w_max = w_max
-        self.clip_w = clip_w
+        # self.w_min = w_min
+        # self.w_max = w_max
+        # self.clip_w = clip_w
         assert condition in ("on-spike", "on-reward"), "Condition must be either 'on-spike' or 'on-reward'"
         self.condition = condition
 
@@ -86,8 +86,8 @@ class STDP_Rule(LearningRule):
         w = w + dw        
 
         # Clip the weights
-        if self.clip_w:
-            w = np.clip(w, self.w_min, self.w_max)
+        # if self.clip_w:
+        #     w = np.clip(w, self.w_min, self.w_max)
         return w
 
 

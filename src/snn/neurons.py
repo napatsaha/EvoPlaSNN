@@ -47,6 +47,7 @@ class NeuronLayer:
     Assumming each new spike resets the trace to its maximum value.
     """
     def __init__(self, size: int, *, tau_mem: float = 1e-1, tau_trace: float = 1e-1, dt: float = 1e-1, threshold: float = 1.0, 
+                 wta: bool = False,
                  membrane_start: float = 0.0, reset_mechanism: Literal["zero", "subtract"] = "zero",
                  trace_amp: float = 1.0, trace_type: Literal["dx1", "dx2", "dx3"] = "dx3"):
         # Basic parameters
@@ -64,6 +65,8 @@ class NeuronLayer:
         # Threshold parameters
         self.threshold = threshold
         self.reset_mechanism = reset_mechanism if reset_mechanism in ["zero", "subtract"] else "zero"
+        # Spike parameters
+        self.wta = wta
 
         # Membrane potential
         self.membrane = np.full((size,), membrane_start)
@@ -80,19 +83,32 @@ class NeuronLayer:
         """
         # Reset the membrane potential for spiking neurons
         if self.reset_mechanism == "zero":
-            self.membrane = np.where(self.spike, 0, self.membrane)
+            self.membrane = np.where(self.membrane >= self.threshold, 0, self.membrane)
         elif self.reset_mechanism == "subtract":
-            self.membrane = np.where(self.spike, self.membrane - self.threshold, self.membrane)
+            self.membrane = np.where(self.membrane >= self.threshold, self.membrane - self.threshold, self.membrane)
         # Calculate the new membrane potential
         self.membrane = self.beta_mem * self.membrane + input_current
         # Check for spikes
-        self.spike = (self.membrane >= self.threshold)
+        self._set_spike()
         # Update the time since last spike
         self.tssp = np.where(self.spike, 0, self.tssp + 1)
         # Update trace
         self.update_trace()
 
         return self.spike.astype(np.int8)
+
+    def _set_spike(self):
+        # Winner Takes All (WTA)
+        if self.wta:
+            self.spike.fill(0)
+            if np.all(self.membrane < self.threshold):
+                return
+            else:
+                idx = np.argmax(self.membrane)
+                self.spike[idx] = 1
+                return
+        else:
+            self.spike = (self.membrane >= self.threshold)
 
     def update_trace(self):
         """
@@ -118,7 +134,7 @@ class NeuronLayer:
         return self.trace
 
     def __repr__(self):
-        return f"NeuronLayer(size={self.size}, tau_mem={self.tau_mem}, tau_trace={self.tau_trace}, dt={self.dt}, threshold={self.threshold})"
+        return f"NeuronLayer(size={self.size}, tau_mem={self.tau_mem}, tau_trace={self.tau_trace}, threshold={self.threshold}, wta={self.wta})"
     def __str__(self):
         return self.__repr__()
     
