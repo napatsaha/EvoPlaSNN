@@ -61,15 +61,18 @@ class PatternSpikeGenerator(SpikeGenerator):
     Delays between spikes can be specified by the interval argument.
     """
     def __init__(self, input_size: int, interval: float, *, spacing: int = None, 
-                 signal_on_end: bool = False, starting_neuron: int = None,
+                 signal_on_end: bool = False, starting_neuron: int = None, loop: bool = False,
                  ascending: bool = True, start_spike: bool = True, seed=None):
         super().__init__(input_size, seed)
         self.interval = max(1, int(interval))
         self.spacing = max(1, int(spacing)) if spacing is not None else interval
         self.signal_on_end = signal_on_end
+
+        # Spiking behaviour
         self.ascending = ascending
         self.start_spike = start_spike
         self.starting_neuron = max(0, min(input_size - 1, starting_neuron)) if starting_neuron is not None else 0 if ascending else input_size - 1
+        self.max_spike_count = self.input_size if loop else self.input_size - self.starting_neuron if self.ascending else self.starting_neuron + 1
         self.direction = 1 if ascending else -1
         self.reset()
         # self.delay_count = self.interval if start_spike else 0
@@ -118,7 +121,7 @@ class PatternSpikeGenerator(SpikeGenerator):
                 self.current_neuron = (self.current_neuron + self.direction) % self.input_size
                 self.spike_count += 1
                 # Check if the pattern is finished
-                if self.spike_count >= self.input_size:
+                if self.spike_count >= self.max_spike_count:
                     self.finished = True
                     self.spike_count = 0
 
@@ -137,7 +140,7 @@ class PatternSpikeGenerator(SpikeGenerator):
             return True
 
     def __len__(self):
-        return self.interval * (self.input_size - 1) + self.spacing
+        return self.interval * (self.max_spike_count - 1) + self.spacing
 
 
 
@@ -147,13 +150,18 @@ class BinaryClassGenerator(SpikeGenerator):
     A SpikeGenerator that alternates between two classes of PatternSpikeGenerators with opposite directions.
     """
     def __init__(self, input_size, interval: int, *, spacing: int = None, start_spike: bool = True, 
-                 signal_on_end: bool = False,
+                 signal_on_end: bool = False, reflect: bool = False,
                  starting_class: Literal["ascending", "descending"] = "ascending", p: float = 0.5, seed=None):
         super().__init__(input_size, seed)
         self.p = p
+        self.reflect = reflect
+        if self.reflect:
+            starting_neurons = [1, input_size - 2]
+        else:
+            starting_neurons = [None, None]
         self.generators = [
-            PatternSpikeGenerator(input_size, interval, spacing=spacing, ascending=True, start_spike=start_spike),
-            PatternSpikeGenerator(input_size, interval, spacing=spacing, ascending=False, start_spike=start_spike)
+            PatternSpikeGenerator(input_size, interval, spacing=spacing, ascending=True, start_spike=start_spike, starting_neuron=starting_neurons[0], loop=False),
+            PatternSpikeGenerator(input_size, interval, spacing=spacing, ascending=False, start_spike=start_spike, starting_neuron=starting_neurons[1], loop=False)
         ]
         self.current_class = 0 if starting_class == "ascending" else 1
         self.signal_on_end = signal_on_end
