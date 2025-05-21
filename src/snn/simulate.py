@@ -98,7 +98,7 @@ class SNNSimulator:
             self.weight_recorder.setup(num_steps)
 
     def plot_membranes(self, col_width: float = 10.0, row_height: float = 2.5, title: str = None, plot_inputs: bool = True, 
-                       color: str = "blue", cmap: str = None, cmap_range: tuple = (0, 1), ylim = None,
+                       color: str = "blue", cmap: str = None, cmap_range: tuple = (0, 1), x_min = 0, x_max = None,
                     savepath: str | Path = None, show: bool = True):
         """
         Plot membrane potentials of all neurons in the network.
@@ -106,6 +106,8 @@ class SNNSimulator:
         assert self.record_membrane, "Membrane recording is not enabled."
         assert self.record_spikes, "Spike recording is not enabled."
 
+        if x_max is None:
+            x_max = self.num_steps
         if cmap is None:
             cm = color
         else:
@@ -131,7 +133,8 @@ class SNNSimulator:
                     c = np.interp(j / (n_neurons - 1), (0, 1), cmap_range)
                     c = cm(c)
                 plot_neuron(fig, gs[j, i], mem=layer_mem[j, :],
-                            threshold=thr[i], tf_post=spike_times[i][j], color=c)
+                            threshold=thr[i], tf_post=spike_times[i][j], color=c,
+                            x_min=x_min, x_max=x_max)
                 
         # Labelling
         fig.supxlabel(f"Time ({self.dt} s)", fontsize=16, y=0.07)
@@ -147,16 +150,19 @@ class SNNSimulator:
 
 
     def plot_spikes(self, x_scale: float = 0.2, y_scale: float = 0.5,
-                    y_eps: float = 0.5, x_eps: float = 0.02, spk_eps: float = 0.25, 
+                    y_eps: float = 0.5, x_eps: float | int = 0.02, spk_eps: float = 0.25, 
                     title: str = None, cmap = None, color: str = "black", cmap_range: tuple = (0, 1),
-                    linewidth=2, x_min = 0,
+                    linewidth=2, x_min = 0, x_max = None,
                     savepath: str | Path = None, show: bool = True, **kwargs):
         """
         Plot spike trains with time on x-axis and neuron index on y-axis.
         """
         assert self.record_spikes, "Spike recording is not enabled."
 
-        x_eps = x_eps * self.num_steps
+        if x_eps < 1 and x_eps > 0:
+            x_eps = x_eps * self.num_steps
+        if x_max is None:
+            x_max = self.num_steps
         if cmap is None:
             cm = color
         else:
@@ -164,8 +170,9 @@ class SNNSimulator:
 
         num_layers = self.network.num_layers
         layer_sizes = self.network.layer_sizes
+        fig_size = ((x_max - x_min) * x_scale, sum(layer_sizes) * y_scale)
         fig, axs = plt.subplots(num_layers, 1, gridspec_kw={"hspace": 0.0}, sharex=True, height_ratios=layer_sizes[::-1], 
-                               figsize=((self.num_steps - x_min) * x_scale, sum(layer_sizes) * y_scale), layout="constrained")
+                               figsize=fig_size, layout="constrained")
         for i, layer_spikes in enumerate(reversed(self.spike_recorder.values)):
             ax = axs[i]
             n_neurons = layer_spikes.shape[0]
@@ -183,7 +190,7 @@ class SNNSimulator:
             ax.vlines(t_spk, n_id - spk_eps, n_id + spk_eps, color=c, linewidth=linewidth, **kwargs)
             # ax.vlines(spike_times, i, i+1, color='black', alpha=0.5)
             ax.set_ylim(0 - y_eps, n_neurons - 1 + y_eps)
-            ax.set_xlim(x_min - x_eps, self.num_steps + x_eps)
+            ax.set_xlim(x_min - x_eps, x_max + x_eps)
             ax.set_yticks(np.arange(n_neurons))
             ax.set_yticklabels(np.arange(n_neurons))
             ax.set_ylabel(f"Layer {i}", rotation=90, ha="center")
@@ -202,7 +209,7 @@ class SNNSimulator:
         plt.close(fig)
 
     def plot_traces(self, x_scale: float = 0.2, y_scale: float = 1.0,
-                    y_eps: float = 0.1, x_eps: float = 0.0, trace_scale: float = 0.8, x_min = 0,
+                    y_eps: float = 0.1, x_eps: float = 0.0, trace_scale: float = 0.8, x_min = 0, x_max = None,
                     title: str = None, cmap = None, color: str = "black", cmap_range: tuple = (0, 1),
                     savepath: str | Path = None, show: bool = True, **kwargs):
         """
@@ -210,7 +217,10 @@ class SNNSimulator:
         """
         assert self.record_traces, "Trace recording is not enabled."
 
-        x_eps = x_eps * self.num_steps
+        if x_eps < 1 and x_eps > 0:
+            x_eps = x_eps * self.num_steps
+        if x_max is None:
+            x_max = self.num_steps
         if cmap is None:
             cm = color
         else:
@@ -218,8 +228,9 @@ class SNNSimulator:
 
         num_layers = self.network.num_layers
         layer_sizes = self.network.layer_sizes
+        fig_size = ((x_max - x_min) * x_scale, sum(layer_sizes) * y_scale)
         fig, axs = plt.subplots(num_layers, 1, gridspec_kw={"hspace": 0.0}, sharex=True, height_ratios=layer_sizes[::-1], 
-                               figsize=((self.num_steps - x_min) * x_scale, sum(layer_sizes) * y_scale), layout="constrained")
+                               figsize=fig_size, layout="constrained")
         for i, layer_traces in enumerate(reversed(self.trace_recorder.values)):
             ax = axs[i]
             n_neurons = layer_traces.shape[0]
@@ -235,7 +246,7 @@ class SNNSimulator:
                 ax.plot(y, color=c, alpha=1.0, drawstyle='steps-post', **kwargs)
 
             ax.set_ylim(0 - y_eps, n_neurons + y_eps)
-            ax.set_xlim(x_min - x_eps, self.num_steps + x_eps)
+            ax.set_xlim(x_min - x_eps, x_max + x_eps)
             ax.set_yticks(np.arange(n_neurons))
             ax.set_yticklabels(np.arange(n_neurons))
             ax.set_ylabel(f"Layer {i}", rotation=90, ha="center")
