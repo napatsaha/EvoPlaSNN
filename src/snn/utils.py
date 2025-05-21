@@ -3,87 +3,18 @@ from pathlib import Path
 from typing import List
 import numpy as np
 import matplotlib.pyplot as plt
-from matplotlib.axes import Axes
-import matplotlib.ticker as ticker
-import matplotlib.gridspec as gridspec
-from matplotlib.figure import Figure
+
+from .plot import _plot_membrane_old
 
 
-def plot_spikes(ax: Axes, tf_spikes: np.ndarray, x_max: int, label: str = "", x_min: int = 0):
-
-    ax.eventplot(tf_spikes, colors='gray', linelengths=0.5)
-    ax.set_ylim(1.0, 1.5)
-    ax.set_xlim(x_min, x_max)
-    ax.set_yticks([])
-    ax.set_xticks([])
-    ax.set_ylabel(label, rotation=0, ha='right', va='center')
-
-def plot_membrane_old(membrane_array, ax: Axes, threshold=None, title=None):
-    ax.plot(membrane_array)
-    if threshold is not None:
-        ax.axhline(threshold, color='gray', linestyle='--')
-    if title is not None:
-        ax.set_title(title)
-
-def plot_membranes(ax: Axes, mem: np.ndarray, *, threshold: float = None, tf_pre: int = None, tf_post: int = None,
-                                title=None, xlabel=None, ylabel=None, x_min: int = None, x_max: int = None, **kwargs):
-    T = len(mem)
-    x_min = 0 if x_min is None else x_min
-    x_max = T if x_max is None else x_max
-    ymax = max(max(mem), 1.0)
-    ymin = min(min(mem), 0.0)
-    ymid = (ymax + ymin) / 2
-    eps = (ymax - ymin) * 0.1
-
-    ax.plot(mem, **kwargs)
-    if tf_pre is not None:
-        ax.vlines(x=tf_pre, ymin=ymin-eps, ymax=ymid - 2*eps, color='gray', alpha=0.5, linestyles='dotted')
-    if tf_post is not None:
-        ax.vlines(x=tf_post, ymin=ymid + 2*eps, ymax=ymax+eps, color='gray', alpha=0.7, linestyles='dotted')
-    if threshold is not None:
-        ax.axhline(y=threshold, color='black', linestyle='--', alpha=0.5)
-    ax.set_xlim(x_min, x_max)
-    ax.xaxis.set_minor_locator(ticker.MultipleLocator(1))
-    ax.set_ylim(ymin - eps, ymax + eps)
-    if ylabel is not None:
-        ax.set_ylabel(ylabel)
-    if xlabel is not None:
-        ax.set_xlabel(xlabel)
-    if title is not None:
-        ax.set_title(title)
-
-def plot_neuron(fig: Figure, gs: gridspec.GridSpec, mem: np.ndarray, *, tf_pre: int = None, tf_post: int = None, threshold: float = None, 
-                x_min: int = None, x_max: int = None, **kwargs):
-    T = len(mem)
-    x_min = 0 if x_min is None else x_min
-    x_max = T if x_max is None else x_max
+def movmean(x: np.ndarray, n: int, mode: str = "valid") -> np.ndarray:   
+    if x.ndim == 1:
+        return np.convolve(x, np.ones(n)/n, mode=mode)
+    elif x.ndim == 2:
+        return np.array([np.convolve(x[i], np.ones(n)/n, mode=mode) for i in range(x.shape[0])])
+    else:
+        raise ValueError(f"movmean only supports 1D and 2D arrays, got {x.ndim}D array instead.")
     
-    ncols = 1# + int(tf_pre is not None) + int(tf_post is not None)
-    nrows = 1
-    height_ratios = [1.0]
-    if tf_post is not None:
-        height_ratios = [0.1] + height_ratios
-        nrows += 1
-    if tf_pre is not None:
-        height_ratios = height_ratios + [0.1]
-        nrows += 1
-
-    gs0 = gridspec.GridSpecFromSubplotSpec(nrows, ncols, subplot_spec=gs, hspace=0.1, height_ratios=height_ratios)
-    plot_idx = 0
-
-    if tf_post is not None:
-        ax = fig.add_subplot(gs0[plot_idx])
-        plot_idx += 1
-        plot_spikes(ax, tf_post, label="Post", x_min=x_min, x_max=x_max)
-
-    ax = fig.add_subplot(gs0[plot_idx])
-    plot_idx += 1
-    plot_membranes(ax, mem, tf_pre=tf_pre, tf_post=tf_post, threshold=threshold, x_min=x_min, x_max=x_max, **kwargs)
-
-    if tf_pre is not None:
-        ax = fig.add_subplot(gs0[plot_idx])
-        plot_idx += 1
-        plot_spikes(ax, tf_pre, label="Pre", x_min=x_min, x_max=x_max)
 
 
 class MatrixRecorder:
@@ -166,7 +97,7 @@ class LayerRecorder:
         # Plotting
         for i, layer in enumerate(self.values):
             for j in range(layer.shape[0]):
-                plot_membrane_old(layer[j, :], axs[j, i], threshold=thresholds[i], title=f"Layer {i}, Neuron {j}")
+                _plot_membrane_old(layer[j, :], axs[j, i], threshold=thresholds[i], title=f"Layer {i}, Neuron {j}")
 
         # Formatting
         if figtitle is not None:
