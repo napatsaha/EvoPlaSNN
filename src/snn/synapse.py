@@ -1,7 +1,7 @@
 from typing import Literal
 import numpy as np
 from .neurons import NeuronLayer
-from .lrule import ANN_Rule, LearningRule, Empty_Rule, STDP_Rule
+from lrule import ANN_Rule, LearningRule, Empty_Rule, STDP_Rule
 
 
 class SynapseLayer:

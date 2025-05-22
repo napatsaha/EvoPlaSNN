@@ -6,7 +6,7 @@ from typing import List, Literal
 import numpy as np
 from typing import Union
 from .synapse import SynapseLayer
-from .lrule import LearningRule, Empty_Rule
+from lrule import LearningRule, Empty_Rule
 from .neurons import NeuronLayer
 
 
@@ -47,7 +47,7 @@ class SNN:
         self.neuron_params = [
             {k: v if not isinstance(v, list | tuple) else v[(self.num_layers + i) % len(v)] for k, v in neuron_params.items()} \
             for i in range(self.num_layers)
-        ]
+        ] if neuron_params is not None else [{}] * self.num_layers
 
         self.synapse_params = synapse_params if synapse_params is not None else {}
 

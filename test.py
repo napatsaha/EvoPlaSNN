@@ -1,4 +1,5 @@
-from snn import SNN, RandomSpikeGenerator, SNNSimulator, PatternSpikeGenerator, STDP_Rule
+from snn import SNN, RandomSpikeGenerator, SNNSimulator, PatternSpikeGenerator
+from lrule import STDP_Rule
 
 
 if __name__ == "__main__":

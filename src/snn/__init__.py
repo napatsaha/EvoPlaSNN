@@ -4,7 +4,7 @@ from .utils import LayerRecorder
 from .synapse import SynapseLayer
 from .neurons import NeuronLayer
 from .spikegen import RandomSpikeGenerator, PatternSpikeGenerator, BinaryClassGenerator
-from .lrule import LearningRule, STDP_Rule
+# from .lrule import LearningRule, STDP_Rule
 
 from . import snn_old
 

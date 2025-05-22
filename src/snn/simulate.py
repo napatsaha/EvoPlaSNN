@@ -7,7 +7,7 @@ import matplotlib as mpl
 
 from .utils import LayerRecorder, MatrixRecorder
 from .snn import SNN
-from .lrule import LearningRule
+from lrule import LearningRule
 from .spikegen import BinaryClassGenerator, SpikeGenerator
 # from  . import plot
 
