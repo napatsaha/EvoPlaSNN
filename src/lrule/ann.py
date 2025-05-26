@@ -1,4 +1,4 @@
-from typing import Callable, List
+from typing import Callable, List, Literal
 from .base import LearningRule
 
 
@@ -42,22 +42,20 @@ class LinearLayer:
     """
     Simple fully-connected layer with weights and activation function.
     """
-    def __init__(self, input_size, output_size, parameters=None, activation_function: str | Callable = None, bias=True):
+    def __init__(self, input_size, output_size, parameters=None, activation_function: str | Callable = None, bias=True, 
+                 weight_dist: Literal["uniform", "normal"] = "uniform"):
         self.input_size = input_size
         self.output_size = output_size
         # self.parameters = parameters
         self._bias = bias
-        self.init_weights(parameters)
+        self._init_weights(parameters, weight_dist)
         self.activation_function = _activation_functions.get(activation_function, linear) if not isinstance(activation_function, Callable) else activation_function
 
 
-    def init_weights(self, parameters: List | np.ndarray):
+    def _init_weights(self, parameters: List | np.ndarray, weight_dist: str):
         if parameters is None:
-            self.weights = np.random.rand(self.input_size, self.output_size)
-            if self._bias:
-                self.bias = np.random.rand(self.output_size)
-            else:
-                self.bias = None
+            self.weight_dist = weight_dist
+            self._randomise_weights()
         else:
             if isinstance(parameters, np.ndarray) and parameters.ndim > 1:
                 parameters = parameters.flatten()
@@ -71,11 +69,22 @@ class LinearLayer:
                 # expected_size = self.input_size * (self.output_size + self._bias * self.output_size)
                 raise ValueError(f"Expected parameters with either size {expected_size} or {expected_size + self.output_size}, got size {len(parameters)}")
 
+            self.weight_dist = None
             self.weights = parameters[:(self.input_size * self.output_size)].reshape(self.input_size, self.output_size)
             if self._bias:
                 self.bias = parameters[(-self.output_size):]
             else:
                 self.bias = None
+
+    def _randomise_weights(self):
+        if self.weight_dist == "uniform":
+            self.weights = np.random.rand(self.input_size, self.output_size)
+            self.bias = np.random.rand(self.output_size) if self._bias else None
+        elif self.weight_dist == "normal":
+            self.weights = np.random.randn(self.input_size, self.output_size)
+            self.bias = np.random.randn(self.output_size) if self._bias else None
+        else:
+            raise ValueError(f"Unknown weight distribution: {self.weight_dist}")
             
     
     def forward(self, x: np.ndarray) -> np.ndarray:
@@ -102,19 +111,21 @@ class LinearLayer:
         return f"LinearLayer(input_size={self.input_size}, output_size={self.output_size}, activation_function={self.activation_function.__name__}, bias={self._bias})"
 
 
-class ANN_Rule(LearningRule):
+class ANN(LearningRule):
     """
     A LearningRule that is approximated by a fully-connected ANN.
     """
     def __init__(self, input_size: int, hidden_size: List | int = None, output_size: int = 1, 
                  parameters: List = None, bias: bool = True,
-                 hidden_activation: str | Callable = None, output_activation: str | Callable = None):
+                 hidden_activation: str | Callable = None, output_activation: str | Callable = None,
+                 weight_dist: Literal["uniform", "normal"] = "uniform"):
         super().__init__()
         self.input_size = int(input_size)
         self.hidden_sizes = self._solve_hidden_sizes(hidden_size)
         self.output_size = int(output_size)
         self.hidden_activation = _activation_functions.get(hidden_activation, relu)
         self.output_activation = _activation_functions.get(output_activation, linear)
+        self.weight_dist = weight_dist
     
         self._create_layers(bias, parameters)
 
@@ -147,7 +158,7 @@ class ANN_Rule(LearningRule):
                 params = None
             layer = LinearLayer(self.layer_sizes[i], self.layer_sizes[i + 1], 
                                 activation_function=self.hidden_activation if i < self.num_layers - 2 else self.output_activation,
-                                bias=bias, parameters=params)
+                                bias=bias, parameters=params, weight_dist=self.weight_dist)
             self.layers.append(layer)
 
     def forward(self, x: np.ndarray) -> np.ndarray:

@@ -1,7 +1,7 @@
 from typing import Literal
 import numpy as np
 from .neurons import NeuronLayer
-from lrule import ANN_Rule, LearningRule, Empty_Rule, STDP_Rule
+from lrule import ANN, LearningRule, Empty_Rule, STDP_Rule
 
 
 class SynapseLayer:
@@ -55,7 +55,7 @@ class SynapseLayer:
     def _get_lrule_type(self):
         if isinstance(self.learning_rule, STDP_Rule):
             return "STDP"
-        elif isinstance(self.learning_rule, ANN_Rule):
+        elif isinstance(self.learning_rule, ANN):
             return "ANN"
         elif isinstance(self.learning_rule, Empty_Rule):
             return None
@@ -91,10 +91,14 @@ class SynapseLayer:
             spk_pre, spk_post = self._tile(self.pre_layer.spike, self.post_layer.spike)
             self.weights = self.learning_rule.update(self.weights, spk_pre, spk_post, trace_pre, trace_post, reward=reward)
         elif self._learning_rule_type is None:
-            # For Empty Rule
             return 
-            # self.weights = self.learning_rule.update(self.weights)
+        elif self._learning_rule_type == "ANN":
+            trace_pre, trace_post = self._tile(self.pre_layer.get_trace(), self.post_layer.get_trace())
+            spk_pre, spk_post = self._tile(self.pre_layer.spike, self.post_layer.spike)
+            self.weights = self.learning_rule.update(self.weights, spk_pre, spk_post, trace_pre, trace_post, reward=reward)
         else:
+            # For Empty Rule
+            self.weights = self.learning_rule.update(self.weights)
             return
         
         # Clip the weights
