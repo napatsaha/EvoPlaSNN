@@ -16,7 +16,7 @@ class LearningRule(ABC):
         """
         Update the synaptic weights based on the learning rule.
         """
-        pass
+        raise NotImplementedError()
 
 
 class Empty_Rule(LearningRule):

@@ -23,7 +23,7 @@ class SNN:
         # Network architecture parameters
         self.input_size = input_size
         self.hidden_size = hidden_size
-        if hidden_size is None or len(hidden_size) == 0 or hidden_size == 0:
+        if hidden_size is None or hidden_size == 0 or len(hidden_size) == 0:
             self.hidden_size = []
         elif isinstance(hidden_size, int):
             self.hidden_size = [hidden_size]

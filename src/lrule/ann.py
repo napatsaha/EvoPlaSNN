@@ -1,5 +1,6 @@
 from typing import Callable, List, Literal
 from .base import LearningRule
+from .utils import tile_array
 
 
 import numpy as np
@@ -107,11 +108,15 @@ class LinearLayer:
         else:
             return self.weights.flatten()
         
+    @property
+    def size(self):
+        return self.parameters.size
+
     def __repr__(self):
         return f"LinearLayer(input_size={self.input_size}, output_size={self.output_size}, activation_function={self.activation_function.__name__}, bias={self._bias})"
 
 
-class ANN(LearningRule):
+class ANN:
     """
     A LearningRule that is approximated by a fully-connected ANN.
     """
@@ -163,21 +168,17 @@ class ANN(LearningRule):
 
     def forward(self, x: np.ndarray) -> np.ndarray:
         """
-        Compute the output of the ANN given the input x.
+        Feedforward.
         """
         for layer in self.layers:
             x = layer.forward(x)
         return x
     
-    def update(self, w: np.ndarray, x: np.ndarray = None) -> np.ndarray:
-        """
-        Apply the ANN Rule to an external set of weights.
-        """
-        dw = self.forward(x)
-        if w is None:
-            return dw
-        else:
-            return w + dw
+        # dw = self.forward(x)
+        # if w is None:
+        #     return dw
+        # else:
+        #     return w + dw
 
     @property
     def parameters(self):
@@ -189,6 +190,8 @@ class ANN(LearningRule):
             params.append(layer.parameters)
         return np.concatenate(params)
     
+    
+
     @property
     def weights(self):
         return [layer.weights for layer in self.layers]
@@ -197,6 +200,75 @@ class ANN(LearningRule):
     def biases(self):
         return [layer.bias for layer in self.layers]
 
+    @property
+    def size(self):
+        return sum([layer.size for layer in self.layers])
 
     def __repr__(self):
-        return f"ANN_Rule(input_size={self.input_size}, hidden_sizes={self.hidden_sizes}, output_size={self.output_size})"
+        return f"ANN(input_size={self.input_size}, hidden_sizes={self.hidden_sizes}, output_size={self.output_size})"
+    
+    def __str__(self):
+        s = "{\n"
+        for layer in self.layers:
+            s += "\t" + str(layer) + "\n"
+        s += "}"
+        return s
+
+
+class ANN_Rule(LearningRule):
+    """
+    A Learning Rule that represents a black box ANN function that converts synapse-related information to weight updates.
+    """
+    def __init__(self, in_trace_pre: bool = True, in_trace_post: bool = True, in_weights: bool = True, in_reward: bool = True, 
+                 **kwargs):
+        super().__init__()
+        self.in_trace_pre = in_trace_pre
+        self.in_trace_post = in_trace_post
+        self.in_weights = in_weights
+        self.in_reward = in_reward
+        self.input_size = int(in_trace_pre) + int(in_trace_post) + int(in_weights) + int(in_reward)
+        self.ann = ANN(input_size=self.input_size, output_size=1, **kwargs)
+
+
+    def update(self, synapse: 'SynapseLayer', reward: float = None, return_inputs: bool = False) -> np.ndarray:
+        """
+        Apply the ANN Rule to an external set of weights.
+        """
+        inp = []
+        w_shape = synapse.weights.shape
+        trace_pre, trace_post = tile_array(w_shape, synapse.pre_layer.trace, synapse.post_layer.trace)
+        if self.in_trace_pre:
+            inp.append(trace_pre.reshape(-1, 1))
+        if self.in_trace_post:
+            inp.append(trace_post.reshape(-1, 1))
+        if self.in_weights:
+            inp.append(synapse.weights.reshape(-1, 1))
+        if self.in_reward:
+            if reward is None:
+                reward = 0
+            inp.append(np.full((np.prod(w_shape), 1), fill_value=reward))
+
+        inp = np.concatenate(inp, axis=1)
+        # inp = np.concatenate([trace_pre.reshape(-1, 1), trace_post.reshape(-1, 1)], axis=1)
+
+        dw = self.ann.forward(inp)
+        dw = dw.reshape(w_shape)
+
+        if return_inputs:
+            return dw, inp
+        else:
+            return dw
+        
+    @property
+    def size(self):
+        return self.ann.size
+    
+    @property
+    def parameters(self):
+        return self.ann.parameters
+    
+    @parameters.setter
+    def parameters(self, value):
+        if len(value) != self.size:
+            raise ValueError(f"Parameter must meet expect size. Got {len(value)}, expected {self.size}")
+        self.ann.parameters = value

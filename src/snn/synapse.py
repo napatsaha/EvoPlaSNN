@@ -1,7 +1,7 @@
 from typing import Literal
 import numpy as np
 from .neurons import NeuronLayer
-from lrule import ANN, LearningRule, Empty_Rule, STDP_Rule
+from lrule import ANN_Rule, LearningRule, Empty_Rule, STDP_Rule
 
 
 class SynapseLayer:
@@ -55,7 +55,7 @@ class SynapseLayer:
     def _get_lrule_type(self):
         if isinstance(self.learning_rule, STDP_Rule):
             return "STDP"
-        elif isinstance(self.learning_rule, ANN):
+        elif isinstance(self.learning_rule, ANN_Rule):
             return "ANN"
         elif isinstance(self.learning_rule, Empty_Rule):
             return None
@@ -81,7 +81,7 @@ class SynapseLayer:
         output_current = np.dot(spike_input, self.weights)
         return output_current
     
-    def update(self, reward=None):
+    def update(self, reward=None) -> None:
         """
         Update the synaptic weights based on the learning rule.
         """
@@ -93,9 +93,11 @@ class SynapseLayer:
         elif self._learning_rule_type is None:
             return 
         elif self._learning_rule_type == "ANN":
-            trace_pre, trace_post = self._tile(self.pre_layer.get_trace(), self.post_layer.get_trace())
-            spk_pre, spk_post = self._tile(self.pre_layer.spike, self.post_layer.spike)
-            self.weights = self.learning_rule.update(self.weights, spk_pre, spk_post, trace_pre, trace_post, reward=reward)
+            dw = self.learning_rule.update(self, reward=reward)
+            self.weights += dw
+            # trace_pre, trace_post = self._tile(self.pre_layer.get_trace(), self.post_layer.get_trace())
+            # spk_pre, spk_post = self._tile(self.pre_layer.spike, self.post_layer.spike)
+            # self.weights = self.learning_rule.update(self.weights, spk_pre, spk_post, trace_pre, trace_post, reward=reward)
         else:
             # For Empty Rule
             self.weights = self.learning_rule.update(self.weights)
