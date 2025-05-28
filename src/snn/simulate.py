@@ -12,6 +12,42 @@ from .spikegen import BinaryClassGenerator, SpikeGenerator
 # from  . import plot
 
 
+class RewardManager:
+    def __init__(self):
+        self.memory = {"t": [], "label": [], "prediction": [], "reward": []}
+
+    def add(self, t: int, label: int, prediction: int, reward: float):
+        self.memory["t"].append(t)
+        self.memory["label"].append(label)
+        self.memory["prediction"].append(prediction)
+        self.memory["reward"].append(reward)
+
+    def calculate_reward(self, label: int, spike_out: np.ndarray, timestep: int) -> float:
+        """
+        Calculate the reward based on the label and prediction.
+        """
+        # If no spikes
+        if np.all(spike_out == 0):
+            pred = None
+            reward = 0.0
+        else:
+            pred = np.argmax(spike_out).item()
+            reward = float(np.equal(label, pred).item())
+
+        self.add(timestep, label, pred, reward)
+        return reward
+    
+    def accuracy(self) -> float:
+        """
+        Calculate the accuracy of the predictions.
+        """
+        if len(self.memory["label"]) == 0:
+            return 0.0
+        accuracy = np.mean(np.equal(self.memory["label"], self.memory["prediction"]))
+        return accuracy
+        
+
+
 class SNNSimulator:
     def __init__(self, network: SNN, spike_generator: SpikeGenerator, *, 
                  record_membrane: bool = True, record_spikes: bool = True, record_traces: bool = True, record_weights: bool = False):
@@ -29,7 +65,7 @@ class SNNSimulator:
         self.spike_recorder = LayerRecorder(network.layer_sizes, dtype=np.int8) if self.record_spikes else None
         self.trace_recorder = LayerRecorder(network.layer_sizes, dtype=np.float32) if self.record_traces else None
         self.weight_recorder = MatrixRecorder([synapse.weights.shape for synapse in network.synapse_layers]) if self.record_weights else None
-        self.reward_collector = []
+        self.reward_manager = RewardManager()
 
         self.dt = network.dt
 
@@ -46,10 +82,11 @@ class SNNSimulator:
 
             # Evaluate reward
             if update_signal and hasattr(self.spike_generator, "get_label"):
-                label = self.spike_generator.get_label()
-                prediction = np.argmax(spk_out) if spk_out.size > 1 else spk_out
-                reward = 1.0 if np.equal(label, prediction) else 0.0
-                self.reward_collector.append((t, label, prediction, reward))
+                # label = self.spike_generator.get_label()
+                # prediction = np.argmax(spk_out) if spk_out.size > 1 else spk_out
+                # reward = 1.0 if np.equal(label, prediction) else 0.0
+                # self.reward_collector.append((t, label, prediction, reward))
+                reward = self.reward_manager.calculate_reward(self.spike_generator.get_label(), spk_out, t)
             else:
                 reward = None
 
