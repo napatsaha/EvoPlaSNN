@@ -15,6 +15,13 @@ class SpikeGenerator(ABC):
         self.input_size = input_size
         self.rng = np.random.default_rng(seed)
 
+    def reset(self):
+        """
+        Resets the generator to its initial state.
+        This method should be overridden by subclasses if needed.
+        """
+        pass
+
     @abstractmethod
     def generate(self) -> np.ndarray:
         pass
@@ -155,6 +162,7 @@ class BinaryClassGenerator(SpikeGenerator):
         super().__init__(input_size, seed)
         self.p = p
         self.reflect = reflect
+        self.signal_on_end = signal_on_end
         if self.reflect:
             starting_neurons = [1, input_size - 2]
         else:
@@ -163,8 +171,11 @@ class BinaryClassGenerator(SpikeGenerator):
             PatternSpikeGenerator(input_size, interval, spacing=spacing, ascending=True, start_spike=start_spike, starting_neuron=starting_neurons[0], loop=False),
             PatternSpikeGenerator(input_size, interval, spacing=spacing, ascending=False, start_spike=start_spike, starting_neuron=starting_neurons[1], loop=False)
         ]
-        self.current_class = 0 if starting_class == "ascending" else 1
-        self.signal_on_end = signal_on_end
+        self.starting_class = starting_class.lower()
+        self.reset()
+
+    def reset(self):
+        self.current_class = 0 if self.starting_class == "ascending" else 1
         self.count = 0
         self.switch = False
         self._finished = False

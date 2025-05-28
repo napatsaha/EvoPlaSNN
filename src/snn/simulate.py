@@ -46,6 +46,11 @@ class RewardManager:
         accuracy = np.mean(np.equal(self.memory["label"], self.memory["prediction"]))
         return accuracy
         
+    def reset(self):
+        """
+        Reset the reward manager.
+        """
+        self.memory = {"t": [], "label": [], "prediction": [], "reward": []}
 
 
 class SNNSimulator:
@@ -68,6 +73,27 @@ class SNNSimulator:
         self.reward_manager = RewardManager()
 
         self.dt = network.dt
+
+    def reset(self):
+        """
+        Reset the simulator to its initial state.
+        """
+        # Reset step count
+        self.num_steps = 0
+
+        # Reset recorders
+        if self.record_membrane:
+            self.mem_recorder.reset()
+        if self.record_spikes:
+            self.spike_recorder.reset()
+        if self.record_traces:
+            self.trace_recorder.reset()
+        if self.record_weights:
+            self.weight_recorder.reset()
+        self.reward_manager.reset()
+
+        # Reset spike generator
+        self.spike_generator.reset()
 
     def run(self, num_steps: int):
         t_start = self.num_steps

@@ -34,7 +34,8 @@ class MatrixRecorder:
     def reset(self):
         self.total_timesteps = 0
         for i, layer_shape in enumerate(self.layer_shapes):
-            self.values[i] = np.zeros((layer_shape[0], layer_shape[1], self.total_timesteps), dtype=self.dtype)
+            self.values[i].fill(0)  # Reset to zeros
+            # self.values[i] = np.zeros((layer_shape[0], layer_shape[1], self.total_timesteps), dtype=self.dtype)
 
     def record(self, layer_index: int, timestep: int, value: np.ndarray):
         if self.total_timesteps == 0:
@@ -66,7 +67,8 @@ class LayerRecorder:
     def reset(self):
         self.total_timesteps = 0
         for i, layer_size in enumerate(self.layer_sizes):
-            self.values[i] = np.zeros((layer_size, self.total_timesteps), dtype=self.dtype)
+            self.values[i].fill(0)  # Reset to zeros
+            # self.values[i] = np.zeros((layer_size, self.total_timesteps), dtype=self.dtype)
 
     def record(self, layer_index: int, timestep: int, value: np.ndarray):
         assert value.shape == (self.layer_sizes[layer_index],), \
