@@ -52,6 +52,8 @@ class SynapseLayer:
         # else:
         #     raise NotImplementedError("Other weight initialisation methods not implemented yet")
 
+        self._normalise_weights()
+
     def _get_lrule_type(self):
         if isinstance(self.learning_rule, STDP_Rule):
             return "STDP"
@@ -108,6 +110,9 @@ class SynapseLayer:
             self.weights = np.clip(self.weights, self.weight_min, self.weight_max)
         
         # Normalise the weights
+        self._normalise_weights()
+
+    def _normalise_weights(self):
         if self.normalise_weights:
             if self.normalise_method == "sum":
                 self.weights = self.weights / np.sum(self.weights, axis=0, keepdims=True)

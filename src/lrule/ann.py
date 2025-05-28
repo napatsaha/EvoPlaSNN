@@ -219,14 +219,14 @@ class ANN_Rule(LearningRule):
     """
     A Learning Rule that represents a black box ANN function that converts synapse-related information to weight updates.
     """
-    def __init__(self, in_trace_pre: bool = True, in_trace_post: bool = True, in_weights: bool = True, in_reward: bool = True, 
+    def __init__(self, use_trace_pre: bool = True, use_trace_post: bool = True, use_weights: bool = True, use_reward: bool = True, 
                  **kwargs):
         super().__init__()
-        self.in_trace_pre = in_trace_pre
-        self.in_trace_post = in_trace_post
-        self.in_weights = in_weights
-        self.in_reward = in_reward
-        self.input_size = int(in_trace_pre) + int(in_trace_post) + int(in_weights) + int(in_reward)
+        self.use_trace_pre = use_trace_pre
+        self.use_trace_post = use_trace_post
+        self.use_weights = use_weights
+        self.use_reward = use_reward
+        self.input_size = int(use_trace_pre) + int(use_trace_post) + int(use_weights) + int(use_reward)
         self.ann = ANN(input_size=self.input_size, output_size=1, **kwargs)
 
 
@@ -237,13 +237,13 @@ class ANN_Rule(LearningRule):
         inp = []
         w_shape = synapse.weights.shape
         trace_pre, trace_post = tile_array(w_shape, synapse.pre_layer.trace, synapse.post_layer.trace)
-        if self.in_trace_pre:
+        if self.use_trace_pre:
             inp.append(trace_pre.reshape(-1, 1))
-        if self.in_trace_post:
+        if self.use_trace_post:
             inp.append(trace_post.reshape(-1, 1))
-        if self.in_weights:
+        if self.use_weights:
             inp.append(synapse.weights.reshape(-1, 1))
-        if self.in_reward:
+        if self.use_reward:
             if reward is None:
                 reward = 0
             inp.append(np.full((np.prod(w_shape), 1), fill_value=reward))

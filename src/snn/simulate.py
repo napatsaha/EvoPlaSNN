@@ -29,6 +29,7 @@ class SNNSimulator:
         self.spike_recorder = LayerRecorder(network.layer_sizes, dtype=np.int8) if self.record_spikes else None
         self.trace_recorder = LayerRecorder(network.layer_sizes, dtype=np.float32) if self.record_traces else None
         self.weight_recorder = MatrixRecorder([synapse.weights.shape for synapse in network.synapse_layers]) if self.record_weights else None
+        self.reward_collector = []
 
         self.dt = network.dt
 
@@ -40,14 +41,23 @@ class SNNSimulator:
             spk_in = self.spike_generator.generate()
             update_signal = self.spike_generator.return_signal()
 
-
             # Forward pass
             spk_out = self.network.forward(spk_in)
+
+            # Evaluate reward
+            if update_signal and hasattr(self.spike_generator, "get_label"):
+                label = self.spike_generator.get_label()
+                prediction = np.argmax(spk_out) if spk_out.size > 1 else spk_out
+                reward = 1.0 if np.equal(label, prediction) else 0.0
+                self.reward_collector.append((t, label, prediction, reward))
+            else:
+                reward = None
+
 
             # Update synaptic weights
             if self.learning_rule is not None:
                 if update_signal:
-                    self.network.update_synapses(update_signal)
+                    self.network.update_synapses(reward=reward)
             
             # Record membrane potentials
             if self.record_membrane:

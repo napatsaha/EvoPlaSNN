@@ -3,7 +3,7 @@ import numpy as np
 
 
 
-def tile_array(target_shape: Tuple[int, int], vec_in: np.ndarray, vec_out: np.ndarray) -> Tuple[np.ndarray]:
+def tile_array(target_shape: Tuple[int, int], vec_in: np.ndarray, vec_out: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
     """
     Reshape input and output vectors to match weight matrix.
     """
