@@ -111,6 +111,17 @@ class LinearLayer:
         else:
             return self.weights.flatten()
         
+    @parameters.setter
+    def parameters(self, value: np.ndarray):
+        """
+        Set the parameters of the layer.
+        """
+        idx = self.input_size * self.output_size
+        self.weights[:] = value[:idx].reshape(self.input_size, self.output_size)
+        if self._bias:
+            self.bias[:] = value[idx:]
+
+
     @property
     def size(self):
         return self.parameters.size
@@ -197,6 +208,18 @@ class ANN:
             params.append(layer.parameters)
         return np.concatenate(params)
     
+    @parameters.setter
+    def parameters(self, value: np.ndarray):
+        """
+        Set the parameters of the ANN.
+        """
+        if len(value) != self.size:
+            raise ValueError(f"Parameters must have size {self.size}. Got {len(value)} instead.")
+        current_index = 0
+        for layer in self.layers:
+            expected_size = layer.size
+            layer.parameters = value[current_index:current_index + expected_size]
+            current_index += expected_size
     
 
     @property
@@ -278,6 +301,4 @@ class ANN_Rule(LearningRule):
     
     @parameters.setter
     def parameters(self, value):
-        if len(value) != self.size:
-            raise ValueError(f"Parameter must meet expect size. Got {len(value)}, expected {self.size}")
         self.ann.parameters = value
