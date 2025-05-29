@@ -8,6 +8,7 @@ from typing import Union
 from .synapse import SynapseLayer
 from lrule import LearningRule, Empty_Rule
 from .neurons import NeuronLayer
+from common.utils import solve_hidden
 
 
 class SNN:
@@ -22,15 +23,15 @@ class SNN:
                  ):
         # Network architecture parameters
         self.input_size = input_size
-        self.hidden_size = hidden_size
-        if hidden_size is None or hidden_size == 0 or len(hidden_size) == 0:
-            self.hidden_size = []
-        elif isinstance(hidden_size, int):
-            self.hidden_size = [hidden_size]
-        elif isinstance(hidden_size, list):
-            self.hidden_size = hidden_size
-        else:
-            raise TypeError("hidden_size must be an int or a list of ints.")
+        self.hidden_size = solve_hidden(hidden_size)
+        # if hidden_size is None or hidden_size == 0 or len(hidden_size) == 0:
+        #     self.hidden_size = []
+        # elif isinstance(hidden_size, int):
+        #     self.hidden_size = [hidden_size]
+        # elif isinstance(hidden_size, list):
+        #     self.hidden_size = hidden_size
+        # else:
+        #     raise TypeError("hidden_size must be an int or a list of ints.")
         self.output_size = output_size
         self.layer_sizes = [input_size] + self.hidden_size + [output_size]
         self.layer_sizes_active = self.layer_sizes
@@ -85,6 +86,15 @@ class SNN:
     def update_synapses(self, reward=None):
         for synapse in self.synapse_layers:
             synapse.update(reward)
+
+    def reset(self):
+        """
+        Reset the state of the network, including all neuron and synapse layers.
+        """
+        for neuron_layer in self.neuron_layers:
+            neuron_layer.reset()
+        for synapse_layer in self.synapse_layers:
+            synapse_layer.reset()
 
     @property
     def membranes(self):

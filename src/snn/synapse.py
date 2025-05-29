@@ -72,6 +72,12 @@ class SynapseLayer:
         vec_out = np.tile(vec_out, (self.weights.shape[0], 1))
         return vec_in, vec_out
     
+    def reset(self) -> None:
+        """
+        Reset the synaptic weights to their initial state.
+        """
+        self._init_weights()
+
     def forward(self, spike_input: np.ndarray) -> np.ndarray:
         """
         Compute the output current to the next neuron layer given a spike current input from the previous neuron layer.

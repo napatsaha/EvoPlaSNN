@@ -77,6 +77,15 @@ class NeuronLayer:
         # Trace
         self.trace = np.zeros(size, dtype=np.float32)
 
+    def reset(self):
+        """
+        Reset the neuron layer state.
+        """
+        self.membrane.fill(self.membrane_start)
+        self.spike.fill(0)
+        self.tssp.fill(0)
+        self.trace.fill(0.0)
+
     def forward(self, input_current: np.ndarray):
         """
         Update the neuron layer state based on the input current and time step.
