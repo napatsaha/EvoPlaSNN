@@ -1,6 +1,9 @@
 from typing import Callable, List, Literal
+
+from common.utils import solve_hidden, calculate_size
 from .base import LearningRule
 from .utils import tile_array
+
 
 
 import numpy as np
@@ -126,26 +129,27 @@ class ANN:
                  weight_dist: Literal["uniform", "normal"] = "uniform"):
         super().__init__()
         self.input_size = int(input_size)
-        self.hidden_sizes = self._solve_hidden_sizes(hidden_size)
+        self.hidden_sizes = solve_hidden(hidden_size)
         self.output_size = int(output_size)
         self.hidden_activation = _activation_functions.get(hidden_activation, relu)
         self.output_activation = _activation_functions.get(output_activation, linear)
         self.weight_dist = weight_dist
+        self.bias = bias
     
         self._create_layers(bias, parameters)
 
-    def _solve_hidden_sizes(self, hidden_size: List | int | None) -> List[int | None]:
-        """
-        Solve the hidden sizes for the ANN.
-        """
-        if hidden_size is None or hidden_size == 0 or len(hidden_size) == 0:
-            return []
-        elif isinstance(hidden_size, int):
-            return [hidden_size]
-        elif isinstance(hidden_size, list):
-            return hidden_size
-        else:
-            raise ValueError("hidden_size must be an int or a list of ints")
+    # def _solve_hidden_sizes(self, hidden_size: List | int | None) -> List[int | None]:
+    #     """
+    #     Solve the hidden sizes for the ANN.
+    #     """
+    #     if hidden_size is None or hidden_size == 0 or len(hidden_size) == 0:
+    #         return []
+    #     elif isinstance(hidden_size, int):
+    #         return [hidden_size]
+    #     elif isinstance(hidden_size, list):
+    #         return hidden_size
+    #     else:
+    #         raise ValueError("hidden_size must be an int or a list of ints")
         
     def _create_layers(self, bias, parameters=None):
         self.layers: List[LinearLayer] = []
@@ -153,6 +157,9 @@ class ANN:
         self.num_layers = len(self.layer_sizes)
         
         if parameters is not None:
+            target_size = calculate_size(self.input_size, self.hidden_sizes, self.output_size, bias)
+            if len(parameters) != target_size:
+                raise ValueError(f"Parameters must have size {target_size}. Got {len(parameters)} instead.")
             current_index = 0
         for i in range(self.num_layers - 1):
             if parameters is not None: 
@@ -205,7 +212,7 @@ class ANN:
         return sum([layer.size for layer in self.layers])
 
     def __repr__(self):
-        return f"ANN(input_size={self.input_size}, hidden_sizes={self.hidden_sizes}, output_size={self.output_size})"
+        return f"ANN(input_size={self.input_size}, hidden_sizes={self.hidden_sizes}, output_size={self.output_size}, bias={self.bias})"
     
     def __str__(self):
         s = "{\n"
@@ -219,7 +226,8 @@ class ANN_Rule(LearningRule):
     """
     A Learning Rule that represents a black box ANN function that converts synapse-related information to weight updates.
     """
-    def __init__(self, use_trace_pre: bool = True, use_trace_post: bool = True, use_weights: bool = True, use_reward: bool = True, 
+    def __init__(self, parameters = None, *, 
+                 use_trace_pre: bool = True, use_trace_post: bool = True, use_weights: bool = True, use_reward: bool = True, 
                  **kwargs):
         super().__init__()
         self.use_trace_pre = use_trace_pre
@@ -227,7 +235,8 @@ class ANN_Rule(LearningRule):
         self.use_weights = use_weights
         self.use_reward = use_reward
         self.input_size = int(use_trace_pre) + int(use_trace_post) + int(use_weights) + int(use_reward)
-        self.ann = ANN(input_size=self.input_size, output_size=1, **kwargs)
+        # self.parameters = parameters
+        self.ann = ANN(input_size=self.input_size, output_size=1, parameters=parameters, **kwargs)
 
 
     def update(self, synapse: 'SynapseLayer', reward: float = None, return_inputs: bool = False) -> np.ndarray:
