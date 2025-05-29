@@ -38,7 +38,7 @@ class Evaluator:
         pass
         # self.fitnesses: List[float] = []
 
-    def evaluate(self, solution: object) -> float:
+    def evaluate(self, solution: object, num_trials: int = None) -> float:
         """
         Evaluates a given solution and returns its fitness.
         """

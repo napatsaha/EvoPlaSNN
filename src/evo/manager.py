@@ -8,11 +8,13 @@ class EvoManager:
     """
     Main class for managing loop of evolutionary optimisation.
     """
-    def __init__(self, solver: Solver, evaluator: Evaluator, *, 
+    def __init__(self, solver: Solver, evaluator: Evaluator, *, num_trials: int = 1,
                  max_generations: int = None, target_fitness: float = None, tolerance: float = 1e-6
                  ):
         self.solver = solver
         self.evaluator = evaluator
+
+        self.num_trials = num_trials
 
         # Optimsation parameters
         self.max_generations = max_generations
@@ -51,7 +53,7 @@ class EvoManager:
 
             # Evaluate solution
             for i, solution in enumerate(solutions):
-                fitness_list[i] = self.evaluator.evaluate(solution)
+                fitness_list[i] = self.evaluator.evaluate(solution, num_trials=self.num_trials)
 
             # Inform solver about fitnesses
             self.solver.tell(fitness_list)
