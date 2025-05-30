@@ -4,6 +4,8 @@ jupyter/
 old/
 media/
 misc/
+results/
+config/
 
 .vscode/
 build/

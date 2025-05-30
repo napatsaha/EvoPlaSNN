@@ -1,3 +1,4 @@
+from pathlib import Path
 import numpy as np
 import logging
 
@@ -8,13 +9,14 @@ class EvoManager:
     """
     Main class for managing loop of evolutionary optimisation.
     """
-    def __init__(self, solver: Solver, evaluator: Evaluator, *, num_trials: int = 1,
+    def __init__(self, solver: Solver, evaluator: Evaluator, *, num_trials: int = 1, log_file: str = None,
                  max_generations: int = None, target_fitness: float = None, tolerance: float = 1e-6
                  ):
         self.solver = solver
         self.evaluator = evaluator
 
         self.num_trials = num_trials
+        self.log_file = log_file
 
         # Optimsation parameters
         self.max_generations = max_generations
@@ -29,7 +31,7 @@ class EvoManager:
         """
         self.logger = logging.getLogger("EvoManager")
         self.logger.setLevel(logging.INFO)
-        handler = logging.StreamHandler()
+        handler = logging.StreamHandler() if self.log_file is None else logging.FileHandler(self.log_file)
         formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
         handler.setFormatter(formatter)
         if self.logger.hasHandlers():
@@ -42,6 +44,7 @@ class EvoManager:
         Runs the evolutionary optimisation loop.
         """
         self._setup_logger()
+        self.evaluator.setup_logger(Path(self.log_file).with_stem("trials") if self.log_file is not None else None)
         if self.max_generations is None:
             self.max_generations = 1000  # Default maximum generations
         gen_count = 0
