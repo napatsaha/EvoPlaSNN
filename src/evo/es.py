@@ -29,8 +29,9 @@ class EvolutionStrategy(Solver):
             top_indices = top_indices[-n:][::-1]
         top_solutions = self.solutions[top_indices]
         for i in range(n):
+            sol = top_solutions[i]
             i = str(i + 1).zfill(2)  # Ensure two-digit index
-            np.savetxt(Path(save_dir) / f"best_rule_{i}.txt", top_solutions[i], fmt=f'%.{precision}f')
+            np.savetxt(Path(save_dir) / f"best_rule_{i}.txt", sol, fmt=f'%.{precision}f')
 
     @override
     def ask(self):

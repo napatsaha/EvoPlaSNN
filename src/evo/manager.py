@@ -10,12 +10,13 @@ class EvoManager:
     Main class for managing loop of evolutionary optimisation.
     """
     def __init__(self, solver: Solver, evaluator: Evaluator, *, num_trials: int = 1, log_file: str = None,
-                 max_generations: int = None, target_fitness: float = None, tolerance: float = 1e-6
+                 max_generations: int = None, target_fitness: float = None, tolerance: float = 1e-6, save_best: int = 1,
                  ):
         self.solver = solver
         self.evaluator = evaluator
 
         self.num_trials = num_trials
+        self.save_best = save_best
         self.log_file = log_file
 
         # Optimsation parameters
@@ -90,6 +91,6 @@ class EvoManager:
         # Save best solution
         if self.log_file is not None:
             save_path = Path(self.log_file).parent
-            self.solver.save_best(save_path, n=10, precision=6)
+            self.solver.save_best(save_path, n=self.save_best, precision=6)
 
         
