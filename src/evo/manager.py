@@ -47,6 +47,8 @@ class EvoManager:
         self.evaluator.setup_logger(Path(self.log_file).with_stem("trials") if self.log_file is not None else None)
         if self.max_generations is None:
             self.max_generations = 1000  # Default maximum generations
+        
+        self.logger.info("Starting evolutionary optimisation.")
         gen_count = 0
         while True:
             # Ask for new solutions
@@ -72,13 +74,22 @@ class EvoManager:
             if np.abs(best_fitness - self.target_fitness) < self.tolerance:
                 # Reached target fitness
                 self.logger.info(f"Target fitness {self.target_fitness} reached at generation {gen_count}.")
-                self.logger.info(f"Best solution: {best_solution}")
                 break
 
             if gen_count >= self.max_generations:
                 # Reached maximum generations
-                self.logger.info(f"Maximum generations {self.max_generations} reached. Stopping optimisation.")
-                self.logger.info(f"Best solution: {best_solution}")
+                self.logger.info(f"Maximum generations {self.max_generations} reached.")
                 break
             
             gen_count += 1
+
+        self.logger.info("Terminating Evolutionary optimisation.")
+        self.logger.info(f"Best solution: {best_solution.round(4)}")
+        self.logger.info(f"Best fitness: {best_fitness:.3f}")
+
+        # Save best solution
+        if self.log_file is not None:
+            save_path = Path(self.log_file).parent
+            self.solver.save_best(save_path, n=10, precision=6)
+
+        

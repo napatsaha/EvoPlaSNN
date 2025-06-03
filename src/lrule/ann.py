@@ -4,7 +4,7 @@ from common.utils import solve_hidden, calculate_size
 from .base import LearningRule
 from .utils import tile_array
 
-
+import yaml
 
 import numpy as np
 
@@ -128,7 +128,22 @@ class LinearLayer:
 
     def __repr__(self):
         return f"LinearLayer(input_size={self.input_size}, output_size={self.output_size}, activation_function={self.activation_function.__name__}, bias={self._bias})"
+    
+    def print_weights(self, precision: int = 6):
+        s = ""
+        prelim = "Weights: "
+        bulk = str(self.weights.round(precision)).replace("\n", f"\n{len(prelim)*" "}")
+        s += f"{prelim}{bulk}\n"
+        if self._bias:
+            prelim = "Bias: ".ljust(len(prelim)+1)
+            bulk = str(self.bias.round(precision)).replace("\n", f"\n{len(prelim)*" "}")
+            s += f"{prelim}{bulk}\n"
+            # s += f"Bias:  {str(self.bias.round(precision)).replace("\n", "\n\t  ")}\n"
+        s += f"Activation: {self.activation_function.__name__}"
+        return s
 
+    def __str__(self):
+        return self.print_weights(precision=4)
 
 class ANN:
     """
@@ -240,7 +255,7 @@ class ANN:
     def __str__(self):
         s = "{\n"
         for layer in self.layers:
-            s += "\t" + str(layer) + "\n"
+            s += "  " + str(layer) + "\n"
         s += "}"
         return s
 
@@ -291,6 +306,45 @@ class ANN_Rule(LearningRule):
         else:
             return dw
         
+    def save_parameters(self, file_path: str, precision: int = 6):
+        """
+        Save only flattened parameters of the ANN Rule to a file. (Intended to use with `lrule.ann.read_ANN_Rule()` function)
+        """
+        np.savetxt(file_path, self.ann.parameters, delimiter=',', fmt=f'%.{precision}f',)
+
+    def save_to_file(self, file_path: str):
+        """
+        Save the ANN Rule as a numpy zip .npz file, containing all meta information about the rule. 
+        (Intended to use with `lrule.ann.ANN_Rule.load_from_file()` method)
+        """
+        np.savez(file_path, parameters=self.ann.parameters, input_size=self.input_size,
+                 use_trace_pre=self.use_trace_pre, use_trace_post=self.use_trace_post,
+                 use_weights=self.use_weights, use_reward=self.use_reward, 
+                 hidden_size=self.ann.hidden_sizes, bias=self.ann.bias,
+                 hidden_activation=self.ann.hidden_activation.__name__,
+                 output_activation=self.ann.output_activation.__name__,)
+        
+    @classmethod
+    def load_from_file(cls, file_path: str):
+        """
+        Load the ANN Rule from a .npz file.
+        (Intended to use with `lrule.ann.ANN_Rule.save_to_file()` method)
+        """
+        data = np.load(file_path)
+        parameters = data['parameters']
+        use_trace_pre = data['use_trace_pre'].item()
+        use_trace_post = data['use_trace_post'].item()
+        use_weights = data['use_weights'].item()
+        use_reward = data['use_reward'].item()
+        
+        return cls(parameters=parameters,
+                   use_trace_pre=use_trace_pre, use_trace_post=use_trace_post,
+                   use_weights=use_weights, use_reward=use_reward,
+                   hidden_size=data["hidden_size"].tolist(),
+                   bias=data["bias"].item(),
+                   hidden_activation=data["hidden_activation"].item(),
+                   output_activation=data["output_activation"].item())
+
     @property
     def size(self):
         return self.ann.size
@@ -302,3 +356,28 @@ class ANN_Rule(LearningRule):
     @parameters.setter
     def parameters(self, value):
         self.ann.parameters = value
+
+    def __repr__(self):
+        return f"ANN_Rule(parameters_size={self.size}, use_trace_pre={self.use_trace_pre}, use_trace_post={self.use_trace_post}, use_weights={self.use_weights}, use_reward={self.use_reward}, " + \
+        f"hidden_size={self.ann.hidden_sizes}, bias={self.ann.bias})"
+    
+    def __str__(self):
+        s = "ANN_Rule("
+        s += "Inputs: "
+        for i, layer in enumerate(self.ann.layers):
+            s += f"\n  Layer {i}: (\n    "
+            s += layer.print_weights(precision=4).replace("\n", "\n    ")
+            s +=  "\n  ),"
+        s += "\n)"
+        return s
+    
+
+def read_ANN_Rule(parameter_path: str, config_path: str) -> ANN_Rule:
+    """
+    Create an ANN Rule from a file with parameters and configuration.
+    """
+    with open(config_path, 'r') as f:
+        config = yaml.safe_load(f)
+    
+    parameters = np.loadtxt(parameter_path, delimiter=',')
+    return ANN_Rule(parameters=parameters, **config["arule_params"])

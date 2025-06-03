@@ -1,4 +1,5 @@
 from typing import Tuple, override
+from pathlib import Path
 import numpy as np
 from .base import Solver
 
@@ -18,6 +19,18 @@ class EvolutionStrategy(Solver):
         self.best_fitness = None
         self.best_solution = None
         
+    def save_best(self, save_dir: str | Path, n: int = 1, precision: int = 6):
+        top_indices = np.argsort(self.fitnesses) # Will arrange from lowest to highest fitness
+        if self.minimise:
+            # First n lowest fitness
+            top_indices = top_indices[:n]
+        else:
+            # Last n fitness in descending order
+            top_indices = top_indices[-n:][::-1]
+        top_solutions = self.solutions[top_indices]
+        for i in range(n):
+            i = str(i + 1).zfill(2)  # Ensure two-digit index
+            np.savetxt(Path(save_dir) / f"best_rule_{i}.txt", top_solutions[i], fmt=f'%.{precision}f')
 
     @override
     def ask(self):

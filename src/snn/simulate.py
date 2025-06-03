@@ -95,6 +95,9 @@ class SNNSimulator:
         # Reset spike generator
         self.spike_generator.reset()
 
+        # Reset network
+        self.network.reset()
+
     def run(self, num_steps: int):
         t_start = self.num_steps
         self._setup_run(num_steps)
