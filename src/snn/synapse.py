@@ -76,7 +76,9 @@ class SynapseLayer:
         """
         Reset the synaptic weights to their initial state.
         """
-        self._init_weights()
+        # self._init_weights()
+        self.weights[:] = np.random.uniform(self.weight_min, self.weight_max, size=(self.pre_layer.size, self.post_layer.size))
+        self._normalise_weights()
 
     def forward(self, spike_input: np.ndarray) -> np.ndarray:
         """
