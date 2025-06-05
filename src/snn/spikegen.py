@@ -150,6 +150,125 @@ class PatternSpikeGenerator(SpikeGenerator):
         return self.interval * (self.max_spike_count - 1) + self.spacing
 
 
+def construct_array(n, interval, spacing, ascending=True):
+    # X = np.zeros((n, spacing), dtype=np.int_)
+    A = np.zeros((n, (n-1)*interval + 1 + spacing), dtype=np.int_)
+    if ascending:
+        row_iter = range(0, n, 1)
+    else:
+        row_iter = range(n-1, -1, -1)
+    col_iter = range(0, n*interval, interval)
+    for i, j in zip(row_iter, col_iter):
+        A[i, j] = 1
+    # C = np.c_[A, X]
+    return A
+
+
+class ArrayPatternGenerator(SpikeGenerator):
+    def __init__(self, input_size, interval: int = 1, spacing: int = None,
+                 *, seed=None):
+        super().__init__(input_size, seed)
+        self.interval = max(1, int(interval))
+        self.spacing = max(1, int(spacing)) if spacing is not None else self.interval
+        self.array = construct_array(self.input_size, self.interval, self.spacing)
+        self._pattern_length = (self.input_size - 1) * self.interval + 1
+        self._full_length = self.array.shape[1]
+        self.reset()
+
+    def reset(self):
+        self.count = 0
+        self.finished = False
+
+    def generate(self) -> np.ndarray:
+        idx = self.count % self._full_length
+        if self.count >= self._pattern_length:
+            self.finished = True
+        if self.count >= self._full_length:
+            self.count = 0
+            self.finished = False
+        spikes = self.array[:, idx]
+        self.count += 1
+        return spikes
+
+
+class BinaryArrayGenerator(SpikeGenerator):
+    class_order = ["ascending", "descending"]
+    current_class: int = None
+    def __init__(self, input_size, interval: int = 1, spacing: int = None, p: float = 1.0,
+                 starting_class: Literal["ascending", "descending"] = None, 
+                 *, seed=None):
+        super().__init__(input_size, seed)
+        self.interval = max(1, int(interval))
+        self.spacing = max(1, int(spacing)) if spacing is not None else self.interval
+        self.p = min(1.0, max(0.0, p))
+        self._init_array()
+        self._starting_class = starting_class
+        self._pattern_length = (self.input_size - 1) * self.interval + 1
+        self._full_length = self.array.shape[2] - 1
+        self.reset()
+
+    def _init_array(self):
+        A = construct_array(self.input_size, self.interval, self.spacing, ascending=True)
+        B = construct_array(self.input_size, self.interval, self.spacing, ascending=False)
+        self.array = np.concatenate([A[np.newaxis, ...], B[np.newaxis, ...]], axis=0)
+
+    def reset(self):
+        if self._starting_class is None:
+            self.current_class = int(self.rng.random() > self.p)
+        else:
+            try:
+                self.current_class = self.class_order.index(self._starting_class.lower())
+            except:
+                raise ValueError(f"Starting class must be one of {self.class_order}")
+        self.count = 0
+        self.finished = False
+
+    def switch(self):
+        r = self.rng.random()
+        if r < self.p:
+            self.current_class = 1 - self.current_class
+
+    def generate(self) -> np.ndarray:
+        # Find index before changing count
+        idx = self.count % self._full_length
+        
+        # When spiking pattern is finished
+        if self.count >= (self._pattern_length - 1):
+            self.finished = True
+
+        # When waiting time is finished, reset to initial state
+        if self.count >= self._full_length:
+            self.finished = False
+            self.count = 0
+            self.switch()
+
+        # Increment count after resetting state
+        self.count += 1
+
+        # Slice stored array using recently resetted class
+        spikes = self.array[self.current_class, :, idx]
+        return spikes
+
+    def return_signal(self):
+        return self.finished and (self.count < self._pattern_length + 1)
+
+    def get_label(self) -> None | int:
+        """
+        Returns the current class label.
+        """
+        if self.return_signal():
+            return self.current_class
+        else:
+            return None
+
+    def __len__(self):
+        return self._full_length
+    
+    def get_pattern_length(self):
+        """
+        Returns the duration of a single pattern (disregarding spacing in-between patterns).
+        """
+        return self._pattern_length
 
 
 class BinaryClassGenerator(SpikeGenerator):
@@ -195,7 +314,7 @@ class BinaryClassGenerator(SpikeGenerator):
         return spikes, finished
     
     def _switch_class(self):
-        r = np.random.rand()
+        r = self.rng.random()
         if r < self.p:
             self.current_class = 1 - self.current_class
         # self.current_class = int(r < self.p)
