@@ -32,12 +32,14 @@ def main():
         yaml.dump(config, f, sort_keys=False)
 
     # Setup evolution objects
-    solver = EvolutionStrategy(**config["evo_params"]["solver"])
     evaluator = SNN_Evaluator(num_simulation_steps=config["num_sim_steps"],
                             snn_params=config["snn_params"],
                             spikegen_params=config["spikegen_params"],
                             arule_params=config["arule_params"],
                             )
+    ndim = evaluator.get_parameter_size()
+    config["evo_params"]["solver"].pop("ndim", None)  # Remove ndim from solver config if it exists
+    solver = EvolutionStrategy(ndim=ndim, **config["evo_params"]["solver"])
     manager = EvoManager(solver, evaluator, log_file=log_file, **config["evo_params"]["manager"])
 
     # Begin experiment
@@ -71,4 +73,4 @@ def eval(results_path: Path, num_steps: int = None):
 if __name__ == "__main__":
     results_path = main()
     # Evaluation of best solution
-    eval(results_path)
+    # eval(results_path)

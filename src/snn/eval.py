@@ -3,30 +3,10 @@ import numpy as np
 
 from evo.base import Evaluator
 from snn import SNN, SNNSimulator
-from snn.spikegen import BinaryClassGenerator
+# from snn.spikegen import BinaryClassGenerator
+import snn.spikegen
 from lrule import ANN_Rule
 
-# class SNN_Evaluator(Evaluator):
-#     def __init__(self):
-#         super().__init__()
-
-#     def evaluate(self, genome):
-#         # mock_parameters = np.linspace(0, 1, num=25)
-#         # spikegen = PatternSpikeGenerator(input_size, interval=1)
-#         spikegen = BinaryClassGenerator(input_size, interval=interval, spacing=spacing, signal_on_end=True, starting_class=starting_class, p=p, reflect=reflect)
-
-#         arule = ANN_Rule(hidden_size=[4], bias=True, parameters=genome)
-#         # srule = STDP_Rule(mu=0.01, lambd=0.1, alpha=0.0, dt=dt)
-#         nn = SNN(input_size, hidden_size, output_size, dt=dt, learning_rule=arule, neuron_params={"tau_trace": tau_trace, "tau_mem": tau_mem}, synapse_params=dict(normalise_weights=normalise_weights, normalise_method = normalise_method),
-#                 winner_take_all=True)
-
-#         simulator = SNNSimulator(nn, spikegen, record_weights=False, record_traces=False, record_membrane=False)
-
-#         simulator.run(T)
-
-#         fitness = simulator.reward_manager.accuracy()
-
-#         return fitness
     
 
 class SNN_Evaluator(Evaluator):
@@ -35,11 +15,18 @@ class SNN_Evaluator(Evaluator):
         # self.input_size = input_size
         self.num_simulation_steps = num_simulation_steps
 
-        self.spikegen = BinaryClassGenerator(input_size=snn_params.get("input_size"), **spikegen_params)
+        spikegen_cls = getattr(snn.spikegen, spikegen_params.pop("class", "BinaryClassGenerator"))
+        self.spikegen = spikegen_cls(input_size=snn_params.get("input_size"), **spikegen_params)
         self.arule = ANN_Rule(**arule_params)
         self.snn = SNN(learning_rule=self.arule, **snn_params)
 
         self.simulator = SNNSimulator(self.snn, self.spikegen, record_weights=False, record_traces=False, record_membrane=False, record_spikes=False)
+
+    def get_parameter_size(self):
+        """
+        Returns the number of parameters in the genome required to build an Evolutionary Algorithm.
+        """
+        return self.arule.size
 
     def setup_logger(self, log_file: str = None):
         handler = logging.StreamHandler() if log_file is None else logging.FileHandler(log_file)
@@ -54,9 +41,6 @@ class SNN_Evaluator(Evaluator):
 
 
     def evaluate(self, genome, num_trials=1):
-        # mock_parameters = np.linspace(0, 1, num=25)
-        # spikegen = PatternSpikeGenerator(input_size, interval=1)
-
         self.arule.parameters = genome
         fitnesses = []
         if self.logger:
