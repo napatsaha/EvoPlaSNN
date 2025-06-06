@@ -221,7 +221,7 @@ class BinaryArrayGenerator(SpikeGenerator):
             except:
                 raise ValueError(f"Starting class must be one of {self.class_order}")
         self.count = 0
-        self.finished = False
+        self._finished = False
 
     def switch(self):
         r = self.rng.random()
@@ -234,11 +234,11 @@ class BinaryArrayGenerator(SpikeGenerator):
         
         # When spiking pattern is finished
         if self.count >= (self._pattern_length - 1):
-            self.finished = True
+            self._finished = True
 
         # When waiting time is finished, reset to initial state
         if self.count >= self._full_length:
-            self.finished = False
+            self._finished = False
             self.count = 0
             self.switch()
 
@@ -250,7 +250,7 @@ class BinaryArrayGenerator(SpikeGenerator):
         return spikes
 
     def return_signal(self):
-        return self.finished and (self.count < self._pattern_length + 1)
+        return self._finished and (self.count < self._pattern_length + 1)
 
     def get_label(self) -> None | int:
         """
@@ -264,21 +264,53 @@ class BinaryArrayGenerator(SpikeGenerator):
     def __len__(self):
         return self._full_length
     
-    def get_pattern_length(self):
+    @property
+    def length(self):
+        """
+        Returns the total number of time steps in a single pattern (including spacing).
+        """
+        return self._full_length
+
+    @property
+    def pattern_length(self):
         """
         Returns the duration of a single pattern (disregarding spacing in-between patterns).
         """
         return self._pattern_length
+    
+    @property
+    def finished(self) -> bool:
+        """
+        Returns whether the current pattern is finished (including last time step in pattern).
+        """
+        return self._finished
+    @property
+    def active(self):
+        """
+        Returns whether the pattern is being generated or whether it is during a waiting period.
+        """
+        return (self.count <= self._pattern_length)
+
+    @property
+    def ready(self) -> bool:
+        """
+        Returns whether the generator is ready to allow weight updates or reward to be calculated.  
+        """
+        return self._finished and self.active
+
+   
 
 
 class BinaryClassGenerator(SpikeGenerator):
     """
     A SpikeGenerator that alternates between two classes of PatternSpikeGenerators with opposite directions.
     """
-    def __init__(self, input_size, interval: int, *, spacing: int = None, start_spike: bool = True, 
+    def __init__(self, input_size, interval: int, spacing: int = None, *, start_spike: bool = True, 
                  signal_on_end: bool = False, reflect: bool = False,
                  starting_class: Literal["ascending", "descending"] = "ascending", p: float = 0.5, seed=None):
         super().__init__(input_size, seed)
+        self.interval = max(1, int(interval))
+        self.spacing = max(1, int(spacing)) if spacing is not None else self.interval
         self.p = p
         self.reflect = reflect
         self.signal_on_end = signal_on_end
@@ -287,10 +319,12 @@ class BinaryClassGenerator(SpikeGenerator):
         else:
             starting_neurons = [None, None]
         self.generators = [
-            PatternSpikeGenerator(input_size, interval, spacing=spacing, ascending=True, start_spike=start_spike, starting_neuron=starting_neurons[0], loop=False),
-            PatternSpikeGenerator(input_size, interval, spacing=spacing, ascending=False, start_spike=start_spike, starting_neuron=starting_neurons[1], loop=False)
+            PatternSpikeGenerator(input_size, self.interval, spacing=self.spacing, ascending=True, start_spike=start_spike, starting_neuron=starting_neurons[0], loop=False),
+            PatternSpikeGenerator(input_size, self.interval, spacing=self.spacing, ascending=False, start_spike=start_spike, starting_neuron=starting_neurons[1], loop=False)
         ]
         self.starting_class = starting_class.lower()
+        self._pattern_length = (self.input_size - 1) * self.interval + 1
+        self._full_length = len(self.generators[0])
         self.reset()
 
     def reset(self):
@@ -338,6 +372,45 @@ class BinaryClassGenerator(SpikeGenerator):
         else:
             return self.current_class
 
+    def __len__(self):
+        return self._full_length
+    
+    @property
+    def length(self):
+        """
+        Returns the total number of time steps in a single pattern (including spacing).
+        """
+        return self._full_length
+
+    @property
+    def pattern_length(self):
+        """
+        Returns the duration of a single pattern (disregarding spacing in-between patterns).
+        """
+        return self._pattern_length
+
+    @property
+    def finished(self) -> bool:
+        """
+        Returns whether the current pattern is finished (including last time step in pattern).
+        """
+        return self._finished
+
+    @property
+    def active(self) -> bool:
+        """
+        Returns whether the generator is currently generating spikes (excluding spacing but including last time step).
+        """
+        return (self.count <= self._pattern_length)
+    
+    @property
+    def ready(self) -> bool:
+        """
+        Returns whether the generator is ready to allow weight updates or reward to be calculated.  
+        If `signal_on_end=True`, returns True only at last time step of pattern (to facilitate `on-reward` updates).  
+        Otherwise, returns True at every time step (to facilitate `on-spike` update).
+        """
+        return self._ready if self.signal_on_end else True
 
 
 if __name__ == "__main__":
