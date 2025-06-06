@@ -122,16 +122,24 @@ class SynapseLayer:
 
     def _normalise_weights(self):
         if self.normalise_weights:
-            if self.normalise_method == "sum":
-                self.weights = self.weights / np.sum(self.weights, axis=0, keepdims=True)
-            elif self.normalise_method == "L2":
-                self.weights = self.weights / np.linalg.norm(self.weights, axis=0, keepdims=True)
-            elif self.normalise_method == "P":
-                p = self.normalise_params.get("p", 1)
-                self.weights = self.weights / np.linalg.norm(self.weights, ord=p, axis=0, keepdims=True)
-            else:
-                raise ValueError(f"Normalisation method {self.normalise_method} not recognised.")
-            
+            self.weights = safe_norm(self.weights, self.normalise_method)
 
     def __repr__(self):
         return f"SynapseLayer({self.weights.shape})"
+    
+
+def safe_norm(array, method, params={}, eps=1e-10):
+    if method == "sum":
+        denom = np.sum(array, axis=0, keepdims=True)
+    elif method == "L2":
+        denom = np.linalg.norm(array, axis=0, keepdims=True)
+    elif method == "P":
+        p = params.get("p", 1)
+        denom = np.linalg.norm(array, ord=p, axis=0, keepdims=True)
+    else:
+        raise ValueError(f"Normalisation method {method} not recognised.")
+    
+    # Avoid division by zero
+    denom = np.where(denom == 0, eps, denom)
+    array = array / denom
+    return array
