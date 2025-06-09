@@ -10,6 +10,7 @@ from evo.es import EvolutionStrategy
 
 from snn.plot import plot_weight_over_time, plot_weights, plot_spikes, plot_membranes
 from snn import SNN, SNNSimulator
+import snn.spikegen as spkgen
 
 from lrule.ann import read_ANN_Rule
 
@@ -55,7 +56,8 @@ def eval(results_path: Path, num_steps: int = None):
     T = config["num_sim_steps"] if num_steps is None else num_steps
     arule = read_ANN_Rule(results_path / "best_rule_01.txt", config_path=results_path / "config.yaml")
 
-    spikegen = BinaryClassGenerator(input_size=config["snn_params"].get("input_size"), **config["spikegen_params"])
+    spikegen_cls = getattr(spkgen, config["spikegen_params"].pop("class", "BinaryClassGenerator"))
+    spikegen = spikegen_cls(input_size=config["snn_params"].get("input_size"), **config["spikegen_params"])
     snn = SNN(learning_rule=arule, **config["snn_params"])
 
     simulator = SNNSimulator(snn, spikegen, record_membrane=True, record_spikes=True, record_traces=True, record_weights=True)
@@ -73,4 +75,4 @@ def eval(results_path: Path, num_steps: int = None):
 if __name__ == "__main__":
     results_path = main()
     # Evaluation of best solution
-    # eval(results_path)
+    eval(results_path)
