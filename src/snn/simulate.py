@@ -4,16 +4,18 @@ from matplotlib import ticker
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib as mpl
-from snn.decoding import RewardManager
 
 from .utils import LayerRecorder, MatrixRecorder
 from .snn import SNN
 from lrule import LearningRule
 from .spikegen import BinaryClassGenerator, SpikeGenerator
+from .decoding import RewardManager, get_decoder_class, BaseDecoder
 
 
 class SNNSimulator:
     def __init__(self, network: SNN, spike_generator: SpikeGenerator, *, 
+                 decoder_type: Literal["final", "rate", "latency"] = "final",
+                 decoder_params: dict = {},
                  record_membrane: bool = True, record_spikes: bool = True, record_traces: bool = True, record_weights: bool = False):
         self.network = network
         self.num_steps = 0
@@ -32,7 +34,10 @@ class SNNSimulator:
 
         # For supervised learning
         self._supervised = hasattr(self.spike_generator, "get_label")
-        self.reward_manager = RewardManager()
+        # self.reward_manager = RewardManager()
+        self.decoder: BaseDecoder = get_decoder_class(decoder_type)(buffer_size=spike_generator.pattern_length, 
+                                                                    neuron_size=network.output_size, **decoder_params) if self._supervised else None
+
 
         self.dt = network.dt
 
@@ -52,7 +57,9 @@ class SNNSimulator:
             self.trace_recorder.reset()
         if self.record_weights:
             self.weight_recorder.reset()
-        self.reward_manager.reset()
+        # self.reward_manager.reset()
+        if self.decoder is not None:
+            self.decoder.reset()
 
         # Reset spike generator
         self.spike_generator.reset()
@@ -66,26 +73,39 @@ class SNNSimulator:
         for t in range(t_start, self.num_steps):
             # Random input spikes
             spk_in = self.spike_generator.generate()
-            update_signal = self.spike_generator.return_signal()
 
             # Forward pass
             spk_out = self.network.forward(spk_in)
 
-            # Evaluate reward
-            if update_signal and self._supervised:
-                # label = self.spike_generator.get_label()
-                # prediction = np.argmax(spk_out) if spk_out.size > 1 else spk_out
-                # reward = 1.0 if np.equal(label, prediction) else 0.0
-                # self.reward_collector.append((t, label, prediction, reward))
-                reward = self.reward_manager.calculate_reward(self.spike_generator.get_label(), spk_out, t)
-            else:
-                reward = None
+            # TODO: Add 
+            if self._supervised and self.spike_generator.active:
+               self.decoder.record(spk_out)
 
-
-            # Update synaptic weights
-            if self.learning_rule is not None:
-                if update_signal:
+            if self._supervised and self.spike_generator.ready:
+                label = self.spike_generator.get_label()
+                reward = self.decoder.calculate_reward(label)
+                # self.reward_collector.append((t, label, reward))
+                if self.learning_rule is not None:
                     self.network.update_synapses(reward=reward)
+
+
+            # TODO: Remove
+            # Evaluate reward
+            # update_signal = self.spike_generator.return_signal()
+            # if update_signal and self._supervised:
+            #     # label = self.spike_generator.get_label()
+            #     # prediction = np.argmax(spk_out) if spk_out.size > 1 else spk_out
+            #     # reward = 1.0 if np.equal(label, prediction) else 0.0
+            #     # self.reward_collector.append((t, label, prediction, reward))
+            #     reward = self.reward_manager.calculate_reward(self.spike_generator.get_label(), spk_out, t)
+            # else:
+            #     reward = None
+
+            # TODO: Remove
+            # Update synaptic weights
+            # if self.learning_rule is not None:
+            #     if update_signal:
+            #         self.network.update_synapses(reward=reward)
             
             # Record membrane potentials
             if self.record_membrane:
@@ -106,6 +126,13 @@ class SNNSimulator:
             if self.record_weights:
                 for i, weights in enumerate(self.network.weights):
                     self.weight_recorder.record(i, t, weights)
+
+    # TODO: Add get_fitness
+    def get_fitness(self) -> float:
+        if self.decoder is None:
+            Warning("Decoder is not set. Fitness cannot be calculated.")
+            return 0.0
+        return self.decoder.get_fitness()
 
     def get_spike_times(self, start=0, end=None) -> List[List[np.ndarray]] | None:
         if self.spike_recorder is None:

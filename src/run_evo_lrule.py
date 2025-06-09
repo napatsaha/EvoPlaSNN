@@ -37,6 +37,7 @@ def main():
                             snn_params=config["snn_params"],
                             spikegen_params=config["spikegen_params"],
                             arule_params=config["arule_params"],
+                            decoder_params=config["decoder_params"],
                             )
     ndim = evaluator.get_parameter_size()
     config["evo_params"]["solver"].pop("ndim", None)  # Remove ndim from solver config if it exists
@@ -60,10 +61,12 @@ def eval(results_path: Path, num_steps: int = None):
     spikegen = spikegen_cls(input_size=config["snn_params"].get("input_size"), **config["spikegen_params"])
     snn = SNN(learning_rule=arule, **config["snn_params"])
 
-    simulator = SNNSimulator(snn, spikegen, record_membrane=True, record_spikes=True, record_traces=True, record_weights=True)
+    decoder_type = config["decoder_params"].pop("type", "final")
+    simulator = SNNSimulator(snn, spikegen, record_membrane=True, record_spikes=True, record_traces=True, record_weights=True,
+                             decoder_type=decoder_type, decoder_params=config["decoder_params"])
     simulator.reset()
     simulator.run(T)
-    accuracy = simulator.reward_manager.accuracy()
+    accuracy = simulator.get_fitness()
     print(f"Accuracy: {accuracy:.2f}")
 
     plot_spikes(simulator, x_min=T-100, x_max=T, x_eps=2, savepath=Path(results_path, "eval_rule_01_spikes.png"), show=False)

@@ -10,7 +10,7 @@ from lrule import ANN_Rule
     
 
 class SNN_Evaluator(Evaluator):
-    def __init__(self, num_simulation_steps: int = 100, snn_params: dict = {}, spikegen_params: dict = {}, arule_params: dict = {}):
+    def __init__(self, num_simulation_steps: int = 100, snn_params: dict = {}, spikegen_params: dict = {}, arule_params: dict = {}, decoder_params: dict = {}):
         super().__init__()
         # self.input_size = input_size
         self.num_simulation_steps = num_simulation_steps
@@ -20,7 +20,9 @@ class SNN_Evaluator(Evaluator):
         self.arule = ANN_Rule(**arule_params)
         self.snn = SNN(learning_rule=self.arule, **snn_params)
 
-        self.simulator = SNNSimulator(self.snn, self.spikegen, record_weights=False, record_traces=False, record_membrane=False, record_spikes=False)
+        decoder_type = decoder_params.pop("type", "final")
+        self.simulator = SNNSimulator(self.snn, self.spikegen, record_weights=False, record_traces=False, record_membrane=False, record_spikes=False,
+                                      decoder_type=decoder_type, decoder_params=decoder_params)
 
     def get_parameter_size(self):
         """
@@ -47,13 +49,13 @@ class SNN_Evaluator(Evaluator):
             self.logger.info(f"\nEvaluating genome: {genome}")
 
         for i in range(num_trials):
-            self.spikegen.reset()
+            # self.spikegen.reset()
             self.simulator.reset()
-            self.snn.reset()
+            # self.snn.reset()
 
             self.simulator.run(self.num_simulation_steps)
 
-            accuracy = self.simulator.reward_manager.accuracy()
+            accuracy = self.simulator.get_fitness()
             fitnesses.append(accuracy)
             if self.logger:
                 self.logger.info(f"Trial {i+1}/{num_trials}: Fitness = {accuracy:.2f}")

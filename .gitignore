@@ -5,7 +5,7 @@ old/
 media/
 misc/
 results/
-config/
+config/*.ini
 
 .vscode/
 build/

@@ -1,0 +1,47 @@
+num_sim_steps: 1000
+snn_params:
+  input_size: 10
+  hidden_size: 0
+  output_size: 2
+  dt: 0.001
+  neuron_params:
+    tau_mem: 0.005
+    tau_trace: 0.005
+  synapse_params:
+    normalise_weights: true
+    normalise_method: L2
+  winner_take_all: true
+spikegen_params:
+  class: BinaryArrayGenerator
+  starting_class: ascending
+  interval: 1
+  spacing: 10
+  p: 1.0
+  # reflect: true
+  # signal_on_end: true
+decoder_params:
+  type: latency
+  direction: last
+  convert_type: negate
+  fitness_type: reward
+arule_params:
+  hidden_size: 4
+  bias: true
+  hidden_activation: relu
+  output_activation: tanh
+  use_weights: true
+  use_reward: true
+  use_trace_pre: true
+  use_trace_post: true
+evo_params:
+  manager:
+    max_generations: 1000
+    target_fitness: 1.0
+    tolerance: 0.02
+    num_trials: 5
+    save_best: 10
+  solver:
+    # ndim: 25
+    popsize: 100
+    sigma: 0.5
+    minimise: false
