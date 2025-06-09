@@ -2,6 +2,22 @@ import numpy as np
 from typing import Literal, Protocol, override
 
 
+decoder_dict = {
+    "final": "FinalStepDecoder",
+    "final_step": "FinalStepDecoder",
+    "rate": "RateDecoder",
+    "latency": "LatencyDecoder"
+}
+
+def get_decoder_class(decoder_type: str):
+    """
+    Get the decoder class based on the decoder type.
+    """
+    if decoder_type not in decoder_dict:
+        raise ValueError(f"Decoder type '{decoder_type}' is not supported. Supported types: {list(decoder_dict.keys())}")
+    return globals()[decoder_dict[decoder_type]]
+
+
 class RewardManager:
     def __init__(self):
         self.memory = {"t": [], "label": [], "prediction": [], "reward": []}
@@ -55,15 +71,21 @@ class Decoder(Protocol):
 
 
 class BaseDecoder(Decoder):
-    def __init__(self, buffer_size: int, neuron_size: int):
+    def __init__(self, buffer_size: int, neuron_size: int, fitness_type: Literal["reward", "mse", "cross_entropy"] = "reward",
+                 reward_null: float = 0.0, reward_correct: float = 1.0, reward_incorrect: float = -1.0):
         super().__init__()
+        if fitness_type not in ["reward", "mse", "cross_entropy"]:
+            raise ValueError("fitness_type must be one of ['reward', 'mse', 'cross_entropy']")
         self.buffer_size = buffer_size
         self.neuron_size = neuron_size
         self.buffer = np.zeros((self.neuron_size, self.buffer_size), dtype=np.int_)
-        self.reward_buffer = []
+        self.fitness_buffer = []
+        self.fitness_type = fitness_type
         self.count = 0
         self._full = False
-        self.reward_null = 0.0
+        self.reward_null = reward_null
+        self.reward_correct = reward_correct
+        self.reward_incorrect = reward_incorrect
 
     def reset(self) -> None:
         """
@@ -71,7 +93,7 @@ class BaseDecoder(Decoder):
         """
         self.buffer.fill(0)
         self._full = False
-        self.reward_buffer.clear()
+        self.fitness_buffer.clear()
         self.count = 0
 
     def record(self, spikes: np.ndarray) -> None:
@@ -99,7 +121,8 @@ class BaseDecoder(Decoder):
         
         a = self._decode()
         # Check if there is a tie
-        if len(np.unique(a)) == 1:
+        max_value = np.max(a)
+        if np.sum(a == max_value) > 1:
             return None
         # Otherwise return neuron with largest value
         else:
@@ -120,18 +143,30 @@ class BaseDecoder(Decoder):
         if pred is None:
             reward = self.reward_null
         else:
-            reward = 1.0 if pred == label else -1.0
+            reward = self.reward_correct if pred == label else self.reward_incorrect
 
-        self.reward_buffer.append(reward)
+        fitness = self.calculate_fitness(label, reward)
+        self.fitness_buffer.append(fitness)
         return reward
     
+    def calculate_fitness(self, label: int, reward: float) -> float:
+        """
+        Calculate fitness for each example.
+        """
+        if self.fitness_type == "reward":
+            return reward
+        else:
+            raise NotImplementedError(f"Fitness type '{self.fitness_type}' is not implemented yet.")
+
+
+
     def get_fitness(self) -> float:
         """
-        Calculate the fitness based on accumulated rewards.
+        Calculate aggregate fitness for this trial.
         """
-        if not self.reward_buffer:
-            raise ValueError("No rewards recorded. Cannot calculate fitness.")
-        return np.mean(self.reward_buffer)
+        if len(self.fitness_buffer) == 0:
+            raise ValueError("No fitness recorded. Cannot calculate fitness.")
+        return np.mean(self.fitness_buffer)
 
 
 class FinalStepDecoder(BaseDecoder):
@@ -162,6 +197,38 @@ class RateDecoder(BaseDecoder):
     
 
 class LatencyDecoder(BaseDecoder):
+    """
+    A decoder that computes the latency (time-to-first-spike) for each neuron 
+    in a spiking neural network (SNN) and applies a specified transformation 
+    to the result.
+
+    Attributes:
+        direction (Literal["first", "last"]): 
+            Determines which direction time-to-first-spike (TTFS) is calculated from.
+            If "first" (default), find the neuron that spikes first.
+            If "last", find the neuron that spikes most recently.
+        convert_type (Literal["negate", "invert"]): Specifies the transformation 
+            to apply to the time-to-first-spike (TTFS) values. "negate" returns 
+            the negative of TTFS, while "invert" returns the reciprocal of TTFS 
+            (with zeros handled to avoid division by zero).
+
+    Methods:
+        _decode() -> np.ndarray:
+            Decodes the buffer to compute the latency for each neuron and 
+            applies the specified transformation.
+
+    Raises:
+        ValueError: If an invalid value is provided for `direction` or 
+            `convert_type`.
+
+    Parameters:
+        buffer_size (int): The size of the buffer used for decoding.
+        neuron_size (int): The number of neurons in the network.
+        direction (Literal["first", "last"], optional): The direction to process 
+            the buffer. Defaults to "first".
+        convert_type (Literal["negate", "invert"], optional): The transformation 
+            to apply to the TTFS values. Defaults to "negate".
+    """
     def __init__(self, buffer_size, neuron_size, direction: Literal["first", "last"] = "first",
                  convert_type: Literal["negate", "invert"] = "negate"):
         super().__init__(buffer_size, neuron_size)
@@ -180,12 +247,14 @@ class LatencyDecoder(BaseDecoder):
             a = self.buffer
         # Find time to first spike for each neuron
         ttfs = np.argmax(a, axis=1)
+        # To handle neurons that never spike, we set their time to first spike to infinity
+        ttfs = np.where(np.sum(a, axis=1) == 0, np.inf, ttfs)
 
         # Finally, convert to opposite
         if self.convert_type == "negate":
             return -ttfs
         elif self.convert_type == "invert":
-            return np.where(ttfs == 0, 0, 1 / ttfs)
+            return safe_divide(1.0, ttfs, default_value=np.inf)
         else:
             raise ValueError("Invalid convert type. Must be 'negate' or 'invert'.")
 
@@ -200,3 +269,7 @@ def cross_entropy(p, q):
 
 def mean_square_error(p, q):
     return np.sum((p - q) ** 2)
+
+def safe_divide(x, y, default_value=np.inf):
+    """Safe division that avoids division by zero."""
+    return np.divide(x, y, where=y != 0, out=np.full(np.broadcast(x, y).shape, default_value, dtype=float))
