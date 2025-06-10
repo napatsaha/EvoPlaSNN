@@ -9,13 +9,13 @@ from .utils import LayerRecorder, MatrixRecorder
 from .snn import SNN
 from lrule import LearningRule
 from .spikegen import BinaryClassGenerator, SpikeGenerator
-from .decoding import RewardManager, get_decoder_class, BaseDecoder
+from .decoding import get_decoder_class, BaseDecoder
 
 
 class SNNSimulator:
     def __init__(self, network: SNN, spike_generator: SpikeGenerator, *, 
-                 decoder_type: Literal["final", "rate", "latency"] = "final",
-                 decoder_params: dict = {},
+                 decoder_type: Literal["final", "rate", "latency"] = "final", decoder_params: dict = {},
+                 supervised: bool = True,
                  record_membrane: bool = True, record_spikes: bool = True, record_traces: bool = True, record_weights: bool = False):
         self.network = network
         self.num_steps = 0
@@ -33,7 +33,11 @@ class SNNSimulator:
         self.weight_recorder = MatrixRecorder([synapse.weights.shape for synapse in network.synapse_layers]) if self.record_weights else None
 
         # For supervised learning
-        self._supervised = hasattr(self.spike_generator, "get_label")
+        self._supervised = supervised
+        # Enforce unsupervised learning if the learning rule update condition is on-spike
+        if hasattr(self.learning_rule, "condition") and self.learning_rule.condition == "on-spike":
+            self._supervised = False
+
         # self.reward_manager = RewardManager()
         self.decoder: BaseDecoder = get_decoder_class(decoder_type)(buffer_size=spike_generator.pattern_length, 
                                                                     neuron_size=network.output_size, **decoder_params) if self._supervised else None
@@ -77,7 +81,6 @@ class SNNSimulator:
             # Forward pass
             spk_out = self.network.forward(spk_in)
 
-            # TODO: Add 
             if self._supervised and self.spike_generator.active:
                self.decoder.record(spk_out)
 
@@ -85,8 +88,11 @@ class SNNSimulator:
                 label = self.spike_generator.get_label()
                 reward = self.decoder.calculate_reward(label)
                 # self.reward_collector.append((t, label, reward))
-                if self.learning_rule is not None:
-                    self.network.update_synapses(reward=reward)
+                self.network.update_synapses(reward=reward)
+
+            if not self._supervised:
+                # Update synaptic weights every timestep
+                self.network.update_synapses(reward=None)
 
 
             # TODO: Remove

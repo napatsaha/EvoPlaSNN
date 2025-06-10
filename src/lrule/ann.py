@@ -264,10 +264,11 @@ class ANN_Rule(LearningRule):
     """
     A Learning Rule that represents a black box ANN function that converts synapse-related information to weight updates.
     """
-    def __init__(self, parameters = None, *, 
+    def __init__(self, parameters = None, *, learning_rate: float = 1.0,
                  use_trace_pre: bool = True, use_trace_post: bool = True, use_weights: bool = True, use_reward: bool = True, 
                  **kwargs):
         super().__init__()
+        self.learning_rate = learning_rate
         self.use_trace_pre = use_trace_pre
         self.use_trace_post = use_trace_post
         self.use_weights = use_weights
@@ -300,6 +301,7 @@ class ANN_Rule(LearningRule):
 
         dw = self.ann.forward(inp)
         dw = dw.reshape(w_shape)
+        dw *= self.learning_rate
 
         if return_inputs:
             return dw, inp

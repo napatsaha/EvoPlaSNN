@@ -95,22 +95,24 @@ class SynapseLayer:
         """
         Update the synaptic weights based on the learning rule.
         """
-        if self._learning_rule_type == "STDP":
+        if self._learning_rule_type is not None:
             # For STDP Rule
-            trace_pre, trace_post = self._tile(self.pre_layer.get_trace(), self.post_layer.get_trace())
-            spk_pre, spk_post = self._tile(self.pre_layer.spike, self.post_layer.spike)
-            self.weights = self.learning_rule.update(self.weights, spk_pre, spk_post, trace_pre, trace_post, reward=reward)
-        elif self._learning_rule_type is None:
-            return 
-        elif self._learning_rule_type == "ANN":
+            # trace_pre, trace_post = self._tile(self.pre_layer.get_trace(), self.post_layer.get_trace())
+            # spk_pre, spk_post = self._tile(self.pre_layer.spike, self.post_layer.spike)
+            # self.weights = self.learning_rule.update(self.weights, spk_pre, spk_post, trace_pre, trace_post, reward=reward)
             dw = self.learning_rule.update(self, reward=reward)
             self.weights += dw
+        # elif self._learning_rule_type is None:
+        #     return 
+        # elif self._learning_rule_type == "ANN":
+        #     dw = self.learning_rule.update(self, reward=reward)
+        #     self.weights += dw
             # trace_pre, trace_post = self._tile(self.pre_layer.get_trace(), self.post_layer.get_trace())
             # spk_pre, spk_post = self._tile(self.pre_layer.spike, self.post_layer.spike)
             # self.weights = self.learning_rule.update(self.weights, spk_pre, spk_post, trace_pre, trace_post, reward=reward)
         else:
             # For Empty Rule
-            self.weights = self.learning_rule.update(self.weights)
+            # self.weights = self.learning_rule.update(self.weights)
             return
         
         # Clip the weights
