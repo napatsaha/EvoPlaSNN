@@ -9,12 +9,13 @@ from .utils import LayerRecorder, MatrixRecorder
 from .snn import SNN
 from lrule import LearningRule
 from .spikegen import BinaryClassGenerator, SpikeGenerator
-from .decoding import get_decoder_class, BaseDecoder
+from .decoding import get_decoder_class, get_fitnessor_class, BaseDecoder, BaseFitnessor
 
 
 class SNNSimulator:
     def __init__(self, network: SNN, spike_generator: SpikeGenerator, *, 
                  decoder_type: Literal["final", "rate", "latency"] = "final", decoder_params: dict = {},
+                 fitnessor_type: Literal["accuracy", "reward", "cross-entropy", "mse"] = "accuracy", fitnessor_params: dict = {},
                  supervised: bool = True,
                  record_membrane: bool = True, record_spikes: bool = True, record_traces: bool = True, record_weights: bool = False):
         self.network = network
@@ -41,6 +42,7 @@ class SNNSimulator:
         # self.reward_manager = RewardManager()
         self.decoder: BaseDecoder = get_decoder_class(decoder_type)(buffer_size=spike_generator.pattern_length, 
                                                                     neuron_size=network.output_size, **decoder_params) if self._supervised else None
+        self.fitnessor: BaseFitnessor = get_fitnessor_class(fitnessor_type)(num_classes=network.output_size, **fitnessor_params) if self._supervised else None
 
 
         self.dt = network.dt
@@ -64,6 +66,8 @@ class SNNSimulator:
         # self.reward_manager.reset()
         if self.decoder is not None:
             self.decoder.reset()
+        if self.fitnessor is not None:
+            self.fitnessor.reset()
 
         # Reset spike generator
         self.spike_generator.reset()
@@ -86,7 +90,9 @@ class SNNSimulator:
 
             if self._supervised and self.spike_generator.ready:
                 label = self.spike_generator.get_label()
-                reward = self.decoder.calculate_reward(label)
+                output = self.decoder.decode()
+                reward = self.decoder.calculate_reward(label, output)
+                self.fitnessor.record(label, output, reward)
                 # self.reward_collector.append((t, label, reward))
                 self.network.update_synapses(reward=reward)
 
@@ -133,12 +139,11 @@ class SNNSimulator:
                 for i, weights in enumerate(self.network.weights):
                     self.weight_recorder.record(i, t, weights)
 
-    # TODO: Add get_fitness
     def get_fitness(self) -> float:
-        if self.decoder is None:
-            Warning("Decoder is not set. Fitness cannot be calculated.")
+        if self.fitnessor is None:
+            Warning("Fitnessor is not set. Fitness cannot be calculated.")
             return 0.0
-        return self.decoder.get_fitness()
+        return self.fitnessor.calculate_fitness()
 
     def get_spike_times(self, start=0, end=None) -> List[List[np.ndarray]] | None:
         if self.spike_recorder is None:

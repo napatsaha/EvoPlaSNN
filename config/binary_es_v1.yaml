@@ -1,29 +1,37 @@
 num_sim_steps: 1000
 snn_params:
-  input_size: 10
+  input_size: 2
   hidden_size: 0
   output_size: 2
   dt: 0.001
   neuron_params:
-    tau_mem: 0.005
-    tau_trace: 0.005
+    tau_mem: 0.004
+    tau_trace: 0.004
   synapse_params:
     normalise_weights: true
     normalise_method: L2
-  winner_take_all: true
+  winner_take_all: false
 spikegen_params:
   class: BinaryArrayGenerator
   starting_class: ascending
-  interval: 1
+  interval: 2
   spacing: 10
   p: 1.0
   # reflect: true
   # signal_on_end: true
 decoder_params:
   type: latency
+  # type: latency
   direction: last
   convert_type: negate
-  fitness_type: reward
+  reward_null: 0.0
+  reward_correct: 1.0
+  reward_incorrect: -1.0
+fitness_params:
+  type: reward
+  # type: accuracy
+  # type: cross-entropy
+  # type: mse
 arule_params:
   hidden_size: 4
   bias: true
@@ -39,7 +47,7 @@ evo_params:
     target_fitness: 1.0
     tolerance: 0.02
     num_trials: 5
-    save_best: 10
+    save_best: 3
   solver:
     # ndim: 25
     popsize: 100

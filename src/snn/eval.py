@@ -10,7 +10,8 @@ from lrule import ANN_Rule
     
 
 class SNN_Evaluator(Evaluator):
-    def __init__(self, num_simulation_steps: int = 100, snn_params: dict = {}, spikegen_params: dict = {}, arule_params: dict = {}, decoder_params: dict = {}):
+    def __init__(self, num_simulation_steps: int = 100, snn_params: dict = {}, spikegen_params: dict = {}, arule_params: dict = {}, decoder_params: dict = {},
+                 fitnessor_params: dict = {}):
         super().__init__()
         # self.input_size = input_size
         self.num_simulation_steps = num_simulation_steps
@@ -21,8 +22,11 @@ class SNN_Evaluator(Evaluator):
         self.snn = SNN(learning_rule=self.arule, **snn_params)
 
         decoder_type = decoder_params.pop("type", "final")
+        fitnessor_type = fitnessor_params.pop("type", "reward")
+        
         self.simulator = SNNSimulator(self.snn, self.spikegen, record_weights=False, record_traces=False, record_membrane=False, record_spikes=False,
-                                      decoder_type=decoder_type, decoder_params=decoder_params)
+                                      decoder_type=decoder_type, decoder_params=decoder_params, 
+                                      fitnessor_type=fitnessor_type, fitnessor_params=fitnessor_params)
 
     def get_parameter_size(self):
         """

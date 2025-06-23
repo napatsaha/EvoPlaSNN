@@ -38,6 +38,7 @@ def main():
                             spikegen_params=config["spikegen_params"],
                             arule_params=config["arule_params"],
                             decoder_params=config["decoder_params"],
+                            fitnessor_params=config["fitness_params"]
                             )
     ndim = evaluator.get_parameter_size()
     config["evo_params"]["solver"].pop("ndim", None)  # Remove ndim from solver config if it exists
