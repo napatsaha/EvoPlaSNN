@@ -62,94 +62,6 @@ class RandomSpikeGenerator(SpikeGenerator):
             raise NotImplementedError(f"Distribution {self.dist} not implemented")
 
 
-class PatternSpikeGenerator(SpikeGenerator):
-    """
-    Generates a pattern of sequential spikes for each neuron in the input layer.
-    Delays between spikes can be specified by the interval argument.
-    """
-    def __init__(self, input_size: int, interval: float, *, spacing: int = None, 
-                 signal_on_end: bool = False, starting_neuron: int = None, loop: bool = False,
-                 ascending: bool = True, start_spike: bool = True, seed=None):
-        super().__init__(input_size, seed)
-        self.interval = max(1, int(interval))
-        self.spacing = max(1, int(spacing)) if spacing is not None else interval
-        self.signal_on_end = signal_on_end
-
-        # Spiking behaviour
-        self.ascending = ascending
-        self.start_spike = start_spike
-        self.starting_neuron = max(0, min(input_size - 1, starting_neuron)) if starting_neuron is not None else 0 if ascending else input_size - 1
-        self.max_spike_count = self.input_size if loop else self.input_size - self.starting_neuron if self.ascending else self.starting_neuron + 1
-        self.direction = 1 if ascending else -1
-        self.reset()
-        # self.delay_count = self.interval if start_spike else 0
-        # self.spike_count = 0
-        # self.current_neuron = 0 if ascending else input_size - 1
-        # self.finished = False
-
-    def reset(self):
-        self.delay_count = self.interval if self.start_spike else 0
-        # if self.spacing > 0:
-        # self.current_neuron = 0 if self.ascending else self.input_size - 1
-        self.current_neuron = self.starting_neuron
-        # else:
-        #     self.current_neuron = - self.spacing if self.ascending else self.input_size + self.spacing - 1
-        self.finished = False
-        self.spike_count = 0
-
-    def generate(self) -> np.ndarray:
-        """
-        Generates a spike pattern for the input layer.
-        The pattern consists of spikes that occur at regular intervals.
-        """
-        self.delay_count += 1
-        spikes =  self.generate_empty()
-
-        # Intermission
-        if self.finished:
-            if self.delay_count >= self.spacing:
-                # self.delay_count += 1
-                self.reset()
-                # spikes =  self.generate_empty()
-            # else:
-            # if self.delay_count >= (self.spacing - 1):
-            #     self.reset()
-        # Regular Spiking
-        if not self.finished:
-            if self.delay_count >= self.interval:
-                # Reset delay count
-                self.delay_count = 0
-
-                # Create a spike pattern
-                # spikes = self.generate_empty()
-                spikes[self.current_neuron] = 1
-
-                # Update the current neuron index
-                self.current_neuron = (self.current_neuron + self.direction) % self.input_size
-                self.spike_count += 1
-                # Check if the pattern is finished
-                if self.spike_count >= self.max_spike_count:
-                    self.finished = True
-                    self.spike_count = 0
-
-            # else:
-            #     spikes = self.generate_empty()
-            
-        return spikes
-
-    def return_signal(self) -> bool | int:
-        """
-        Returns a signal that indicates whether the pattern is finished.
-        """
-        if self.signal_on_end:
-            return self.finished
-        else:
-            return True
-
-    def __len__(self):
-        return self.interval * (self.max_spike_count - 1) + self.spacing
-
-
 def construct_array(n, interval, spacing, ascending=True):
     # X = np.zeros((n, spacing), dtype=np.int_)
     A = np.zeros((n, (n-1)*interval + 1 + spacing), dtype=np.int_)
@@ -299,6 +211,92 @@ class BinaryArrayGenerator(SpikeGenerator):
         return self._finished and self.active
 
    
+class PatternSpikeGenerator(SpikeGenerator):
+    """
+    Generates a pattern of sequential spikes for each neuron in the input layer.
+    Delays between spikes can be specified by the interval argument.
+    """
+    def __init__(self, input_size: int, interval: float, *, spacing: int = None, 
+                 signal_on_end: bool = False, starting_neuron: int = None, loop: bool = False,
+                 ascending: bool = True, start_spike: bool = True, seed=None):
+        super().__init__(input_size, seed)
+        self.interval = max(1, int(interval))
+        self.spacing = max(1, int(spacing)) if spacing is not None else interval
+        self.signal_on_end = signal_on_end
+
+        # Spiking behaviour
+        self.ascending = ascending
+        self.start_spike = start_spike
+        self.starting_neuron = max(0, min(input_size - 1, starting_neuron)) if starting_neuron is not None else 0 if ascending else input_size - 1
+        self.max_spike_count = self.input_size if loop else self.input_size - self.starting_neuron if self.ascending else self.starting_neuron + 1
+        self.direction = 1 if ascending else -1
+        self.reset()
+        # self.delay_count = self.interval if start_spike else 0
+        # self.spike_count = 0
+        # self.current_neuron = 0 if ascending else input_size - 1
+        # self.finished = False
+
+    def reset(self):
+        self.delay_count = self.interval if self.start_spike else 0
+        # if self.spacing > 0:
+        # self.current_neuron = 0 if self.ascending else self.input_size - 1
+        self.current_neuron = self.starting_neuron
+        # else:
+        #     self.current_neuron = - self.spacing if self.ascending else self.input_size + self.spacing - 1
+        self.finished = False
+        self.spike_count = 0
+
+    def generate(self) -> np.ndarray:
+        """
+        Generates a spike pattern for the input layer.
+        The pattern consists of spikes that occur at regular intervals.
+        """
+        self.delay_count += 1
+        spikes =  self.generate_empty()
+
+        # Intermission
+        if self.finished:
+            if self.delay_count >= self.spacing:
+                # self.delay_count += 1
+                self.reset()
+                # spikes =  self.generate_empty()
+            # else:
+            # if self.delay_count >= (self.spacing - 1):
+            #     self.reset()
+        # Regular Spiking
+        if not self.finished:
+            if self.delay_count >= self.interval:
+                # Reset delay count
+                self.delay_count = 0
+
+                # Create a spike pattern
+                # spikes = self.generate_empty()
+                spikes[self.current_neuron] = 1
+
+                # Update the current neuron index
+                self.current_neuron = (self.current_neuron + self.direction) % self.input_size
+                self.spike_count += 1
+                # Check if the pattern is finished
+                if self.spike_count >= self.max_spike_count:
+                    self.finished = True
+                    self.spike_count = 0
+
+            # else:
+            #     spikes = self.generate_empty()
+            
+        return spikes
+
+    def return_signal(self) -> bool | int:
+        """
+        Returns a signal that indicates whether the pattern is finished.
+        """
+        if self.signal_on_end:
+            return self.finished
+        else:
+            return True
+
+    def __len__(self):
+        return self.interval * (self.max_spike_count - 1) + self.spacing
 
 
 class BinaryClassGenerator(SpikeGenerator):

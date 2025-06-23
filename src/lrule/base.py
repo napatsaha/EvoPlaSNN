@@ -26,7 +26,7 @@ class Empty_Rule(LearningRule):
     def __init__(self):
         super().__init__()
 
-    def update(self, w: np.ndarray, **kwargs) -> np.ndarray:
+    def update(self, **kwargs) -> float:
         # No update
-        return w
+        return 0.0
     
