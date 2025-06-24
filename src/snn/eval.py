@@ -33,6 +33,13 @@ class SNN_Evaluator(Evaluator):
         Returns the number of parameters in the genome required to build an Evolutionary Algorithm.
         """
         return self.arule.size
+    
+    def is_minimise(self):
+        """
+        Returns whether the optimisation is minimisation or maximisation.
+        Depends on Fitnessor type.
+        """
+        return self.simulator.fitnessor.minimise if hasattr(self.simulator, 'fitnessor') and self.simulator.fitnessor is not None else False
 
     def setup_logger(self, log_file: str = None):
         handler = logging.StreamHandler() if log_file is None else logging.FileHandler(log_file)

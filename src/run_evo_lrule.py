@@ -28,11 +28,7 @@ def main():
 
     log_file = Path(results_path, "best.log")
 
-    # Save a copy of configuration used
-    with open(results_path / "config.yaml", "w") as f:
-        yaml.dump(config, f, sort_keys=False)
-
-    # Setup evolution objects
+    # Configure SNN Evaluator object
     evaluator = SNN_Evaluator(num_simulation_steps=config["num_sim_steps"],
                             snn_params=config["snn_params"],
                             spikegen_params=config["spikegen_params"],
@@ -40,36 +36,60 @@ def main():
                             decoder_params=config["decoder_params"],
                             fitnessor_params=config["fitness_params"]
                             )
+    # Configure Evolution Solver object
     ndim = evaluator.get_parameter_size()
-    config["evo_params"]["solver"].pop("ndim", None)  # Remove ndim from solver config if it exists
-    solver = EvolutionStrategy(ndim=ndim, **config["evo_params"]["solver"])
+    is_minimise = evaluator.is_minimise()
+    # config["evo_params"]["solver"].pop("ndim", None)  # Remove ndim from solver config if it exists
+    config["evo_params"]["solver"]["ndim"] = ndim
+    config["evo_params"]["solver"]["minimise"] = is_minimise
+    solver = EvolutionStrategy(**config["evo_params"]["solver"])
+    # Configure Evolution Manager object
     manager = EvoManager(solver, evaluator, log_file=log_file, **config["evo_params"]["manager"])
+
+    # Save a copy of configuration used
+    with open(results_path / "config.yaml", "w") as f:
+        yaml.dump(config, f, sort_keys=False)
 
     # Begin experiment
     manager.run()
 
     return results_path 
 
-def eval(results_path: Path, num_steps: int = None):
+def eval(results_path: Path, num_steps: int = None, rule_id: int = 1, num_evals: int = 10):
 
     with open(results_path / "config.yaml", "r") as f:
         config = yaml.safe_load(f)
 
     T = config["num_sim_steps"] if num_steps is None else num_steps
-    arule = read_ANN_Rule(results_path / "best_rule_01.txt", config_path=results_path / "config.yaml")
+    rule_id_name = f"best_rule_{rule_id:02d}.txt"
+    if not (results_path / rule_id_name).exists():
+        raise FileNotFoundError(f"Rule file {rule_id_name} not found in {results_path}. Please run the evolution first.")
+    # Load the best ANN learning rule
+    arule = read_ANN_Rule(results_path / rule_id_name, config_path=results_path / "config.yaml")
 
     spikegen_cls = getattr(spkgen, config["spikegen_params"].pop("class", "BinaryClassGenerator"))
     spikegen = spikegen_cls(input_size=config["snn_params"].get("input_size"), **config["spikegen_params"])
     snn = SNN(learning_rule=arule, **config["snn_params"])
 
     decoder_type = config["decoder_params"].pop("type", "final")
+    fitnessor_type = config["fitness_params"].pop("type", "accuracy")
     simulator = SNNSimulator(snn, spikegen, record_membrane=True, record_spikes=True, record_traces=True, record_weights=True,
-                             decoder_type=decoder_type, decoder_params=config["decoder_params"])
+                             decoder_type=decoder_type, decoder_params=config["decoder_params"],
+                             fitnessor_type=fitnessor_type, fitnessor_params=config["fitness_params"])
+    
+    fits = []
+    for _ in range(num_evals):
+        simulator.reset()
+        simulator.run(T)
+        fitness = simulator.get_fitness()
+        fits.append(fitness)
+
+    print(f"Mean fitness (Type: {fitnessor_type}): {sum(fits) / len(fits):.2f} ({num_evals} evaluations)")
+
+    # Plotting
     simulator.reset()
     simulator.run(T)
-    accuracy = simulator.get_fitness()
-    print(f"Accuracy: {accuracy:.2f}")
-
+    fitness = simulator.get_fitness()
     plot_spikes(simulator, x_min=T-100, x_max=T, x_eps=2, savepath=Path(results_path, "eval_rule_01_spikes.png"), show=False)
     plot_membranes(simulator, x_min=T-100, x_max=T, plot_inputs=False, col_width=20, row_height=7, savepath=Path(results_path, "eval_rule_01_membranes.png"), show=False)
     plot_weights(simulator, div=10, savepath=Path(results_path, "eval_rule_01_weights.png"), show=False)
