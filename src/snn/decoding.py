@@ -459,7 +459,8 @@ class LatencyDecoder(BaseDecoder):
             to apply to the TTFS values. Defaults to "negate".
     """
     def __init__(self, buffer_size, neuron_size, direction: Literal["first", "last"] = "first",
-                 convert_type: Literal["negate", "invert"] = "negate", **kwargs):
+                 convert_type: Literal["negate", "invert"] = "negate", 
+                 max_value: int = None, **kwargs):
         super().__init__(buffer_size, neuron_size, **kwargs)
         if direction not in ["first", "last"]:
             raise ValueError("Direction must be 'first' or 'last'.")
@@ -467,6 +468,7 @@ class LatencyDecoder(BaseDecoder):
             raise ValueError("Convert type must be 'negate' or 'invert'.")
         self.direction = direction
         self.convert_type = convert_type
+        self.max_value = max_value if max_value is not None else self.buffer_size
 
     @override
     def _decode(self) -> np.ndarray:
@@ -477,7 +479,7 @@ class LatencyDecoder(BaseDecoder):
         # Find time to first spike for each neuron
         ttfs = np.argmax(a, axis=1)
         # To handle neurons that never spike, we set their time to first spike to infinity
-        ttfs = np.where(np.sum(a, axis=1) == 0, np.inf, ttfs)
+        ttfs = np.where(np.sum(a, axis=1) == 0, self.max_value, ttfs)
 
         # Finally, convert to opposite
         if self.convert_type == "negate":

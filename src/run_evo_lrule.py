@@ -1,9 +1,10 @@
-import os
+
 import time
-from snn.spikegen import BinaryClassGenerator
+from typing import Tuple
 import yaml
-from pprint import pprint
 from pathlib import Path
+import numpy as np
+
 from evo.manager import EvoManager
 from snn.eval import SNN_Evaluator
 from evo.es import EvolutionStrategy
@@ -55,7 +56,10 @@ def main():
 
     return results_path 
 
-def eval(results_path: Path, num_steps: int = None, rule_id: int = 1, num_evals: int = 10):
+def eval(results_path: Path | str, num_steps: int = None, rule_id: int = 1, num_evals: int = 10, save_plots: bool = False, verbose: bool = True) -> Tuple[float, float]:
+
+    if not isinstance(results_path, Path):
+        results_path = Path(results_path)
 
     with open(results_path / "config.yaml", "r") as f:
         config = yaml.safe_load(f)
@@ -71,6 +75,12 @@ def eval(results_path: Path, num_steps: int = None, rule_id: int = 1, num_evals:
     spikegen = spikegen_cls(input_size=config["snn_params"].get("input_size"), **config["spikegen_params"])
     snn = SNN(learning_rule=arule, **config["snn_params"])
 
+    # Backward compatbility of fitness_params
+    if "fitness_params" not in config:
+        config["fitness_params"] = {}
+        if "fitness_type" in config["decoder_params"]:
+            config["fitness_params"]["type"] = config["decoder_params"].pop("fitness_type")
+
     decoder_type = config["decoder_params"].pop("type", "final")
     fitnessor_type = config["fitness_params"].pop("type", "accuracy")
     simulator = SNNSimulator(snn, spikegen, record_membrane=True, record_spikes=True, record_traces=True, record_weights=True,
@@ -84,19 +94,25 @@ def eval(results_path: Path, num_steps: int = None, rule_id: int = 1, num_evals:
         fitness = simulator.get_fitness()
         fits.append(fitness)
 
-    print(f"Mean fitness (Type: {fitnessor_type}): {sum(fits) / len(fits):.2f} ({num_evals} evaluations)")
+    mean_fits = sum(fits) / len(fits)
+    std_fits = np.std(fits)
+
+    if verbose:
+        print(f"Mean fitness (Type: {fitnessor_type}): {mean_fits:.2f} ({num_evals} evaluations)")
 
     # Plotting
-    simulator.reset()
-    simulator.run(T)
-    fitness = simulator.get_fitness()
-    plot_spikes(simulator, x_min=T-100, x_max=T, x_eps=2, savepath=Path(results_path, "eval_rule_01_spikes.png"), show=False)
-    plot_membranes(simulator, x_min=T-100, x_max=T, plot_inputs=False, col_width=20, row_height=7, savepath=Path(results_path, "eval_rule_01_membranes.png"), show=False)
-    plot_weights(simulator, div=10, savepath=Path(results_path, "eval_rule_01_weights.png"), show=False)
-    plot_weight_over_time(simulator, savepath=Path(results_path, "eval_rule_01_weight_over_time.png"), show=False)
+    if save_plots:
+        simulator.reset()
+        simulator.run(T)
+        fitness = simulator.get_fitness()
+        plot_spikes(simulator, x_min=T-100, x_max=T, x_eps=2, savepath=Path(results_path, "eval_rule_01_spikes.png"), show=False)
+        plot_membranes(simulator, x_min=T-100, x_max=T, plot_inputs=False, col_width=20, row_height=7, savepath=Path(results_path, "eval_rule_01_membranes.png"), show=False)
+        plot_weights(simulator, div=10, savepath=Path(results_path, "eval_rule_01_weights.png"), show=False)
+        plot_weight_over_time(simulator, savepath=Path(results_path, "eval_rule_01_weight_over_time.png"), show=False)
 
+    return mean_fits, std_fits
 
 if __name__ == "__main__":
     results_path = main()
     # Evaluation of best solution
-    eval(results_path)
+    eval(results_path, save_plots=True)
