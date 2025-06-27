@@ -74,15 +74,6 @@ def get_fitnessor_class(fitnessor_type: str):
 #         """
 #         self.memory = {"t": [], "label": [], "prediction": [], "reward": []}
 
-class RewarderProtocol(Protocol):
-    def calculate_reward(self, target) -> float:
-        pass
-
-    def calculate_fitness(self, label: int, reward: float) -> float:
-        pass
-
-    def get_fitness(self) -> float:
-        pass
 
 
 class Decoder(Protocol):
