@@ -10,16 +10,12 @@ from snn.eval import SNN_Evaluator
 from evo.es import EvolutionStrategy
 
 from snn.plot import plot_weight_over_time, plot_weights, plot_spikes, plot_membranes
-from snn import SNN, SNNSimulator
-import snn.spikegen as spkgen
 
-from lrule.ann import read_ANN_Rule
-
-def main():
+def main(config_file: str | Path) -> Path:
     ROOT = Path(__file__).parent.parent
 
     # Default config file
-    config_path = Path(ROOT, "config", "binary_es_v1.yaml")
+    config_path = Path(ROOT, "config", config_file)
     with open(config_path, "r") as f:
         config = yaml.safe_load(f)
 
@@ -117,14 +113,15 @@ def eval(results_path: Path | str, num_steps: int = None, rule_id: int = 1, num_
         simulator.reset()
         simulator.run(T)
         fitness = simulator.get_fitness()
-        plot_spikes(simulator, x_min=T-100, x_max=T, x_eps=2, savepath=Path(results_path, "eval_rule_01_spikes.png"), show=False)
-        plot_membranes(simulator, x_min=T-100, x_max=T, plot_inputs=False, col_width=20, row_height=7, savepath=Path(results_path, "eval_rule_01_membranes.png"), show=False)
-        plot_weights(simulator, div=10, savepath=Path(results_path, "eval_rule_01_weights.png"), show=False)
-        plot_weight_over_time(simulator, savepath=Path(results_path, "eval_rule_01_weight_over_time.png"), show=False)
+        prefix = f"eval_rule_{rule_id:02d}"
+        plot_spikes(simulator, x_min=T-100, x_max=T, x_eps=2, savepath=Path(results_path, f"{prefix}_spikes.png"), show=False)
+        plot_membranes(simulator, x_min=T-100, x_max=T, plot_inputs=False, col_width=20, row_height=7, savepath=Path(results_path, f"{prefix}_membranes.png"), show=False)
+        plot_weights(simulator, div=10, savepath=Path(results_path, f"{prefix}_weights.png"), show=False)
+        plot_weight_over_time(simulator, savepath=Path(results_path, f"{prefix}_weight_over_time.png"), show=False)
 
     return mean_fits, std_fits
 
 if __name__ == "__main__":
-    results_path = main()
+    results_path = main(config_file="binary_es_v2.yaml")
     # Evaluation of best solution
     eval(results_path, save_plots=True)

@@ -52,7 +52,7 @@ class SNN_Evaluator(Evaluator):
         Returns whether the optimisation is minimisation or maximisation.
         Depends on Fitnessor type.
         """
-        return self.simulator.fitnessor.minimise if hasattr(self.simulator, 'fitnessor') and self.simulator.fitnessor is not None else False
+        return self.simulator.is_minimise()
 
     def setup_logger(self, log_file: str = None):
         handler = logging.StreamHandler() if log_file is None else logging.FileHandler(log_file)

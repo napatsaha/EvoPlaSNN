@@ -11,17 +11,22 @@ from .snn import SNN
 from lrule import LearningRule
 from .spikegen import BinaryClassGenerator, SpikeGenerator
 from .decoding import get_decoder_class, get_fitnessor_class, BaseDecoder, BaseFitnessor
+from .rewarder import create_rewarder, create_collector, RewarderProtocol, CollectorProtocol
 
 
 class SNNSimulator:
+    decoder: BaseDecoder | None
+    fitnessor: BaseFitnessor | None
+    rewarder: RewarderProtocol | None
+    collector: CollectorProtocol | None
     def __init__(self, network: SNN, spike_generator: SpikeGenerator, *, 
                  params: dict = {},
                 #  decoder_type: Literal["final", "rate", "latency"] = "final", decoder_params: dict = {},
                 #  fitnessor_type: Literal["accuracy", "reward", "cross-entropy", "mse"] = "accuracy", fitnessor_params: dict = {},
                  supervised: bool = True,
                  record_membrane: bool = True, record_spikes: bool = True, record_traces: bool = True, record_weights: bool = False):
-        self.network = network
         self.num_steps = 0
+        self.network = network
         self.spike_generator = spike_generator
         self.learning_rule = network.learning_rule
 
@@ -41,16 +46,42 @@ class SNNSimulator:
         if hasattr(self.learning_rule, "condition") and self.learning_rule.condition == "on-spike":
             self._supervised = False
 
-        # self.reward_manager = RewardManager()
+        # Initialize post-processing components
         params = copy.deepcopy(params)
-        if "decoder_params" in params:
-            decoder_type = params["decoder_params"].pop("type", "final")
-            self.decoder: BaseDecoder = get_decoder_class(decoder_type)(buffer_size=spike_generator.pattern_length, 
-                                                                        neuron_size=network.output_size, **params["decoder_params"]) if self._supervised else None
-        if "fitnessor_params" in params:
-            fitnessor_type = params["fitnessor_params"].pop("type", "accuracy")
-            fitnessor_params = params["fitnessor_params"]
-            self.fitnessor: BaseFitnessor = get_fitnessor_class(fitnessor_type)(num_classes=network.output_size, **fitnessor_params) if self._supervised else None
+        # Option 0: Decodes spike output after certain timestep and computes reward/fitness based on decoded output
+        if "decoder_params" in params or "fitnessor_params" in params:
+            self._post_process_type = 0
+            if "decoder_params" in params:
+                decoder_type = params["decoder_params"].pop("type", "final")
+                self.decoder: BaseDecoder = get_decoder_class(decoder_type)(buffer_size=spike_generator.pattern_length, 
+                                                                            neuron_size=network.output_size, **params["decoder_params"]) if self._supervised else None
+            if "fitnessor_params" in params:
+                fitnessor_type = params["fitnessor_params"].pop("type", "accuracy")
+                fitnessor_params = params["fitnessor_params"]
+                self.fitnessor: BaseFitnessor = get_fitnessor_class(fitnessor_type)(num_classes=network.output_size, **fitnessor_params) if self._supervised else None
+        # Option 1: Computes reward at every timestep by comparing spike outputs with target outputs. 
+        # Fitness is just aggregated version of either errors or rewards within each example.
+        elif "rewarder_params" in params:
+            self._post_process_type = 1
+            rewarder_type = params["rewarder_params"].pop("type", "simple")
+            self.rewarder = create_rewarder(
+                rewarder_type,
+                num_classes=network.output_size, 
+                pattern_length=spike_generator.pattern_length, 
+                spacing=spike_generator.spacing, 
+                **params["rewarder_params"])
+            collector_type = params["collector_params"].pop("type", "simple")
+            self.collector = create_collector(
+                collector_type,
+                buffer_size=spike_generator.length, **params.get("collector_params", {}))
+        # Option 2: No supervised learning. No reward function.
+        else:
+            self._post_process_type = -1
+            self._supervised = False
+            self.decoder = None
+            self.fitnessor = None
+            self.rewarder = None
+            self.collector = None
 
         self.dt = network.dt
 
@@ -71,10 +102,14 @@ class SNNSimulator:
         if self.record_weights:
             self.weight_recorder.reset()
         # self.reward_manager.reset()
-        if self.decoder is not None:
+        if hasattr(self, 'decoder') and self.decoder is not None:
             self.decoder.reset()
-        if self.fitnessor is not None:
+        if hasattr(self, 'fitnessor') and self.fitnessor is not None:
             self.fitnessor.reset()
+        if hasattr(self, 'rewarder') and self.rewarder is not None:
+            self.rewarder.reset()
+        if hasattr(self, 'collector') and self.collector is not None:
+            self.collector.reset()
 
         # Reset spike generator
         self.spike_generator.reset()
@@ -92,20 +127,33 @@ class SNNSimulator:
             # Forward pass
             spk_out = self.network.forward(spk_in)
 
-            if self._supervised and self.spike_generator.active:
-               self.decoder.record(spk_out)
+            # Post-processing
+            if self._post_process_type == 0:
+                if self._supervised and self.spike_generator.active:
+                    self.decoder.record(spk_out)
 
-            if self._supervised and self.spike_generator.ready:
-                label = self.spike_generator.get_label()
-                output = self.decoder.decode()
-                reward = self.decoder.calculate_reward(label, output)
-                self.fitnessor.record(label, output, reward)
-                # self.reward_collector.append((t, label, reward))
+                if self._supervised and self.spike_generator.ready:
+                    label = self.spike_generator.get_label()
+                    output = self.decoder.decode()
+                    reward = self.decoder.calculate_reward(label, output)
+                    self.fitnessor.record(label, output, reward)
+                    # self.reward_collector.append((t, label, reward))
+                    self.network.update_synapses(reward=reward)
+
+            elif self._post_process_type == 1:
+                target = self.rewarder.get_target(self.spike_generator.current_class)
+                error, reward = self.rewarder.get_reward(target, spk_out)
+                self.collector.record(reward, error)
+
+                if self.spike_generator.ready:
+                    self.collector.collate()
+
                 self.network.update_synapses(reward=reward)
 
-            if not self._supervised:
-                # Update synaptic weights every timestep
-                self.network.update_synapses(reward=None)
+            else:
+                if not self._supervised:
+                    # Update synaptic weights every timestep
+                    self.network.update_synapses(reward=None)
 
 
             # TODO: Remove
@@ -146,11 +194,27 @@ class SNNSimulator:
                 for i, weights in enumerate(self.network.weights):
                     self.weight_recorder.record(i, t, weights)
 
-    def get_fitness(self) -> float:
-        if self.fitnessor is None:
-            Warning("Fitnessor is not set. Fitness cannot be calculated.")
-            return 0.0
-        return self.fitnessor.calculate_fitness()
+    def get_fitness(self) -> float | None:
+        if self._post_process_type == 0:
+            if self.fitnessor is None:
+                Warning("Fitnessor is not set. Fitness cannot be calculated.")
+                return None
+            return self.fitnessor.calculate_fitness()
+        elif self._post_process_type == 1:
+            if self.collector is None:
+                Warning("Collector is not set. Fitness cannot be calculated.")
+                return None
+            return self.collector.calculate_fitness()
+        else:
+            return None
+
+    def is_minimise(self) -> bool | None:
+        if self._post_process_type == 0:
+            return self.fitnessor.minimise if self.fitnessor is not None else None
+        elif self._post_process_type == 1:
+            return self.collector.minimise if self.collector is not None else None
+        else:
+            return None
 
     def get_spike_times(self, start=0, end=None) -> List[List[np.ndarray]] | None:
         if self.spike_recorder is None:
