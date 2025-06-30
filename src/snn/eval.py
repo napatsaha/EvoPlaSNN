@@ -1,4 +1,6 @@
 import logging
+import copy
+from typing import Dict, Any
 import numpy as np
 
 from evo.base import Evaluator
@@ -10,23 +12,34 @@ from lrule import ANN_Rule
     
 
 class SNN_Evaluator(Evaluator):
-    def __init__(self, num_simulation_steps: int = 100, snn_params: dict = {}, spikegen_params: dict = {}, arule_params: dict = {}, decoder_params: dict = {},
-                 fitnessor_params: dict = {}):
+    def __init__(self, 
+                 params: Dict = {},
+                 record_info: bool = False,
+                #  num_simulation_steps: int = 100, snn_params: dict = {}, spikegen_params: dict = {}, arule_params: dict = {}, 
+                #  decoder_params: dict = {}, fitnessor_params: dict = {}
+                 ):
         super().__init__()
         # self.input_size = input_size
-        self.num_simulation_steps = num_simulation_steps
+        params = copy.deepcopy(params)
+        self.num_simulation_steps = params["num_sim_steps"]
 
-        spikegen_cls = getattr(snn.spikegen, spikegen_params.pop("class", "BinaryClassGenerator"))
-        self.spikegen = spikegen_cls(input_size=snn_params.get("input_size"), **spikegen_params)
-        self.arule = ANN_Rule(**arule_params)
-        self.snn = SNN(learning_rule=self.arule, **snn_params)
+        spikegen_cls = getattr(snn.spikegen, params["spikegen_params"].pop("class", "BinaryClassGenerator"))
+        self.spikegen = spikegen_cls(input_size=params["snn_params"].get("input_size"), **params["spikegen_params"])
+        self.arule = ANN_Rule(**params["arule_params"])
+        self.snn = SNN(learning_rule=self.arule, **params["snn_params"])
 
-        decoder_type = decoder_params.pop("type", "final")
-        fitnessor_type = fitnessor_params.pop("type", "reward")
+        # decoder_type = decoder_params.pop("type", "final")
+        # fitnessor_type = fitnessor_params.pop("type", "reward")
         
-        self.simulator = SNNSimulator(self.snn, self.spikegen, record_weights=False, record_traces=False, record_membrane=False, record_spikes=False,
-                                      decoder_type=decoder_type, decoder_params=decoder_params, 
-                                      fitnessor_type=fitnessor_type, fitnessor_params=fitnessor_params)
+        self.simulator = SNNSimulator(self.snn, self.spikegen, 
+                                      record_weights=False if not record_info else True, 
+                                      record_traces=False if not record_info else True,
+                                      record_membrane=False if not record_info else True,
+                                      record_spikes=False if not record_info else True,
+                                      params=params
+                                    #   decoder_type=decoder_type, decoder_params=decoder_params, 
+                                    #   fitnessor_type=fitnessor_type, fitnessor_params=fitnessor_params
+                                      )
 
     def get_parameter_size(self):
         """

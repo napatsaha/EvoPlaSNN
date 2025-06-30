@@ -30,13 +30,15 @@ def main():
     log_file = Path(results_path, "best.log")
 
     # Configure SNN Evaluator object
-    evaluator = SNN_Evaluator(num_simulation_steps=config["num_sim_steps"],
-                            snn_params=config["snn_params"],
-                            spikegen_params=config["spikegen_params"],
-                            arule_params=config["arule_params"],
-                            decoder_params=config["decoder_params"],
-                            fitnessor_params=config["fitness_params"]
-                            )
+    evaluator = SNN_Evaluator(
+        params=config
+        # num_simulation_steps=config["num_sim_steps"],
+        # snn_params=config["snn_params"],
+        # spikegen_params=config["spikegen_params"],
+        # arule_params=config["arule_params"],
+        # decoder_params=config["decoder_params"],
+        # fitnessor_params=config["fitness_params"]
+    )
     # Configure Evolution Solver object
     ndim = evaluator.get_parameter_size()
     is_minimise = evaluator.is_minimise()
@@ -68,24 +70,33 @@ def eval(results_path: Path | str, num_steps: int = None, rule_id: int = 1, num_
     rule_id_name = f"best_rule_{rule_id:02d}.txt"
     if not (results_path / rule_id_name).exists():
         raise FileNotFoundError(f"Rule file {rule_id_name} not found in {results_path}. Please run the evolution first.")
-    # Load the best ANN learning rule
-    arule = read_ANN_Rule(results_path / rule_id_name, config_path=results_path / "config.yaml")
+    
+    # # Load the best ANN learning rule
+    # arule = read_ANN_Rule(results_path / rule_id_name, config_path=results_path / "config.yaml")
 
-    spikegen_cls = getattr(spkgen, config["spikegen_params"].pop("class", "BinaryClassGenerator"))
-    spikegen = spikegen_cls(input_size=config["snn_params"].get("input_size"), **config["spikegen_params"])
-    snn = SNN(learning_rule=arule, **config["snn_params"])
+    # spikegen_cls = getattr(spkgen, config["spikegen_params"].pop("class", "BinaryClassGenerator"))
+    # spikegen = spikegen_cls(input_size=config["snn_params"].get("input_size"), **config["spikegen_params"])
+    # snn = SNN(learning_rule=arule, **config["snn_params"])
 
-    # Backward compatbility of fitness_params
-    if "fitness_params" not in config:
-        config["fitness_params"] = {}
-        if "fitness_type" in config["decoder_params"]:
-            config["fitness_params"]["type"] = config["decoder_params"].pop("fitness_type")
+    # # Backward compatbility of fitness_params
+    # if "fitness_params" not in config:
+    #     config["fitness_params"] = {}
+    #     if "fitness_type" in config["decoder_params"]:
+    #         config["fitness_params"]["type"] = config["decoder_params"].pop("fitness_type")
 
-    decoder_type = config["decoder_params"].pop("type", "final")
-    fitnessor_type = config["fitness_params"].pop("type", "accuracy")
-    simulator = SNNSimulator(snn, spikegen, record_membrane=True, record_spikes=True, record_traces=True, record_weights=True,
-                             decoder_type=decoder_type, decoder_params=config["decoder_params"],
-                             fitnessor_type=fitnessor_type, fitnessor_params=config["fitness_params"])
+    # # decoder_type = config["decoder_params"].pop("type", "final")
+    # # fitnessor_type = config["fitness_params"].pop("type", "accuracy")
+    # simulator = SNNSimulator(snn, spikegen, record_membrane=True, record_spikes=True, record_traces=True, record_weights=True,
+    #                          params=config,
+    #                         #  decoder_type=decoder_type, decoder_params=config["decoder_params"],
+    #                         #  fitnessor_type=fitnessor_type, fitnessor_params=config["fitness_params"]
+    #                          )
+
+    evaluator = SNN_Evaluator(
+        params=config,
+        record_info=True
+    )
+    simulator = evaluator.simulator
     
     fits = []
     for _ in range(num_evals):
@@ -98,7 +109,8 @@ def eval(results_path: Path | str, num_steps: int = None, rule_id: int = 1, num_
     std_fits = np.std(fits)
 
     if verbose:
-        print(f"Mean fitness (Type: {fitnessor_type}): {mean_fits:.2f} ({num_evals} evaluations)")
+        fitness_type = config.get("fitnessor_params", {}).get("type", "unknown")
+        print(f"Mean fitness (Type: {fitness_type}): {mean_fits:.2f} ({num_evals} evaluations)")
 
     # Plotting
     if save_plots:

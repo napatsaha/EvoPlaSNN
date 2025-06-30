@@ -21,16 +21,16 @@ spikegen_params:
   # signal_on_end: true
 decoder_params:
   type: latency
-  # type: latency
+  # type: final
   direction: last
   convert_type: negate
   reward_null: 0.0
   reward_correct: 1.0
   reward_incorrect: -1.0
-fitness_params:
-  type: reward
+fitnessor_params:
+  # type: reward
   # type: accuracy
-  # type: cross-entropy
+  type: cross_entropy
   # type: mse
 arule_params:
   hidden_size: 4
@@ -43,13 +43,13 @@ arule_params:
   use_trace_post: true
 evo_params:
   manager:
-    max_generations: 1000
+    max_generations: 10
     target_fitness: 1.0
     tolerance: 0.02
     num_trials: 5
     save_best: 3
   solver:
     # ndim: 25
-    popsize: 100
+    popsize: 10
     sigma: 0.5
     minimise: false

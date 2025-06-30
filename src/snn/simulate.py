@@ -1,3 +1,4 @@
+import copy
 from pathlib import Path
 from typing import List, Literal
 from matplotlib import ticker
@@ -14,8 +15,9 @@ from .decoding import get_decoder_class, get_fitnessor_class, BaseDecoder, BaseF
 
 class SNNSimulator:
     def __init__(self, network: SNN, spike_generator: SpikeGenerator, *, 
-                 decoder_type: Literal["final", "rate", "latency"] = "final", decoder_params: dict = {},
-                 fitnessor_type: Literal["accuracy", "reward", "cross-entropy", "mse"] = "accuracy", fitnessor_params: dict = {},
+                 params: dict = {},
+                #  decoder_type: Literal["final", "rate", "latency"] = "final", decoder_params: dict = {},
+                #  fitnessor_type: Literal["accuracy", "reward", "cross-entropy", "mse"] = "accuracy", fitnessor_params: dict = {},
                  supervised: bool = True,
                  record_membrane: bool = True, record_spikes: bool = True, record_traces: bool = True, record_weights: bool = False):
         self.network = network
@@ -40,10 +42,15 @@ class SNNSimulator:
             self._supervised = False
 
         # self.reward_manager = RewardManager()
-        self.decoder: BaseDecoder = get_decoder_class(decoder_type)(buffer_size=spike_generator.pattern_length, 
-                                                                    neuron_size=network.output_size, **decoder_params) if self._supervised else None
-        self.fitnessor: BaseFitnessor = get_fitnessor_class(fitnessor_type)(num_classes=network.output_size, **fitnessor_params) if self._supervised else None
-
+        params = copy.deepcopy(params)
+        if "decoder_params" in params:
+            decoder_type = params["decoder_params"].pop("type", "final")
+            self.decoder: BaseDecoder = get_decoder_class(decoder_type)(buffer_size=spike_generator.pattern_length, 
+                                                                        neuron_size=network.output_size, **params["decoder_params"]) if self._supervised else None
+        if "fitnessor_params" in params:
+            fitnessor_type = params["fitnessor_params"].pop("type", "accuracy")
+            fitnessor_params = params["fitnessor_params"]
+            self.fitnessor: BaseFitnessor = get_fitnessor_class(fitnessor_type)(num_classes=network.output_size, **fitnessor_params) if self._supervised else None
 
         self.dt = network.dt
 
