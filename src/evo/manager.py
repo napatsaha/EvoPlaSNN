@@ -2,6 +2,8 @@ from pathlib import Path
 import numpy as np
 import logging
 
+from tqdm import tqdm
+
 from .base import Solver, Evaluator
 
 
@@ -51,38 +53,44 @@ class EvoManager:
         
         self.logger.info("Starting evolutionary optimisation.")
         gen_count = 0
-        while True:
-            # Ask for new solutions
-            solutions = self.solver.ask()
+        try:
+            pbar = tqdm(total=self.max_generations, desc="Generations", position=0, leave=True)
+            while True:
+                # Ask for new solutions
+                solutions = self.solver.ask()
 
-            fitness_list = np.zeros(self.solver.popsize)
+                fitness_list = np.zeros(self.solver.popsize)
 
-            # Evaluate solution
-            for i, solution in enumerate(solutions):
-                fitness_list[i] = self.evaluator.evaluate(solution, num_trials=self.num_trials)
+                # Evaluate solution
+                for i, solution in tqdm(enumerate(solutions), desc="Populations", total=self.solver.popsize, position=1, leave=False):
+                    fitness_list[i] = self.evaluator.evaluate(solution, num_trials=self.num_trials)
 
-            # Inform solver about fitnesses
-            self.solver.tell(fitness_list)
+                # Inform solver about fitnesses
+                self.solver.tell(fitness_list)
 
-            # Get best solutions and their fitnesses
-            best_solution, best_fitness = self.solver.result()
+                # Get best solutions and their fitnesses
+                best_solution, best_fitness = self.solver.result()
 
-            # Log result
-            if gen_count % logging_freq == 0:
-                self.logger.info(f"Generation {gen_count}: Best fitness = {best_fitness:.3f}, Best solution = {best_solution.round(2)}")
+                # Log result
+                if gen_count % logging_freq == 0:
+                    self.logger.info(f"Generation {gen_count}: Best fitness = {best_fitness:.3f}, Best solution = {best_solution.round(2)}")
 
-            # Check stopping criteria
-            if np.abs(best_fitness - self.target_fitness) < self.tolerance:
-                # Reached target fitness
-                self.logger.info(f"Target fitness {self.target_fitness} reached at generation {gen_count}.")
-                break
+                # Check stopping criteria
+                if np.abs(best_fitness - self.target_fitness) < self.tolerance:
+                    # Reached target fitness
+                    self.logger.info(f"Target fitness {self.target_fitness} reached at generation {gen_count}.")
+                    break
 
-            if gen_count >= self.max_generations:
-                # Reached maximum generations
-                self.logger.info(f"Maximum generations {self.max_generations} reached.")
-                break
-            
-            gen_count += 1
+                if gen_count >= self.max_generations:
+                    # Reached maximum generations
+                    self.logger.info(f"Maximum generations {self.max_generations} reached.")
+                    break
+                
+                gen_count += 1
+                pbar.update(1)
+        finally:
+            pbar.close()
+
 
         self.logger.info("Terminating Evolutionary optimisation.")
         self.logger.info(f"Best solution: {best_solution.round(4)}")
