@@ -24,11 +24,11 @@ collector_params:
   fitness_type: reward
   agg_func: mean
 arule_params:
-  hidden_size: 3
+  hidden_size: 4
   bias: true
   hidden_activation: relu
   output_activation: tanh
-  use_weights: false
+  use_weights: true
   use_reward: true
   use_trace_pre: true
   use_trace_post: true

@@ -1,4 +1,3 @@
-
 import time
 from typing import Tuple
 import yaml
@@ -12,8 +11,11 @@ from evo.utils import create_solver
 
 from snn.plot import plot_weight_over_time, plot_weights, plot_spikes, plot_membranes
 
+
+ROOT = Path(__file__).parent.parent
+
+
 def main(config_file: str | Path) -> Path:
-    ROOT = Path(__file__).parent.parent
 
     # Default config file
     config_path = Path(ROOT, "config", config_file)
@@ -23,19 +25,13 @@ def main(config_file: str | Path) -> Path:
     # Directory to save new results
     results_path = Path(ROOT, "results", "binary_es", time.strftime("%y-%m-%d_%H-%M"))
     results_path.mkdir(parents=True, exist_ok=True)
-
     log_file = Path(results_path, "best.log")
 
     # Configure SNN Evaluator object
     evaluator = SNN_Evaluator(
         params=config
-        # num_simulation_steps=config["num_sim_steps"],
-        # snn_params=config["snn_params"],
-        # spikegen_params=config["spikegen_params"],
-        # arule_params=config["arule_params"],
-        # decoder_params=config["decoder_params"],
-        # fitnessor_params=config["fitness_params"]
     )
+
     # Configure Evolution Solver object
     ndim = evaluator.get_parameter_size()
     is_minimise = evaluator.is_minimise()
@@ -44,6 +40,7 @@ def main(config_file: str | Path) -> Path:
     solver = create_solver(config["evo_params"]["solver"])
     if "popsize" not in config["evo_params"]["solver"]:
         config["evo_params"]["solver"]["popsize"] = solver.popsize
+    
     # Configure Evolution Manager object
     manager = EvoManager(solver, evaluator, log_file=log_file, **config["evo_params"]["manager"])
 

@@ -1,17 +1,18 @@
 from pathlib import Path
-import numpy as np
 import logging
-
 from tqdm import tqdm
 
-from .base import Solver, Evaluator
+import numpy as np
+
+
+from .base import BaseSolver, Evaluator
 
 
 class EvoManager:
     """
     Main class for managing loop of evolutionary optimisation.
     """
-    def __init__(self, solver: Solver, evaluator: Evaluator, *, num_trials: int = 1, log_file: str = None,
+    def __init__(self, solver: BaseSolver, evaluator: Evaluator, *, num_trials: int = 1, log_file: str = None,
                  max_generations: int = None, target_fitness: float = None, tolerance: float = 1e-6, save_best: int = 1,
                  ):
         self.solver = solver

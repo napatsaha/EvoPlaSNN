@@ -40,6 +40,7 @@ class SNN_Evaluator(Evaluator):
                                     #   decoder_type=decoder_type, decoder_params=decoder_params, 
                                     #   fitnessor_type=fitnessor_type, fitnessor_params=fitnessor_params
                                       )
+        self.logger = None
 
     def get_parameter_size(self):
         """
