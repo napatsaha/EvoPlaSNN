@@ -21,26 +21,26 @@ rewarder_params:
   type: simple
 collector_params:
   type: simple
-  fitness_type: error
+  fitness_type: reward
   agg_func: mean
 arule_params:
-  hidden_size: 4
+  hidden_size: 3
   bias: true
   hidden_activation: relu
   output_activation: tanh
-  use_weights: true
+  use_weights: false
   use_reward: true
   use_trace_pre: true
   use_trace_post: true
 evo_params:
   manager:
-    max_generations: 10
+    max_generations: 5
     target_fitness: 1.0
     tolerance: 0.02
-    num_trials: 5
+    num_trials: 10
     save_best: 3
   solver:
     # ndim: 25
     type: CMA-ES
-    popsize: 10
+    # popsize: 10
     # minimise: false

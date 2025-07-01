@@ -39,11 +39,11 @@ def main(config_file: str | Path) -> Path:
     # Configure Evolution Solver object
     ndim = evaluator.get_parameter_size()
     is_minimise = evaluator.is_minimise()
-    # config["evo_params"]["solver"].pop("ndim", None)  # Remove ndim from solver config if it exists
     config["evo_params"]["solver"]["ndim"] = ndim
     config["evo_params"]["solver"]["minimise"] = is_minimise
-    # solver = EvolutionStrategy(**config["evo_params"]["solver"])
     solver = create_solver(config["evo_params"]["solver"])
+    if "popsize" not in config["evo_params"]["solver"]:
+        config["evo_params"]["solver"]["popsize"] = solver.popsize
     # Configure Evolution Manager object
     manager = EvoManager(solver, evaluator, log_file=log_file, **config["evo_params"]["manager"])
 

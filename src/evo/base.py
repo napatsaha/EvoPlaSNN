@@ -45,10 +45,10 @@ class Evaluator(Protocol):
     
 
 class BaseSolver(Solver):
-    def __init__(self, popsize, ndim, minimise: bool = True):
+    def __init__(self, ndim: int = 2, popsize: int = None, minimise: bool = True):
         self.solutions: List | np.ndarray = []
-        self.popsize = popsize
         self.ndim = ndim
+        self.popsize = popsize if popsize is not None else int(4 + np.floor(3 + np.log(self.ndim)))
         self.minimise = minimise
         self.reset()
 

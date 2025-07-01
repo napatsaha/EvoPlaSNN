@@ -5,8 +5,8 @@ from .base import BaseSolver
 
 
 class EvolutionStrategy(BaseSolver):
-    def __init__(self, popsize, ndim, minimise=True, *, sigma=0.1):
-        super().__init__(popsize, ndim, minimise)
+    def __init__(self, ndim, popsize, minimise=True, *, sigma=0.1):
+        super().__init__(ndim, popsize, minimise)
         self.sigma = sigma
 
     def reset(self):
@@ -55,4 +55,4 @@ class EvolutionStrategy(BaseSolver):
     #     return self.best_solution, self.best_fitness
 
     def __repr__(self):
-        return f"{self.__class__.__name__}(popsize={self.popsize}, ndim={self.ndim}, minimise={self.minimise}, sigma={self.sigma})"
+        return f"{self.__class__.__name__}(ndim={self.ndim}, popsize={self.popsize}, minimise={self.minimise}, sigma={self.sigma})"

@@ -6,20 +6,27 @@ from .base import BaseSolver
 
 
 class CMA_ES(BaseSolver):
-    def __init__(self, ndim, popsize, minimise: bool = True, *, n_best = None, sigma = 1.0, seed: int = None):
-        super().__init__(popsize, ndim, minimise)
+    """
+    Covariance Matrix Adaptation Evolution Strategy (CMA-ES) algorithm.
+
+    Based on tutorial paper and subsequent implementation in MATLAB by:
+    Hansen, Nikolaus. “The CMA Evolution Strategy: A Tutorial.” arXiv, March 10, 2023. https://doi.org/10.48550/arXiv.1604.00772.
+
+    This version neglects Step-Size Control (`sigma`) in the full implementation, and only applies Rank-$$\mu$$ and Rank-one updates to the covariance matrix.
+    Equivalent to Section 3.4, Equation (30) of the tutorial paper.
+    """
+    def __init__(self, ndim: int = 2, popsize: int = None, minimise: bool = True, *, n_best: int = None, sigma: float = 1.0, seed: int = None):
+        super().__init__(ndim, popsize, minimise)
         # Random generation
         self.rng = np.random.default_rng(seed)
 
         # Dimension and population
-        self.ndim = ndim
-        self.popsize = popsize if popsize is not None else int(4 + np.floor(3 + np.log(self.ndim)))
         self.n_best = int(n_best) if n_best is not None else self.popsize // 2
 
         # Sizes and weights
         self.weights = np.log((self.n_best + 1) / 2) - np.log(np.arange(1, self.n_best + 1))
         self.weights /= np.sum(self.weights)
-        self.mu_eff = 1 / np.sum(self.weights ** 2)
+        self.mu_eff = 1 / np.sum(self.weights ** 2) # Variance effective selection mass 
 
         # Distribution parameters
         self.mean = np.zeros(ndim)
@@ -43,6 +50,7 @@ class CMA_ES(BaseSolver):
     def tell(self, fitnesses):
         # Save best solution and fitness
         super().tell(fitnesses)
+
         # Select parents
         best_idx = np.argsort(fitnesses)[:self.n_best]
         x_best = self.solutions[best_idx]
@@ -65,16 +73,6 @@ class CMA_ES(BaseSolver):
         self.cov = (1 - self.c_1 - self.c_mu) * self.cov + \
             self.c_1 * rank_1_cov + \
             self.c_mu * rank_mu_cov
-
-        # # Return best solution and fitness
-        # best_solution = x_best[0]
-        # best_fits = fitnesses[best_idx[0]]
-
-        # return best_solution, best_fits
-    
-    # @override
-    # def result(self):
-    #     return self.best_solution, self.best_fitness
 
     def __repr__(self):
         return f"CMA-ES(ndim={self.ndim}, popsize={self.popsize}, minimise={self.minimise}, n_best={self.n_best}, sigma={self.sigma}, \
