@@ -278,7 +278,7 @@ class ANN_Rule(LearningRule):
         self.ann = ANN(input_size=self.input_size, output_size=1, parameters=parameters, **kwargs)
 
 
-    def update(self, synapse: 'SynapseLayer', reward: float = None, return_inputs: bool = False) -> np.ndarray:
+    def update(self, synapse: 'SynapseLayer', reward: float = None, return_inputs: bool = False) -> np.ndarray: # type: ignore
         """
         Apply the ANN Rule to an external set of weights.
         """

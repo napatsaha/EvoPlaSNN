@@ -1,14 +1,13 @@
-from typing import List, Tuple
+from typing import List, Tuple, Protocol, override
+from pathlib import Path
 import numpy as np
 
 
-class Solver:
+class Solver(Protocol):
     """
     Base solver for all Evolutionary Algorithms.
     """
     def __init__(self, popsize: int):
-        self.solutions: List | np.ndarray = []
-        self.popsize = popsize
         pass
 
     def ask(self) -> List:
@@ -17,7 +16,7 @@ class Solver:
         """
         raise NotImplementedError("ask method must be implemented by subclasses.")
     
-    def tell(self, fitnessses: List):
+    def tell(self, fitnesses: List):
         """
         Informs current solutions with evaluted fitnesses.
         """
@@ -30,7 +29,7 @@ class Solver:
         raise NotImplementedError("result method must be implemented by subclasses.")
     
 
-class Evaluator:
+class Evaluator(Protocol):
     """
     Base class for evaluation functions.
     """
@@ -44,3 +43,43 @@ class Evaluator:
         """
         raise NotImplementedError("evaluate method must be implemented by subclasses.")
     
+
+class BaseSolver(Solver):
+    def __init__(self, popsize, ndim, minimise: bool = True):
+        self.solutions: List | np.ndarray = []
+        self.popsize = popsize
+        self.ndim = ndim
+        self.minimise = minimise
+        self.reset()
+
+    def reset(self):
+        self.fitnesses = np.zeros(self.popsize)
+        self.solutions = []
+        self.best_fitness = None
+        self.best_solution = None
+
+    def tell(self, fitnesses):
+        best_idx = np.argmin(fitnesses) if self.minimise else np.argmax(fitnesses)
+        # Update self
+        self.fitnesses = fitnesses
+        self.best_fitness = fitnesses[best_idx]
+        self.best_solution = self.solutions[best_idx]
+
+    def save_best(self, save_dir: str | Path, n: int = 1, precision: int = 6):
+        top_indices = np.argsort(self.fitnesses) # Will arrange from lowest to highest fitness
+        if self.minimise:
+            # First n lowest fitness
+            top_indices = top_indices[:n]
+        else:
+            # Last n fitness in descending order
+            top_indices = top_indices[-n:][::-1]
+        top_solutions = self.solutions[top_indices]
+        for i in range(n):
+            sol = top_solutions[i]
+            i = str(i + 1).zfill(2)  # Ensure two-digit index
+            np.savetxt(Path(save_dir) / f"best_rule_{i}.txt", sol, fmt=f'%.{precision}f')
+
+    @override
+    def result(self) -> Tuple[np.ndarray, float]:
+        """Return the best solution and its fitness."""
+        return self.best_solution, self.best_fitness

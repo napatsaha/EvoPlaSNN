@@ -41,6 +41,6 @@ evo_params:
     save_best: 3
   solver:
     # ndim: 25
+    type: CMA-ES
     popsize: 10
-    sigma: 0.5
-    minimise: false
+    # minimise: false

@@ -7,7 +7,8 @@ import numpy as np
 
 from evo.manager import EvoManager
 from snn.eval import SNN_Evaluator
-from evo.es import EvolutionStrategy
+# from evo.es import EvolutionStrategy
+from evo.utils import create_solver
 
 from snn.plot import plot_weight_over_time, plot_weights, plot_spikes, plot_membranes
 
@@ -41,7 +42,8 @@ def main(config_file: str | Path) -> Path:
     # config["evo_params"]["solver"].pop("ndim", None)  # Remove ndim from solver config if it exists
     config["evo_params"]["solver"]["ndim"] = ndim
     config["evo_params"]["solver"]["minimise"] = is_minimise
-    solver = EvolutionStrategy(**config["evo_params"]["solver"])
+    # solver = EvolutionStrategy(**config["evo_params"]["solver"])
+    solver = create_solver(config["evo_params"]["solver"])
     # Configure Evolution Manager object
     manager = EvoManager(solver, evaluator, log_file=log_file, **config["evo_params"]["manager"])
 
@@ -53,6 +55,7 @@ def main(config_file: str | Path) -> Path:
     manager.run()
 
     return results_path 
+
 
 def eval(results_path: Path | str, num_steps: int = None, rule_id: int = 1, num_evals: int = 10, save_plots: bool = False, verbose: bool = True) -> Tuple[float, float]:
 
