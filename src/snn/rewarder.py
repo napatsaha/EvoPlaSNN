@@ -68,9 +68,20 @@ class CollectorProtocol(Protocol):
         """
         return self._minimise
 
+def fitness_func1(error, a=3, b=2):
+    return a * np.exp(-error) - b
 
-def fitness_func(error, a=3, b=2):
+def fitness_func2(error, a=3, b=2):
+    return a / (2 - np.exp(-error)) - b
+
+def fitness_func3(error, a=3, b=2):
     return a / (1 + error) - b
+
+fitness_func_dict = {
+    "func1": fitness_func1,
+    "func2": fitness_func2,
+    "func3": fitness_func3
+}
 
 class SimpleRewarder(RewarderProtocol):
     """
@@ -115,23 +126,60 @@ class SimpleRewarder(RewarderProtocol):
         # Sum the absolute differences between target and output spikes
         error = np.sum(np.abs(target_spikes - output_spikes))
         # Reward = +1 for Error = 0,
-        # Reward = -0.5 for Error = 1,
-        # Reward = -1 for Error = 2, etc
-        reward = fitness_func(error)
+        # Reward = -1 for Error > 0, etc
+        reward = 1.0 if error == 0 else -1.0
         return error, reward
     
 
 class SimpleCollector(CollectorProtocol):
-    def __init__(self, buffer_size: int = None, fitness_type: Literal["reward", "error"] = "reward", agg_func: Callable | str = "sum",
+    def __init__(self, buffer_size: int = None, fitness_type: Literal["reward", "error", "mapped"] = "reward", 
+                 agg_func: Callable | str = "sum", map_func: Callable | Literal["func1", "func2", "func3"] = "func3",
+                 map_func_kwargs: dict = None,
                  **kwargs):
+        """
+        Simple collector for aggregating rewards and errors over a buffer size.
+        Args:
+            buffer_size (int): Maximum Size of the buffer to store rewards and errors.
+            fitness_type (str): Type of fitness to calculate. Options are "reward", "error", or "mapped".
+                - "reward": Aggregate rewards.
+                - "error": Aggregate errors.
+                - "mapped": Summed errors mapped to rewards using a mapping function.
+            agg_func (Callable | str): Function to aggregate rewards/errors within-sample. Can be "sum", "mean", or a custom function.
+                Only applied to "reward" or "error".
+            map_func (Callable, optional): Function to map errors to rewards. Defaults to None.
+                Only applied "mapped" fitness.
+        """
+        self.fitnesses = []
         self.rewards = []
         self.errors = []
-        self.reward_buffer = deque(maxlen=buffer_size)
-        self.error_buffer = deque(maxlen=buffer_size)
-        if fitness_type not in ["reward", "error"]:
-            raise ValueError("fitness_type must be either 'reward' or 'error'")
+        self._in_sample_rewards = deque(maxlen=buffer_size)
+        self._in_sample_errors = deque(maxlen=buffer_size)
+        if fitness_type not in ["reward", "error", "mapped"]:
+            raise ValueError("fitness_type must be either 'reward', 'error' or 'mapped'.")
         self.fitness_type = fitness_type
         self._minimise = True if fitness_type == "error" else False
+        # Function for mapping errors to rewards
+        if isinstance(map_func, str):
+            if map_func in fitness_func_dict:
+                self.map_func = fitness_func_dict[map_func]
+            else:
+                raise ValueError(f"map_func: ({map_func}) not recognised. Available options are {list(fitness_func_dict.keys())}.")
+        elif isinstance(map_func, Callable):
+            self.map_func = map_func
+        else:
+            raise ValueError("map_func must be either a string or a callable function.")
+        # Custom mapping function arguments
+        if map_func_kwargs is not None:
+            self.map_func_kwargs = map_func_kwargs
+        else:
+            self.map_func_kwargs = {}
+        # if map_func is not None:
+        #     if not callable(map_func):
+        #         raise ValueError("map_func must be a callable function.")
+        #     self.map_func = map_func
+        # elif map_func is None:
+        #     self.map_func = fitness_func
+        # Function for aggregating
         if isinstance(agg_func, str):
             if agg_func == "sum":
                 self.agg_func = sum
@@ -139,29 +187,43 @@ class SimpleCollector(CollectorProtocol):
                 self.agg_func = np.mean
             else:
                 raise ValueError(f"agg_func: ({agg_func}) not recognised.")
-        else:
+        elif isinstance(agg_func, Callable):
             self.agg_func = agg_func
+        else:
+            raise ValueError("agg_func must be either a string name or a callable function.")
 
     def reset(self):
+        self.fitnesses.clear()
         self.rewards.clear()
         self.errors.clear()
-        self.reward_buffer.clear()
-        self.error_buffer.clear()
+        self._in_sample_rewards.clear()
+        self._in_sample_errors.clear()
 
     def record(self, reward: float, error: float) -> None:
-        self.reward_buffer.append(reward)
-        self.error_buffer.append(error)
+        self._in_sample_rewards.append(int(reward))
+        self._in_sample_errors.append(int(error))
 
     def collate(self):
-        self.rewards.append(self.agg_func(self.reward_buffer))
-        self.errors.append(self.agg_func(self.error_buffer))
-        self.reward_buffer.clear()
-        self.error_buffer.clear()
+        # Map total errors to reward using designated mapping function
+        total_errors = np.sum(self._in_sample_errors)
+        fitness = self.map_func(total_errors, **self.map_func_kwargs)
+        self.fitnesses.append(float(fitness))
+        # Append the aggregated rewards and errors to the lists
+        self.rewards.append(float(self.agg_func(self._in_sample_rewards)))
+        self.errors.append(float(self.agg_func(self._in_sample_errors)))
+        # self.rewards.append(self.agg_func(self.reward_buffer))
+        # self.errors.append(self.agg_func(self.error_buffer))
+
+        # Clear existing buffer for this sample
+        self._in_sample_rewards.clear()
+        self._in_sample_errors.clear()
 
     def calculate_fitness(self) -> float:
         if self.fitness_type == "reward":
-            return self.agg_func(self.rewards)
+            return np.mean(self.rewards)
         elif self.fitness_type == "error":
-            return self.agg_func(self.errors)
+            return np.mean(self.errors)
+        elif self.fitness_type == "mapped":
+            return np.mean(self.fitnesses)
         else:
             return 0.0

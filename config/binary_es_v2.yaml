@@ -1,6 +1,6 @@
 num_sim_steps: 1000
 snn_params:
-  input_size: 2
+  input_size: 5
   hidden_size: 0
   output_size: 2
   dt: 0.001
@@ -21,8 +21,11 @@ rewarder_params:
   type: simple
 collector_params:
   type: simple
-  fitness_type: reward
-  agg_func: mean
+  fitness_type: mapped
+  map_func: func3
+  map_func_kwargs:
+    a: 3
+    b: 2 
 arule_params:
   hidden_size: 4
   bias: true
@@ -42,5 +45,5 @@ evo_params:
   solver:
     # ndim: 25
     type: CMA-ES
-    # popsize: 10
+    popsize: 30
     # minimise: false

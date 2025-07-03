@@ -128,6 +128,7 @@ class SNNSimulator:
             spk_out = self.network.forward(spk_in)
 
             # Post-processing
+            # If using Decoder-Fitnessor scheme
             if self._post_process_type == 0:
                 if self._supervised and self.spike_generator.active:
                     self.decoder.record(spk_out)
@@ -140,6 +141,7 @@ class SNNSimulator:
                     # self.reward_collector.append((t, label, reward))
                     self.network.update_synapses(reward=reward)
 
+            # If using Rewarder-Collector scheme
             elif self._post_process_type == 1:
                 target = self.rewarder.get_target(self.spike_generator.current_class)
                 error, reward = self.rewarder.get_reward(target, spk_out)
