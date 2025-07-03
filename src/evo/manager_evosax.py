@@ -17,10 +17,11 @@ class ProblemWrapper(Problem):
     Converts default Evaluator interface to EvoSax's Problem interface.
     """
     evaluator: Evaluator
-    def __init__(self, evaluator: Evaluator, num_trials: int = 1):
+    def __init__(self, evaluator: Evaluator, num_trials: int = None):
         self.evaluator = evaluator
         self.num_trials = num_trials
         self._num_dims = evaluator.get_parameter_size()
+        self._minimise = evaluator.is_minimise()
 
     def init(self, key: jax.Array) -> State:
         return State(counter=0)
@@ -38,6 +39,9 @@ class ProblemWrapper(Problem):
         fitnesses = []
         for solution in population:
             fitness = self.evaluator.evaluate(solution, num_trials=self.num_trials)
+            # Force minimisation because evasax algorithms only deals with minimisation problems.
+            if self._minimise:
+                fitness = -fitness
             fitnesses.append(fitness)
         fitnesses = jnp.array(fitnesses)
         state = state.replace(counter=state.counter + 1)
@@ -95,6 +99,8 @@ class EvoManager:
 
     def run(self, seed: int = 0):
         self._setup_logger()
+        if hasattr(self.evaluator, "num_trials") and self.evaluator.num_trials is None:
+            self.evaluator.num_trials = self.num_trials
 
         # Initialisation
         key = jax.random.PRNGKey(seed)

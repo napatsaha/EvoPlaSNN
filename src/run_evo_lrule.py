@@ -4,7 +4,6 @@ import yaml
 from pathlib import Path
 import numpy as np
 
-from evo.manager import EvoManager
 from snn.eval import SNN_Evaluator
 # from evo.es import EvolutionStrategy
 from evo.utils import create_solver
@@ -27,22 +26,45 @@ def main(config_file: str | Path) -> Path:
     results_path.mkdir(parents=True, exist_ok=True)
     log_file = Path(results_path, "best.log")
 
-    # Configure SNN Evaluator object
-    evaluator = SNN_Evaluator(
-        params=config
-    )
+    manager_type = config["evo_params"]["manager"].pop("type", "original")
 
-    # Configure Evolution Solver object
-    ndim = evaluator.get_parameter_size()
-    is_minimise = evaluator.is_minimise()
-    config["evo_params"]["solver"]["ndim"] = ndim
-    config["evo_params"]["solver"]["minimise"] = is_minimise
-    solver = create_solver(config["evo_params"]["solver"])
-    if "popsize" not in config["evo_params"]["solver"]:
-        config["evo_params"]["solver"]["popsize"] = solver.popsize
-    
-    # Configure Evolution Manager object
-    manager = EvoManager(solver, evaluator, log_file=log_file, **config["evo_params"]["manager"])
+    if manager_type == "original":
+        from evo.manager import EvoManager
+        # Configure SNN Evaluator object
+        evaluator = SNN_Evaluator(
+            params=config
+        )
+
+        # Configure Evolution Solver object
+        ndim = evaluator.get_parameter_size()
+        is_minimise = evaluator.is_minimise()
+        config["evo_params"]["solver"]["ndim"] = ndim
+        config["evo_params"]["solver"]["minimise"] = is_minimise
+        solver = create_solver(config["evo_params"]["solver"])
+        if "popsize" not in config["evo_params"]["solver"]:
+            config["evo_params"]["solver"]["popsize"] = solver.popsize
+        
+        # Configure Evolution Manager object
+        manager = EvoManager(solver, evaluator, log_file=log_file, **config["evo_params"]["manager"])
+
+    elif manager_type == "evosax":
+        from evo.manager_evosax import EvoManager, ProblemWrapper
+        import evosax.algorithms as algo
+        import jax.numpy as jnp
+        # Configure SNN Evaluator object
+        evaluator = ProblemWrapper(
+            SNN_Evaluator(
+                params=config
+            )
+        )
+        # Configure Evolution Solver object
+        ndim = evaluator.num_dims
+        solver_class = getattr(algo, config["evo_params"]["solver"].get("type", "CMA_ES"))
+        popsize = config["evo_params"]["solver"].get("popsize")
+        solver = solver_class(population_size=popsize, solution=jnp.zeros(ndim, dtype=jnp.float32))
+        # Configure Evolution Manager object
+        manager = EvoManager(solver, evaluator, log_file=log_file, **config["evo_params"]["manager"])
+
 
     # Save a copy of configuration used
     with open(results_path / "config.yaml", "w") as f:
@@ -122,6 +144,6 @@ def eval(results_path: Path | str, num_steps: int = None, rule_id: int = 1, num_
     return mean_fits, std_fits
 
 if __name__ == "__main__":
-    results_path = main(config_file="binary_es_v2.yaml")
+    results_path = main(config_file="binary_es_v2_evosax.yaml")
     # Evaluation of best solution
     eval(results_path, save_plots=True)

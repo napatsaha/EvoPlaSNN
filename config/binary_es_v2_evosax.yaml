@@ -37,15 +37,14 @@ arule_params:
   use_trace_post: true
 evo_params:
   manager:
-    type: original
-    # type: evosax
+    type: evosax
     max_generations: 5
-    target_fitness: 1.0
+    target_fitness: -1.0
     tolerance: 0.02
     num_trials: 10
     save_best: 3
   solver:
     # ndim: 25
-    type: CMA-ES
+    type: CMA_ES
     popsize: 30
     # minimise: false
