@@ -52,8 +52,8 @@ class CMA_ES(BaseSolver):
         super().tell(fitnesses)
 
         # Select parents
-        best_idx = np.argsort(fitnesses)[:self.n_best]
-        x_best = self.solutions[best_idx]
+        best_indices = np.argsort(fitnesses)[:self.n_best] if self.minimise else np.argsort(fitnesses)[:-self.n_best-1:-1]
+        x_best = self.solutions[best_indices]
 
         # Find new mean
         mean_old = self.mean.copy()
