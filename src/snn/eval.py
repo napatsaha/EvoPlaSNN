@@ -55,6 +55,13 @@ class SNN_Evaluator(Evaluator):
         """
         return self.simulator.is_minimise()
 
+    def get_target_fitness(self) -> float:
+        """
+        Returns the target fitness for the evaluation.
+        This is used to determine when the optimisation should stop.
+        """
+        return self.simulator.get_target_fitness()
+
     def setup_logger(self, log_file: str = None):
         handler = logging.StreamHandler() if log_file is None else logging.FileHandler(log_file)
         formatter = logging.Formatter('%(message)s')

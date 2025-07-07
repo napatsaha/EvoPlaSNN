@@ -136,6 +136,13 @@ class SimpleRewarder(RewarderProtocol):
         reward = 1.0 if error == 0 else -1.0
         return error, reward
     
+    def get_max_reward(self):
+        """
+        Get the maximum possible reward for the current target array.
+        This is simply the number of classes, since each class has a target spike at one position.
+        """
+        return 1.0 * self.spikegen.input_size
+
 
 class WeightedRewarder(SimpleRewarder):
     def __init__(self, num_classes, spikegen: BinaryArrayGenerator, *,
@@ -173,6 +180,13 @@ class WeightedRewarder(SimpleRewarder):
         # Block out rewards during interval timesteps
         wts = np.where(wts.mask, 0.0, wts)
         return wts
+
+    def get_max_reward(self):
+        """
+        Get the maximum possible reward for the current target array.
+        This is simply the sum of the weights averaged between class.
+        """
+        return np.sum(self.weights, axis=1).mean()
 
     def get_target(self, current_class):
         idx = self.count % self.full_length

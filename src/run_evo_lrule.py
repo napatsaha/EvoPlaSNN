@@ -36,10 +36,9 @@ def main(config_file: str | Path) -> Path:
         )
 
         # Configure Evolution Solver object
-        ndim = evaluator.get_parameter_size()
-        is_minimise = evaluator.is_minimise()
-        config["evo_params"]["solver"]["ndim"] = ndim
-        config["evo_params"]["solver"]["minimise"] = is_minimise
+        config["evo_params"]["solver"]["ndim"] = evaluator.get_parameter_size()
+        config["evo_params"]["solver"]["minimise"] = evaluator.is_minimise()
+        config["evo_params"]["manager"]["target_fitness"] = evaluator.get_target_fitness()
         solver = create_solver(config["evo_params"]["solver"])
         if "popsize" not in config["evo_params"]["solver"]:
             config["evo_params"]["solver"]["popsize"] = solver.popsize
@@ -144,6 +143,6 @@ def eval(results_path: Path | str, num_steps: int = None, rule_id: int = 1, num_
     return mean_fits, std_fits
 
 if __name__ == "__main__":
-    results_path = main(config_file="binary_es_v2_evosax.yaml")
+    results_path = main(config_file="binary_es_v2.yaml")
     # Evaluation of best solution
     eval(results_path, save_plots=True)

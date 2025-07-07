@@ -209,6 +209,22 @@ class SNNSimulator:
         else:
             return None
 
+    def get_target_fitness(self) -> float | None:
+        if self._post_process_type == 0:
+            if self.fitnessor.minimise:
+                return 0.0
+            else:
+                return 1.0
+        elif self._post_process_type == 1:
+            if self.collector.fitness_type == "reward":
+                return float(self.rewarder.get_max_reward())
+            elif self.collector.fitness_type == "error":
+                return 0.0
+            elif self.collector.fitness_type == "mapped":
+                return 1.0
+        else:
+            return None
+
     def is_minimise(self) -> bool | None:
         if self._post_process_type == 0:
             return self.fitnessor.minimise if self.fitnessor is not None else None
