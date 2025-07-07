@@ -8,7 +8,7 @@ import matplotlib as mpl
 
 from .utils import LayerRecorder, MatrixRecorder
 from .snn import SNN
-from lrule import LearningRule
+# from lrule import LearningRule
 from .spikegen import BinaryClassGenerator, SpikeGenerator
 from .decoding import get_decoder_class, get_fitnessor_class, BaseDecoder, BaseFitnessor
 from .rewarder import create_rewarder, create_collector, RewarderProtocol, CollectorProtocol
@@ -67,8 +67,7 @@ class SNNSimulator:
             self.rewarder = create_rewarder(
                 rewarder_type,
                 num_classes=network.output_size, 
-                pattern_length=spike_generator.pattern_length, 
-                spacing=spike_generator.spacing, 
+                spikegen=spike_generator, 
                 **params["rewarder_params"])
             collector_type = params["collector_params"].pop("type", "simple")
             self.collector = create_collector(
