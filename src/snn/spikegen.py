@@ -111,12 +111,12 @@ class BinaryArrayGenerator(SpikeGenerator):
                  *, seed=None):
         super().__init__(input_size, seed)
         self.interval = max(1, int(interval))
-        self.spacing = max(1, int(spacing)) if spacing is not None else self.interval
+        self.spacing = max(0, int(spacing)) if spacing is not None else self.interval
         self.p = min(1.0, max(0.0, p))
         self._init_array()
         self._starting_class = starting_class
         self._pattern_length = (self.input_size - 1) * self.interval + 1
-        self._full_length = self.array.shape[2] - 1
+        self._full_length = self.array.shape[2]
         self.reset()
 
     def _init_array(self):

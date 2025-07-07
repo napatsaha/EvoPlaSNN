@@ -2,9 +2,13 @@ import numpy as np
 from typing import Literal, Protocol, Tuple, Callable
 from collections import deque
 
+from snn.spikegen import BinaryArrayGenerator
+
 def create_rewarder(type: str, **kwargs):
     if type == "simple":
         class_name = "SimpleRewarder"
+    elif type == "weighted":
+        class_name = "WeightedRewarder"
     # return getattr(globals(), class_name)(**kwargs)
     return globals()[class_name](**kwargs)
 
@@ -83,31 +87,33 @@ fitness_func_dict = {
     "func3": fitness_func3
 }
 
+
 class SimpleRewarder(RewarderProtocol):
     """
     Compare against pre-generated target array instead of comparing each output spikes timestep-by-timestep.
     """
-    def __init__(self, num_classes, pattern_length, *,
-                 spacing: int = None,
+    def __init__(self, num_classes, spikegen: BinaryArrayGenerator, *,
                  target_position: Literal["first", "last"] = "last", **kwargs):
         self.num_classes = num_classes
-        self.pattern_length = pattern_length
-        self.full_length = pattern_length
-        self.spacing = spacing if spacing is not None else 0
+        self.spikegen = spikegen
+        self.pattern_length = self.spikegen.pattern_length
+        self.full_length = self.spikegen.length
+        self.spacing = spikegen.spacing
+
         self.target_position = target_position
-        self._label = 0 if target_position == "first" else pattern_length - 1
+        self._label = 0 if target_position == "first" else self.pattern_length - 1
         self._create_target_array()
         self.reset()
 
     def _create_target_array(self):
         # Create pre-generated array of target outputs for easier slicing
-        self.target_array = np.zeros((self.num_classes, self.num_classes, self.pattern_length), dtype=np.int_)
+        self.target_array = np.zeros((self.num_classes, self.num_classes, self.spikegen.pattern_length), dtype=np.int_)
         for i in range(self.num_classes):
             self.target_array[i, i, self._label] = 1
         if self.spacing > 0:
             # Add spacing after pattern
             self.target_array = np.pad(self.target_array, ((0, 0), (0, 0), (0, self.spacing)), mode='constant', constant_values=0)
-            self.full_length = self.target_array.shape[2] - 1
+            # self.full_length = self.target_array.shape[2] - 1
 
     def reset(self):
         self.count = 0
@@ -130,6 +136,61 @@ class SimpleRewarder(RewarderProtocol):
         reward = 1.0 if error == 0 else -1.0
         return error, reward
     
+
+class WeightedRewarder(SimpleRewarder):
+    def __init__(self, num_classes, spikegen: BinaryArrayGenerator, *,
+                 ignore_silent_inputs: bool = True,
+                 log_scale: bool = False,
+                 target_position: Literal["first", "last"] = "last", **kwargs):
+        super().__init__(num_classes, spikegen,
+                         target_position=target_position, **kwargs)
+        self.ignore_silent_inputs = ignore_silent_inputs
+        self.log_scale = log_scale
+        self.weights = self.create_weights(spikegen)
+
+    def create_weights(self, spikegen: BinaryArrayGenerator):
+        # Just an easier way to write self.target_array
+        A = self.target_array
+        # Create mask to block out non-input timesteps (i.e. during intervals)
+        mask = np.sum(spikegen.array, axis=(1,))
+        mask = np.logical_not(mask.astype(np.bool))
+        mask = np.broadcast_to(mask, A.shape)
+        A_masked = np.ma.masked_array(A, mask)
+        # number of non-silent timesteps
+        if self.ignore_silent_inputs:
+            LENG = (spikegen.pattern_length + spikegen.interval - 1) / spikegen.interval
+        else:
+            LENG = spikegen.pattern_length
+        # total number of spikes in each class (assuming every class has same number of total spikes)
+        CNT = np.max(A_masked, axis=(1)).sum(axis=1).data[0]
+        RATE = CNT / LENG
+        # If silent, Weight = 1 / (1 - RATE) <- Lower  (e.g. 1/0.96 = 1.04)
+        # If active, Weight = 1 / RATE       <- Higher (e.g. 1/0.04 = 25)
+        wts = 1 / np.abs(A_masked.max(axis=1) - 1 + RATE)
+        # Apply log scaling if required
+        if self.log_scale:
+            wts = np.log(wts)
+        # Block out rewards during interval timesteps
+        wts = np.where(wts.mask, 0.0, wts)
+        return wts
+
+    def get_target(self, current_class):
+        idx = self.count % self.full_length
+
+        target_spikes = self.target_array[current_class, :, idx]
+        wts = self.weights[current_class, idx]
+        if self.count >= self.full_length:
+            self.count = 0
+        
+        self.count += 1
+        return target_spikes, wts
+
+    def get_reward(self, target_spikes, output_spikes):
+        target_spikes, wts = target_spikes
+        error, reward = super().get_reward(target_spikes, output_spikes)
+        # Apply weights to the reward
+        reward *= wts
+        return error, reward
 
 class SimpleCollector(CollectorProtocol):
     def __init__(self, buffer_size: int = None, fitness_type: Literal["reward", "error", "mapped"] = "reward", 
