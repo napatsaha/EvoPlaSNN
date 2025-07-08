@@ -10,7 +10,7 @@ snn_params:
   synapse_params:
     normalise_weights: true
     normalise_method: L2
-  winner_take_all: false
+  winner_take_all: true
 spikegen_params:
   class: BinaryArrayGenerator
   starting_class: ascending
@@ -18,13 +18,19 @@ spikegen_params:
   spacing: 10
   p: 1.0
 rewarder_params:
-  type: weighted
-  ignore_silent_inputs: true
-  log_scale: true
+  type: simple
+  # type: weighted
+  # ignore_silent_inputs: true
+  # log_scale: true
 collector_params:
   type: simple
-  fitness_type: reward
-  agg_func: sum
+  # fitness_type: reward
+  # agg_func: sum
+  fitness_type: mapped
+  map_func: func3
+  map_func_kwargs:
+    a: 3
+    b: 2
 arule_params:
   learning_rate: 1.0
   hidden_size: 4
@@ -40,12 +46,12 @@ evo_params:
     type: original
     # type: evosax
     max_generations: 100
-    target_fitness: 1.0
+    # target_fitness: 1.0
     tolerance: 0.02
     num_trials: 15
     save_best: 3
   solver:
     # ndim: 25
-    type: ES
+    type: CMA-ES
     popsize: 30
     # minimise: false

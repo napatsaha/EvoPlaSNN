@@ -227,6 +227,7 @@ class SimpleCollector(CollectorProtocol):
         self.fitnesses = []
         self.rewards = []
         self.errors = []
+        self.buffer_size = buffer_size
         self._in_sample_rewards = deque(maxlen=buffer_size)
         self._in_sample_errors = deque(maxlen=buffer_size)
         if fitness_type not in ["reward", "error", "mapped"]:
@@ -275,8 +276,8 @@ class SimpleCollector(CollectorProtocol):
         self._in_sample_errors.clear()
 
     def record(self, reward: float, error: float) -> None:
-        self._in_sample_rewards.append(int(reward))
-        self._in_sample_errors.append(int(error))
+        self._in_sample_rewards.append(reward.item())
+        self._in_sample_errors.append(error.item())
 
     def collate(self):
         # Map total errors to reward using designated mapping function

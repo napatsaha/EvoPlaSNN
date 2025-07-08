@@ -72,7 +72,7 @@ class SNNSimulator:
             collector_type = params["collector_params"].pop("type", "simple")
             self.collector = create_collector(
                 collector_type,
-                buffer_size=spike_generator.length, **params.get("collector_params", {}))
+                buffer_size=spike_generator.pattern_length, **params.get("collector_params", {}))
         # Option 2: No supervised learning. No reward function.
         else:
             self._post_process_type = -1
@@ -144,7 +144,8 @@ class SNNSimulator:
             elif self._post_process_type == 1:
                 target = self.rewarder.get_target(self.spike_generator.current_class)
                 error, reward = self.rewarder.get_reward(target, spk_out)
-                self.collector.record(reward, error)
+                if self.spike_generator.active:
+                    self.collector.record(reward, error)
 
                 if self.spike_generator.ready:
                     self.collector.collate()

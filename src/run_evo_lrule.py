@@ -64,6 +64,8 @@ def main(config_file: str | Path) -> Path:
         # Configure Evolution Manager object
         manager = EvoManager(solver, evaluator, log_file=log_file, **config["evo_params"]["manager"])
 
+    # Re-insert the manager type into the config
+    config["evo_params"]["manager"]["type"] = manager_type
 
     # Save a copy of configuration used
     with open(results_path / "config.yaml", "w") as f:
