@@ -276,8 +276,8 @@ class SimpleCollector(CollectorProtocol):
         self._in_sample_errors.clear()
 
     def record(self, reward: float, error: float) -> None:
-        self._in_sample_rewards.append(reward.item())
-        self._in_sample_errors.append(error.item())
+        self._in_sample_rewards.append(reward)
+        self._in_sample_errors.append(error)
 
     def collate(self):
         # Map total errors to reward using designated mapping function

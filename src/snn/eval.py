@@ -7,7 +7,7 @@ from evo.base import Evaluator
 from snn import SNN, SNNSimulator
 # from snn.spikegen import BinaryClassGenerator
 import snn.spikegen
-from lrule import ANN_Rule
+from lrule import ANN_Rule, LearningRule
 
     
 
@@ -15,6 +15,7 @@ class SNN_Evaluator(Evaluator):
     def __init__(self, 
                  params: Dict = {},
                  record_info: bool = False,
+                 learning_rule: LearningRule = None,
                 #  num_simulation_steps: int = 100, snn_params: dict = {}, spikegen_params: dict = {}, arule_params: dict = {}, 
                 #  decoder_params: dict = {}, fitnessor_params: dict = {}
                  ):
@@ -25,7 +26,7 @@ class SNN_Evaluator(Evaluator):
 
         spikegen_cls = getattr(snn.spikegen, params["spikegen_params"].pop("class", "BinaryClassGenerator"))
         self.spikegen = spikegen_cls(input_size=params["snn_params"].get("input_size"), **params["spikegen_params"])
-        self.arule = ANN_Rule(**params["arule_params"])
+        self.arule = ANN_Rule(**params["arule_params"]) if learning_rule is None else learning_rule
         self.snn = SNN(learning_rule=self.arule, **params["snn_params"])
 
         # decoder_type = decoder_params.pop("type", "final")
@@ -73,9 +74,9 @@ class SNN_Evaluator(Evaluator):
             self.logger.handlers.clear()
         self.logger.addHandler(handler)
 
-
-    def evaluate(self, genome, num_trials=1):
-        self.arule.parameters = genome
+    def evaluate(self, genome: np.ndarray = None, num_trials=1):
+        if genome is not None:
+            self.arule.parameters = genome
         fitnesses = []
         if self.logger:
             self.logger.info(f"\nEvaluating genome: {genome}")

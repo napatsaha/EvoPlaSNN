@@ -1,5 +1,6 @@
 import time
 from typing import Tuple
+from lrule.ann import read_ANN_Rule
 import yaml
 from pathlib import Path
 import numpy as np
@@ -90,8 +91,8 @@ def eval(results_path: Path | str, num_steps: int = None, rule_id: int = 1, num_
     if not (results_path / rule_id_name).exists():
         raise FileNotFoundError(f"Rule file {rule_id_name} not found in {results_path}. Please run the evolution first.")
     
-    # # Load the best ANN learning rule
-    # arule = read_ANN_Rule(results_path / rule_id_name, config_path=results_path / "config.yaml")
+    # Load the best ANN learning rule
+    arule = read_ANN_Rule(results_path / rule_id_name, config_path=results_path / "config.yaml")
 
     # spikegen_cls = getattr(spkgen, config["spikegen_params"].pop("class", "BinaryClassGenerator"))
     # spikegen = spikegen_cls(input_size=config["snn_params"].get("input_size"), **config["spikegen_params"])
@@ -113,7 +114,8 @@ def eval(results_path: Path | str, num_steps: int = None, rule_id: int = 1, num_
 
     evaluator = SNN_Evaluator(
         params=config,
-        record_info=True
+        record_info=True,
+        learning_rule=arule
     )
     simulator = evaluator.simulator
     
@@ -147,4 +149,5 @@ def eval(results_path: Path | str, num_steps: int = None, rule_id: int = 1, num_
 if __name__ == "__main__":
     results_path = main(config_file="binary_es_v2.yaml")
     # Evaluation of best solution
+    # results_path = "/Users/90961365/Projects/SNN-Test/results/binary_es/25-07-08_20-44"
     eval(results_path, save_plots=True)
