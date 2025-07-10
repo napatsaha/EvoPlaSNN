@@ -43,7 +43,7 @@ def update_dictionary(config: dict, overrides: dict) -> dict:
     return config
 
 
-def main(config_file: str | Path, config_overrides: dict = None) -> Path:
+def main(config_file: str | Path, config_overrides: dict = None, parent_run: str = None) -> Path:
     """Main function to run the evolutionary learning rule experiment."""
     # Default config file
     config_path = Path(ROOT, "config", config_file)
@@ -55,7 +55,11 @@ def main(config_file: str | Path, config_overrides: dict = None) -> Path:
         config = update_dictionary(config, config_overrides)
 
     # Directory to save new results
-    results_path = Path(ROOT, "results", "binary_es", time.strftime("%y-%m-%d_%H-%M"))
+
+    results_path = Path(ROOT, "results", "binary_es")
+    if parent_run is not None:
+        results_path = results_path / parent_run
+    results_path = results_path / time.strftime("%y-%m-%d_%H-%M")
     results_path.mkdir(parents=True, exist_ok=True)
     log_file = Path(results_path, "best.log")
 
@@ -183,13 +187,14 @@ if __name__ == "__main__":
     argparser = argparse.ArgumentParser(description="Run Evolutionary Learning Rule Experiment")
     argparser.add_argument("--config", type=str, default="binary_es_v2.yaml", help="Path to the configuration file")
     argparser.add_argument("--override", type=str, nargs="*", help="Override specific config values (e.g., snn_params.neuron_params.tau_mem=0.05)")
+    argparser.add_argument("--parent", type=str, default=None, help="Parent run directory to save results in. Useful for running series of related results.")
     args = argparser.parse_args()
 
     # Parse overrides
     config_overrides = parse_config_overrides(args.override) if args.override else {}
 
     # Run main function
-    results_path = main(config_file=args.config, config_overrides=config_overrides)
+    results_path = main(config_file=args.config, config_overrides=config_overrides, parent_run=args.parent)
     # Evaluation of best solution
     # results_path = "/Users/90961365/Projects/SNN-Test/results/binary_es/25-07-08_20-44"
     eval(results_path, save_plots=True)
