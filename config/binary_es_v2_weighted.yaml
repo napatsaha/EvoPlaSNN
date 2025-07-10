@@ -8,8 +8,8 @@ snn_params:
     tau_mem: 0.004
     tau_trace: 0.004
   synapse_params:
-    clip_weights: false
-    normalise_weights: false
+    clip_weights: true
+    normalise_weights: true
     normalise_method: L2
   winner_take_all: true
 spikegen_params:
@@ -19,21 +19,21 @@ spikegen_params:
   spacing: 10
   p: 1.0
 rewarder_params:
-  type: simple
-  # type: weighted
-  # ignore_silent_inputs: true
-  # log_scale: true
-collector_params:
   # type: simple
-  # fitness_type: reward
-  # agg_func: sum
-  fitness_type: mapped
-  map_func: func3
-  map_func_kwargs:
-    a: 3
-    b: 2
+  type: weighted
+  ignore_silent_inputs: true
+  log_scale: true
+collector_params:
+  type: simple
+  fitness_type: reward
+  agg_func: sum
+  # fitness_type: mapped
+  # map_func: func3
+  # map_func_kwargs:
+  #   a: 3
+  #   b: 2
 arule_params:
-  learning_rate: 0.1
+  learning_rate: 1.0
   hidden_size: 4
   bias: true
   hidden_activation: relu

@@ -11,4 +11,10 @@ dependencies:
   - numpy=2.2.4
   - matplotlib=3.10.1
   - scipy=1.15.2
+  - pyyaml=6.0.2
+  - tqdm=4.67.1
+  - pip:
+    - evosax==0.2.0
+    - jax==0.6.2
+    - rich==14.0.0
 prefix: /Users/90961365/miniconda3/envs/snn-test

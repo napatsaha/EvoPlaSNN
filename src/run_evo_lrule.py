@@ -1,4 +1,5 @@
 import time
+import argparse
 from typing import Tuple
 from lrule.ann import read_ANN_Rule
 import yaml
@@ -15,12 +16,43 @@ from snn.plot import plot_weight_over_time, plot_weights, plot_spikes, plot_memb
 ROOT = Path(__file__).parent.parent
 
 
-def main(config_file: str | Path) -> Path:
+def parse_config_overrides(overrides: list[str]) -> dict:
+    """Parse key-value pairs for configuration overrides."""
+    config_updates = {}
+    for override in overrides:
+        keys, value = override.split("=")
+        keys = keys.split(".")
+        current = config_updates
+        for key in keys[:-1]:
+            current = current.setdefault(key, {})
+        current[keys[-1]] = yaml.safe_load(value)  # Convert value to appropriate type
+    return config_updates
 
+
+def update_dictionary(config: dict, overrides: dict) -> dict:
+    """Update a configuration dictionary with overrides."""
+    for key in overrides.keys():
+        if key in config:
+            if isinstance(config[key], dict) and isinstance(overrides[key], dict):
+                config[key] = update_dictionary(config[key], overrides[key])
+            else:
+                config[key] = overrides[key]
+        else:
+            config[key] = overrides[key]
+
+    return config
+
+
+def main(config_file: str | Path, config_overrides: dict = None) -> Path:
+    """Main function to run the evolutionary learning rule experiment."""
     # Default config file
     config_path = Path(ROOT, "config", config_file)
     with open(config_path, "r") as f:
         config = yaml.safe_load(f)
+
+    # Apply overrides to the configuration
+    if config_overrides:
+        config = update_dictionary(config, config_overrides)
 
     # Directory to save new results
     results_path = Path(ROOT, "results", "binary_es", time.strftime("%y-%m-%d_%H-%M"))
@@ -147,7 +179,17 @@ def eval(results_path: Path | str, num_steps: int = None, rule_id: int = 1, num_
     return mean_fits, std_fits
 
 if __name__ == "__main__":
-    results_path = main(config_file="binary_es_v2.yaml")
+    # Argument parser
+    argparser = argparse.ArgumentParser(description="Run Evolutionary Learning Rule Experiment")
+    argparser.add_argument("--config", type=str, default="binary_es_v2.yaml", help="Path to the configuration file")
+    argparser.add_argument("--override", type=str, nargs="*", help="Override specific config values (e.g., snn_params.neuron_params.tau_mem=0.05)")
+    args = argparser.parse_args()
+
+    # Parse overrides
+    config_overrides = parse_config_overrides(args.override) if args.override else {}
+
+    # Run main function
+    results_path = main(config_file=args.config, config_overrides=config_overrides)
     # Evaluation of best solution
     # results_path = "/Users/90961365/Projects/SNN-Test/results/binary_es/25-07-08_20-44"
     eval(results_path, save_plots=True)
