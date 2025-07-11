@@ -9,7 +9,7 @@ snn_params:
     tau_trace: 0.004
   synapse_params:
     clip_weights: false
-    normalise_weights: false
+    normalise_weights: true
     normalise_method: L2
   winner_take_all: true
 spikegen_params:
