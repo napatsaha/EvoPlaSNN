@@ -1,5 +1,5 @@
 
-from typing import Literal
+from typing import List, Literal
 import numpy as np
 
 from abc import ABC, abstractmethod
@@ -62,17 +62,27 @@ class RandomSpikeGenerator(SpikeGenerator):
             raise NotImplementedError(f"Distribution {self.dist} not implemented")
 
 
-def construct_array(n, interval, spacing, ascending=True):
+def construct_array(n, interval, spacing, ascending=True, failure_rate=0.5, jitter=0):
     # X = np.zeros((n, spacing), dtype=np.int_)
     A = np.zeros((n, (n-1)*interval + 1 + spacing), dtype=np.int_)
-    if ascending:
-        row_iter = range(0, n, 1)
-    else:
-        row_iter = range(n-1, -1, -1)
+    # if ascending:
+    row_iter = range(0, n, 1)
+    # else:
+    #     row_iter = range(n-1, -1, -1)
     col_iter = range(0, n*interval, interval)
     for i, j in zip(row_iter, col_iter):
+        # Failure rate is the probability of skipping current neuron's spike
+        if failure_rate > 0:
+            p = np.random.rand()
+            if p < failure_rate:
+                continue
+        # Jitter is std in Normal distribution (dt unit), applied as perturbation to spike timing (j)
+        if jitter > 0:
+            t_offset = np.round(np.random.normal(0, jitter)).astype(np.int_)
+            j = np.clip(j + t_offset, 0, A.shape[1] - 1)
         A[i, j] = 1
-    # C = np.c_[A, X]
+    if not ascending:
+        A = np.flip(A, axis=0)
     return A
 
 
@@ -101,6 +111,86 @@ class ArrayPatternGenerator(SpikeGenerator):
         spikes = self.array[:, idx]
         self.count += 1
         return spikes
+
+
+class CustomArrayGenerator(SpikeGenerator):
+    """
+    An spike generator that accepts any arbritary number of arrays as input patterns, each corresponding to an individual class.
+    """
+    def __init__(self, input_size: int, arrays: List[np.ndarray], p: float = 1.0,
+                 starting_class: int = None, *, seed=None):
+        super().__init__(input_size, seed)
+        self.p = min(1.0, max(0.0, p))
+        self.num_classes = len(arrays)
+        self._starting_class = starting_class
+        self.array = arrays
+        self._validate_arrays()
+        self._full_length = self._pattern_length
+
+    def _validate_arrays(self):
+        for array in self.array:
+            array = np.asarray(array)
+        ndims = [arr.ndim for arr in self.array]
+        if not all(ndim == 2 for ndim in ndims):
+            raise ValueError("All arrays must be 2D (shape: [num_classes, input_size])")
+        input_shapes = [arr.shape[0] for arr in self.array]
+        # Check if all input_sizes are the same without using self.input_size
+        if len(set(input_shapes)) != 1:
+            raise ValueError("All arrays must have the same input size.")
+        pattern_length = [arr.shape[1] for arr in self.array]
+        if len(set(pattern_length)) != 1:
+            raise ValueError("All arrays must have the same pattern length.")
+        self.input_size = input_shapes[0]
+        self._pattern_length = pattern_length[0]
+        self.array = np.stack(self.array, axis=0)  # Stack arrays along a new axis
+
+    def reset(self):
+        if self._starting_class is None:
+            self.current_class = self.rng.integers(0, self.num_classes)
+        else:
+            if self._starting_class < 0 or self._starting_class >= self.num_classes:
+                raise ValueError(f"Starting class must be between 0 and {self.num_classes - 1}")
+            self.current_class = self._starting_class
+        self.count = 0
+        self._finished = False
+
+    def switch(self):
+        r = self.rng.random()
+        if r < self.p:
+            self.current_class = (self.current_class + 1) % self.num_classes
+
+    def generate(self) -> np.ndarray:
+        idx = self.count % self._full_length
+
+        # When spiking pattern is finished
+        if self.count >= (self._pattern_length - 1):
+            self._finished = True
+
+        # When waiting time is finished, reset to initial state
+        if self.count >= self._full_length:
+            self._finished = False
+            self.count = 0
+            self.switch()
+
+        # Increment count after resetting state
+        self.count += 1
+
+        # Slice stored array using recently resetted class
+        spikes = self.array[self.current_class, :, idx]
+        return spikes
+    
+    def get_label(self) -> int:
+        """
+        Returns the current class label.
+        """
+        return self.current_class
+
+    @property
+    def finished(self) -> bool:
+        """
+        Returns whether the current pattern is finished.
+        """
+        return self._finished
 
 
 class BinaryArrayGenerator(SpikeGenerator):
