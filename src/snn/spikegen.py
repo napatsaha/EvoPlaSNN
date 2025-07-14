@@ -230,9 +230,9 @@ class BinaryClassGenerator(SpikeGenerator):
         return self._ready if self.signal_on_end else True
 
 
-def construct_array(n, interval, spacing, ascending=True, failure_rate=0.5, jitter=0):
+def construct_array(n, interval, ascending=True, failure_rate=0.0, jitter=0):
     # X = np.zeros((n, spacing), dtype=np.int_)
-    A = np.zeros((n, (n-1)*interval + 1 + spacing), dtype=np.int_)
+    A = np.zeros((n, (n-1)*interval + 1), dtype=np.int_)
     # if ascending:
     row_iter = range(0, n, 1)
     # else:
@@ -255,12 +255,15 @@ def construct_array(n, interval, spacing, ascending=True, failure_rate=0.5, jitt
 
 
 class ArrayPatternGenerator(SpikeGenerator):
-    def __init__(self, input_size, interval: int = 1, spacing: int = None,
+    def __init__(self, input_size, interval: int = 1, spacing: int = None, ascending: bool = True,
                  *, seed=None):
         super().__init__(input_size, seed)
         self.interval = max(1, int(interval))
         self.spacing = max(1, int(spacing)) if spacing is not None else self.interval
-        self.array = construct_array(self.input_size, self.interval, self.spacing)
+        self.ascending = ascending
+        self.array = construct_array(self.input_size, self.interval, self.ascending)
+        if self.spacing > 0:
+            self.array = np.pad(self.array, ((0, 0), (0, self.spacing)), mode='constant', constant_values=0)
         self._pattern_length = (self.input_size - 1) * self.interval + 1
         self._full_length = self.array.shape[1]
         self.reset()
@@ -288,6 +291,7 @@ class BinaryArrayGenerator(SpikeGenerator):
                  starting_class: Literal["ascending", "descending"] = None, 
                  *, seed=None):
         super().__init__(input_size, seed)
+        self.num_classes = 2
         self.interval = max(1, int(interval))
         self.spacing = max(0, int(spacing)) if spacing is not None else self.interval
         self.p = min(1.0, max(0.0, p))
@@ -298,9 +302,16 @@ class BinaryArrayGenerator(SpikeGenerator):
         self.reset()
 
     def _init_array(self):
-        A = construct_array(self.input_size, self.interval, self.spacing, ascending=True)
-        B = construct_array(self.input_size, self.interval, self.spacing, ascending=False)
+        A = construct_array(self.input_size, self.interval, ascending=True)
+        B = construct_array(self.input_size, self.interval, ascending=False)
         self.array = np.concatenate([A[np.newaxis, ...], B[np.newaxis, ...]], axis=0)
+        self._pad_arrays()
+
+    def _pad_arrays(self):
+        """
+        Pads each array to the full length by adding zeros at the end.
+        """
+        self.array = np.pad(self.array, ((0, 0), (0, 0), (0, self.spacing)), mode='constant', constant_values=0)
 
     def reset(self):
         if self._starting_class is None:
@@ -393,7 +404,7 @@ class CustomArrayGenerator(SpikeGenerator):
     """
     An spike generator that accepts any arbritary number of arrays as input patterns, each corresponding to an individual class.
     """
-    def __init__(self, input_size: int, arrays: List[np.ndarray], p: float = 1.0,
+    def __init__(self, input_size: int, arrays: List[np.ndarray], p: float = 1.0, spacing: int = None,
                  starting_class: int = None, *, seed=None):
         super().__init__(input_size, seed)
         self.p = min(1.0, max(0.0, p))
@@ -401,7 +412,11 @@ class CustomArrayGenerator(SpikeGenerator):
         self._starting_class = starting_class
         self.array = arrays
         self._validate_arrays()
-        self._full_length = self._pattern_length
+        self.spacing = max(0, int(spacing)) if spacing is not None else 0
+        self._full_length = self._pattern_length + self.spacing
+        if self.spacing > 0:
+            self._pad_arrays()
+        self.reset()
 
     def _validate_arrays(self):
         for array in self.array:
@@ -419,6 +434,12 @@ class CustomArrayGenerator(SpikeGenerator):
         self.input_size = input_shapes[0]
         self._pattern_length = pattern_length[0]
         self.array = np.stack(self.array, axis=0)  # Stack arrays along a new axis
+
+    def _pad_arrays(self):
+        """
+        Pads each array to the full length by adding zeros at the end.
+        """
+        self.array = np.pad(self.array, ((0, 0), (0, 0), (0, self.spacing)), mode='constant', constant_values=0)
 
     def reset(self):
         if self._starting_class is None:
@@ -480,11 +501,12 @@ class CustomTimingGenerator(SpikeGenerator):
                  seed=None):
         super().__init__(input_size, seed)
         self.num_classes = len(timings)
-        # TODO: Validate timings
-        self.timings = timings
         self.spacing = max(0, int(spacing)) if spacing is not None else 0
         self._pattern_length = duration
         self._full_length = self._pattern_length + self.spacing
+        # TODO: Validate timings
+        self.timings = timings
+        self._validate_timings()
         self.array = np.zeros((input_size, self._full_length), dtype=np.int8)
 
         # Perturbation parameters
@@ -499,6 +521,19 @@ class CustomTimingGenerator(SpikeGenerator):
         self._finished = False
         self.current_class = None
         self.reset()
+
+    def _validate_timings(self):
+        for timing in self.timings:
+            # First check for appropriate dimension
+            assert np.ndim(timing) == 2, "Timings must be a list of 2D arrays."
+            # Second check if second axis has length 2
+            assert timing.shape[1] == 2, "Each timing must have two columns: (neuron_id, time_step)."
+            # Third check if neuron_id is within range
+            assert np.all(timing[:, 0] < self.input_size) and np.all(timing[:, 0] >= 0), f"Neuron IDs must be in range [0, {self.input_size - 1}]."
+            # Fourth check if time_step is within range
+            assert np.all(timing[:, 1] < self._pattern_length) and np.all(timing[:, 1] >= 0), f"Time steps must be in range [0, {self._pattern_length - 1}]."
+            # Fifth check if pairings are unique
+            assert np.all(np.unique(timing, axis=0, return_counts=True)[1] == 1), "Each (neuron, time) pairing must be unique."
 
     def reset(self):
         self.count = 0
@@ -584,6 +619,57 @@ def create_binary_class_timing(input_size, interval) -> List[np.ndarray]:
         construct_linear_pattern_timing(input_size, interval, ascending=True),
         construct_linear_pattern_timing(input_size, interval, ascending=False)
     ]
+
+def create_binary_class_array(input_size, interval) -> List[np.ndarray]:
+    """
+    Returns a list of two arrays for binary classification tasks.
+    Each array contains spikes in the form of a 2D numpy array with shape (input_size, pattern_length).
+    The first array represents an ascending pattern and the second represents a descending pattern.
+    """
+    A = construct_array(input_size, interval, ascending=True)
+    B = construct_array(input_size, interval, ascending=False)
+    return [A, B]
+
+
+# Factory function to create a spike generator based on class name and input size.
+def create_spikegen(class_name, input_size, **kwargs):
+    """
+    Creates an instance of a spike generator based on the specified class name.
+
+    Args:
+        class_name (str): The name of the spike generator class to instantiate.
+        input_size (int): The size of the input for the spike generator.
+        **kwargs: Additional keyword arguments to pass to the spike generator class.
+
+    Returns:
+        SpikeGenerator: An instance of the specified spike generator class.
+
+    Raises:
+        ValueError: If the specified class name is not found or does not inherit from SpikeGenerator.
+
+    Notes:
+        - If `class_name` is "CustomTimingGenerator", the function generates binary class timings
+          and calculates the duration based on the `interval` argument.
+        - If `class_name` is "CustomArrayGenerator", the function generates binary class arrays
+          based on the `interval` argument.
+        - For other class names, the function directly instantiates the class if it is a subclass
+          of `SpikeGenerator`.
+    """
+    spikegen_cls = globals().get(class_name, None)
+    if class_name == "CustomTimingGenerator":
+        interval = kwargs.pop("interval", 1)
+        timings = create_binary_class_timing(input_size, interval)
+        duration = (input_size - 1) * interval + 1
+        spikegen = spikegen_cls(input_size, duration, timings, **kwargs)
+    elif class_name == "CustomArrayGenerator":
+        interval = kwargs.pop("interval", 1)
+        arrays = create_binary_class_array(input_size, interval)
+        spikegen = spikegen_cls(input_size, arrays=arrays, **kwargs)
+    elif class_name is not None and issubclass(spikegen_cls, SpikeGenerator):
+        spikegen = spikegen_cls(input_size, **kwargs)
+    else:
+        raise ValueError(f"Spike generator class {class_name} not found or does not inherit from SpikeGenerator.")
+    return spikegen
 
 
 

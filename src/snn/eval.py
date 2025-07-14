@@ -6,7 +6,9 @@ import numpy as np
 from evo.base import Evaluator
 from snn import SNN, SNNSimulator
 # from snn.spikegen import BinaryClassGenerator
-import snn.spikegen
+from snn.spikegen import create_spikegen
+# import snn.spikegen
+
 from lrule import ANN_Rule, LearningRule
 
     
@@ -24,8 +26,11 @@ class SNN_Evaluator(Evaluator):
         params = copy.deepcopy(params)
         self.num_simulation_steps = params["num_sim_steps"]
 
-        spikegen_cls = getattr(snn.spikegen, params["spikegen_params"].pop("class", "BinaryClassGenerator"))
-        self.spikegen = spikegen_cls(input_size=params["snn_params"].get("input_size"), **params["spikegen_params"])
+        # spikegen_cls = getattr(snn.spikegen, params["spikegen_params"].pop("class", "BinaryClassGenerator"))
+        # self.spikegen = spikegen_cls(input_size=params["snn_params"].get("input_size"), **params["spikegen_params"])
+        self.spikegen = create_spikegen(params["spikegen_params"].pop("class", "BinaryClassGenerator"), 
+                                        input_size=params["snn_params"].get("input_size"),
+                                        **params["spikegen_params"])
         self.arule = ANN_Rule(**params["arule_params"]) if learning_rule is None else learning_rule
         self.snn = SNN(learning_rule=self.arule, **params["snn_params"])
 

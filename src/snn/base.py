@@ -12,6 +12,7 @@ class SpikeGenerator(ABC):
     rng: np.random.Generator
     count: int
     current_class: int
+    num_classes: int
     _full_length: int
     _pattern_length: int
     _finished: bool
