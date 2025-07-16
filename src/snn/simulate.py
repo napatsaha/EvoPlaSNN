@@ -68,7 +68,8 @@ class SNNSimulator:
             self.rewarder = create_rewarder(
                 rewarder_type,
                 num_classes=network.output_size, 
-                spikegen=spike_generator, 
+                pattern_length=spike_generator.pattern_length,
+                spacing=getattr(spike_generator, "spacing", None),
                 **params["rewarder_params"])
             collector_type = params["collector_params"].pop("type", "simple")
             self.collector = create_collector(

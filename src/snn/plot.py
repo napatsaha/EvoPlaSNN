@@ -13,9 +13,9 @@ import numpy as np
 
 
 def plot_spikes(simulator: 'SNNSimulator', x_scale: float = 0.2, y_scale: float = 0.5,
-                y_eps: float = 0.5, x_eps: float | int = 0.02, spk_eps: float = 0.25, 
+                y_eps: float = 0.5, x_eps: float | int = 1, spk_eps: float = 0.25, 
                 title: str = None, cmap = None, color: str = "black", cmap_range: tuple = (0, 1),
-                linewidth=2, x_min = 0, x_max = None,
+                linewidth=2, x_min = None, x_max = None,
                 savepath: str | Path = None, show: bool = True, **kwargs):
     """
     Plot spike trains with time on x-axis and neuron index on y-axis.
@@ -26,6 +26,8 @@ def plot_spikes(simulator: 'SNNSimulator', x_scale: float = 0.2, y_scale: float 
         x_eps = x_eps * simulator.num_steps
     if x_max is None:
         x_max = simulator.num_steps
+    if x_min is None:
+        x_min = max(0, x_max - 100)
     if cmap is None:
         cm = color
     else:
