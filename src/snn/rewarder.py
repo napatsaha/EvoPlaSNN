@@ -31,9 +31,11 @@ class RewarderProtocol(Protocol):
     def reset(self):
         """Reset the rewarder state."""
         pass
+
     def get_target(self, current_class: int) -> np.ndarray:
         """Get the target spikes for the current class."""
         pass
+
     def get_reward(self, target_spikes: np.ndarray, output_spikes: np.ndarray) -> Tuple[float, float]:
         """
         Calculate the reward based on the target spikes and output spikes.
@@ -92,28 +94,87 @@ class SimpleRewarder(RewarderProtocol):
     """
     Compare against pre-generated target array instead of comparing each output spikes timestep-by-timestep.
     """
-    def __init__(self, num_classes, spikegen: BinaryArrayGenerator, *,
-                 target_position: Literal["first", "last"] = "last", **kwargs):
+    def __init__(self, num_classes, pattern_length: int, spacing: int = 0, interval: int = None, *,
+                 target_position: Literal["first", "last", "rate"] = "last", **kwargs):
         self.num_classes = num_classes
-        self.spikegen = spikegen
-        self.pattern_length = self.spikegen.pattern_length
-        self.full_length = self.spikegen.length
-        self.spacing = spikegen.spacing
+        # self.spikegen = spikegen
+        self.pattern_length = pattern_length
+        self.spacing = spacing
+        self.interval = interval if interval is not None else 1
+        self.full_length = self.pattern_length + self.spacing
 
         self.target_position = target_position
-        self._label = 0 if target_position == "first" else self.pattern_length - 1
+        if self.target_position == "first":
+            self._label = 0
+        elif self.target_position == "last":
+            self._label = self.pattern_length - 1
+        elif self.target_position == "rate":
+            self._label = np.arange(0, self.pattern_length, self.interval)
+        
+        # self._label = 0 if target_position == "first" else self.pattern_length - 1 if target_position == "last" else None
         self._create_target_array()
         self.reset()
 
     def _create_target_array(self):
         # Create pre-generated array of target outputs for easier slicing
-        self.target_array = np.zeros((self.num_classes, self.num_classes, self.spikegen.pattern_length), dtype=np.int_)
+        self.target_array = np.zeros((self.num_classes, self.num_classes, self.pattern_length), dtype=np.int_)
         for i in range(self.num_classes):
             self.target_array[i, i, self._label] = 1
+            # if self.target_position == "rate":
+            #     if self.interval is None:
+            #         self.target_array[i, i, :] = 1
+            #     else:
+            #         idx = np.arange(0, self.pattern_length, self.interval)
+            #         self.target_array[i, i, idx] = 1
+            # else:
+            #     self.target_array[i, i, self._label] = 1
         if self.spacing > 0:
             # Add spacing after pattern
             self.target_array = np.pad(self.target_array, ((0, 0), (0, 0), (0, self.spacing)), mode='constant', constant_values=0)
             # self.full_length = self.target_array.shape[2] - 1
+
+    def find_active_indices(self, input_array: np.ndarray) -> np.ndarray:
+        # Just make it only work with 2D array
+        # if input_array.ndim == 2:
+        active = (np.max(input_array, axis=0) > 0).astype(np.int8)
+        # Find the indices of the active spikes based on the target position
+        if self.target_position == "last":
+            idx = self.full_length - np.argmax(np.flip(active, axis=-1), axis=-1)
+        elif self.target_position == "first":
+            idx = np.argmax(active, axis=-1)
+        elif self.target_position == "rate":
+            idx = np.nonzero(active)
+        # elif input_array.ndim == 3:
+        #     active = (np.max(input_array, axis=-2) > 0).astype(np.int8)
+        #     # Find the indices of the active spikes based on the target position
+        #     if self.target_position == "last":
+        #         idx = -np.argmax(np.flip(active, axis=-1), axis=-1)
+        #     elif self.target_position == "first":
+        #         idx = np.argmax(active, axis=-1)
+        #     elif self.target_position == "rate":
+        #         idx = np.nonzero(active)
+        # np.put_along_axis(self.target_array, idx[:, np.newaxis], 1, axis=1)
+        return idx
+
+    def update_target_array(self, input_array: np.ndarray, current_class: int = None) -> None:
+        """
+        Update the target array based on the input array.
+        This is useful if the target array needs to be dynamically generated or updated.
+        """        
+        if current_class is None and input_array.ndim == 3:
+            # Bulk update for all classes
+            self.target_array.fill(0)  # Reset the target array
+            for i in range(self.num_classes):
+                idx = self.find_active_indices(input_array[i])
+                self.target_array[i, i, idx] = 1
+        elif current_class is not None and input_array.ndim == 2:
+            if current_class < 0 or current_class >= self.num_classes:
+                raise ValueError(f"current_class must be between 0 and {self.num_classes - 1}. Got {current_class}.")
+            self.target_array[current_class].fill(0)  # Reset the target array for the current class
+            idx = self.find_active_indices(input_array)
+            self.target_array[current_class, current_class, idx] = 1
+        else:
+            raise ValueError("Input array must be 2D for single class update or 3D for bulk update.")
 
     def reset(self):
         self.count = 0
@@ -141,15 +202,18 @@ class SimpleRewarder(RewarderProtocol):
         Get the maximum possible reward for the current target array.
         This is simply the number of classes, since each class has a target spike at one position.
         """
-        return 1.0 * self.spikegen.input_size
+        return 1.0
 
 
-class WeightedRewarder(SimpleRewarder):
+class WeightedRewarder_old(SimpleRewarder):
+    """
+    Weighted Rewarder version that only works with Array-based Spike Generator.
+    """
     def __init__(self, num_classes, spikegen: BinaryArrayGenerator, *,
                  ignore_silent_inputs: bool = True,
                  log_scale: bool = False,
                  target_position: Literal["first", "last"] = "last", **kwargs):
-        super().__init__(num_classes, spikegen,
+        super().__init__(num_classes, spikegen.pattern_length, spikegen.spacing,
                          target_position=target_position, **kwargs)
         self.ignore_silent_inputs = ignore_silent_inputs
         self.log_scale = log_scale
@@ -205,6 +269,93 @@ class WeightedRewarder(SimpleRewarder):
         # Apply weights to the reward
         reward *= wts
         return error, reward
+
+
+class WeightedRewarder(SimpleRewarder):
+    def __init__(self, num_classes, pattern_length: int, spacing: int = 0, interval: int = None, *,
+                 ignore_silent_inputs: bool = True,
+                 log_scale: bool = False,
+                 target_position: Literal["first", "last", "rate"] = "last", **kwargs):
+        super().__init__(num_classes, pattern_length, spacing, interval,
+                         target_position=target_position, **kwargs)
+        self.ignore_silent_inputs = ignore_silent_inputs
+        self.log_scale = log_scale
+        # self.weights = self.create_weights()
+        if self.interval > 1 and self.ignore_silent_inputs:
+            self._spk_leng = (self.pattern_length + self.interval - 1) / self.interval
+        else:
+            self._spk_leng = self.pattern_length
+        self._update_rate()
+        # self._create_weights()
+
+    def _update_rate(self):
+        """
+        Update spike rates to be used for weighted rewards, based on internal target array.
+        Can be called after updating target array.
+        """
+        self._spk_cnt = np.max(self.target_array, axis=(1,)).sum(axis=1)
+        self._spk_rate = self._spk_cnt / self._spk_leng
+        self.pos_wt = 1 / self._spk_rate
+        self.neg_wt = 1 / (1 - self._spk_rate)
+
+    def _create_weights(self):
+        active = np.max(self.target_array, axis=(1,))
+        self.weights = np.zeros_like(active, dtype=np.float32)
+        pos_wts = 1 / self._spk_rate
+        neg_wts = 1 / (1 - self._spk_rate)
+        self.weights = np.where(active > 0, np.broadcast_to(pos_wts, active.T.shape).T, 
+                                np.broadcast_to(neg_wts, active.T.shape).T)
+        # Apply log scaling if required
+        if self.log_scale:
+            self.weights = np.log(self.weights)
+
+    # def create_weights(self):
+    #     """
+    #     New version, without relying on spikegen.array
+    #     """
+    #     # Simply tells if any output spike occurs at each timestep or not
+    #     active = (np.max(self.target_array, axis=(1,)) > 0).astype(np.int8)
+    #     # number of non-silent timesteps
+    #     if self.interval > 1 and self.ignore_silent_inputs:
+    #         leng = (self.pattern_length + self.interval - 1) / self.interval
+    #     else:
+    #         leng = self.pattern_length
+    #     # total number of spikes in each class (assuming every class has same number of total spikes)
+    #     cnt = active.sum(axis=1)
+    #     spk_rate = cnt / leng
+    #     spk_rate = np.broadcast_to(spk_rate, active.T.shape).T
+    #     # If silent, Weight = 1 / (1 - RATE) <- Lower  (e.g. 1/0.96 = 1.04)
+    #     # If active, Weight = 1 / RATE       <- Higher (e.g. 1/0.04 = 25)
+    #     wts = 1 / np.abs(active - 1 + spk_rate)
+    #     # Apply log scaling if required
+    #     if self.log_scale:
+    #         wts = np.log(wts)
+    #     return wts.astype(np.float32)
+
+    def update_target_array(self, input_array, current_class: int = None) -> None:
+        """
+        Same as parent's update_target_array, but also updates the weights.
+        """
+        super().update_target_array(input_array, current_class)
+        # self.weights = self.create_weights()
+        self._update_rate()
+
+    # def get_max_reward(self):
+    #     """
+    #     Get the maximum possible reward for the current target array.
+    #     This is simply the sum of the weights averaged between class.
+    #     """
+    #     return np.sum(self.weights, axis=1).mean()
+
+    def get_reward(self, target_spikes, output_spikes):
+        # Get Binary rewards
+        error, reward = super().get_reward(target_spikes, output_spikes)
+        # Apply weights to the reward
+        wts = self.pos_wt if reward > 0 else self.neg_wt
+        reward *= wts
+        return error, reward
+
+
 
 class SimpleCollector(CollectorProtocol):
     def __init__(self, buffer_size: int = None, fitness_type: Literal["reward", "error", "mapped"] = "reward", 

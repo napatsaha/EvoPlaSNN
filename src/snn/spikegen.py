@@ -620,14 +620,14 @@ def create_binary_class_timing(input_size, interval) -> List[np.ndarray]:
         construct_linear_pattern_timing(input_size, interval, ascending=False)
     ]
 
-def create_binary_class_array(input_size, interval) -> List[np.ndarray]:
+def create_binary_class_array(input_size, interval, failure_rate=0.0, jitter=0) -> List[np.ndarray]:
     """
     Returns a list of two arrays for binary classification tasks.
     Each array contains spikes in the form of a 2D numpy array with shape (input_size, pattern_length).
     The first array represents an ascending pattern and the second represents a descending pattern.
     """
-    A = construct_array(input_size, interval, ascending=True)
-    B = construct_array(input_size, interval, ascending=False)
+    A = construct_array(input_size, interval, ascending=True, failure_rate=failure_rate, jitter=jitter)
+    B = construct_array(input_size, interval, ascending=False, failure_rate=failure_rate, jitter=jitter)
     return [A, B]
 
 
