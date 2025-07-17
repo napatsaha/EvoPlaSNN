@@ -139,7 +139,7 @@ class SimpleRewarder(RewarderProtocol):
         active = (np.max(input_array, axis=0) > 0).astype(np.int8)
         # Find the indices of the active spikes based on the target position
         if self.target_position == "last":
-            idx = self.full_length - np.argmax(np.flip(active, axis=-1), axis=-1)
+            idx = self.full_length - np.argmax(np.flip(active, axis=-1), axis=-1) - 1
         elif self.target_position == "first":
             idx = np.argmax(active, axis=-1)
         elif self.target_position == "rate":
@@ -273,13 +273,14 @@ class WeightedRewarder_old(SimpleRewarder):
 
 class WeightedRewarder(SimpleRewarder):
     def __init__(self, num_classes, pattern_length: int, spacing: int = 0, interval: int = None, *,
-                 ignore_silent_inputs: bool = True,
+                 ignore_silent_inputs: bool = False,
                  log_scale: bool = False,
                  target_position: Literal["first", "last", "rate"] = "last", **kwargs):
         super().__init__(num_classes, pattern_length, spacing, interval,
                          target_position=target_position, **kwargs)
         self.ignore_silent_inputs = ignore_silent_inputs
         self.log_scale = log_scale
+        self.min_denom = 1e-3
         # self.weights = self.create_weights()
         if self.interval > 1 and self.ignore_silent_inputs:
             self._spk_leng = (self.pattern_length + self.interval - 1) / self.interval
@@ -295,16 +296,15 @@ class WeightedRewarder(SimpleRewarder):
         """
         self._spk_cnt = np.max(self.target_array, axis=(1,)).sum(axis=1)
         self._spk_rate = self._spk_cnt / self._spk_leng
-        self.pos_wt = 1 / self._spk_rate
-        self.neg_wt = 1 / (1 - self._spk_rate)
+        # Prevent division by zero when all spikes are silent or all spikes are active
+        self.pos_wt = 1 / np.where(self._spk_rate == 0, self.min_denom, self._spk_rate)
+        self.neg_wt = 1 / np.where(self._spk_rate == 1, self.min_denom, (1 - self._spk_rate))
 
     def _create_weights(self):
         active = np.max(self.target_array, axis=(1,))
         self.weights = np.zeros_like(active, dtype=np.float32)
-        pos_wts = 1 / self._spk_rate
-        neg_wts = 1 / (1 - self._spk_rate)
-        self.weights = np.where(active > 0, np.broadcast_to(pos_wts, active.T.shape).T, 
-                                np.broadcast_to(neg_wts, active.T.shape).T)
+        self.weights = np.where(active > 0, np.broadcast_to(self.pos_wts, active.T.shape).T, 
+                                np.broadcast_to(self.neg_wts, active.T.shape).T)
         # Apply log scaling if required
         if self.log_scale:
             self.weights = np.log(self.weights)
@@ -348,10 +348,11 @@ class WeightedRewarder(SimpleRewarder):
     #     return np.sum(self.weights, axis=1).mean()
 
     def get_reward(self, target_spikes, output_spikes):
-        # Get Binary rewards
+        # Get Binary rewards (sum of errors)
         error, reward = super().get_reward(target_spikes, output_spikes)
+        # Apply weights based on whether target spikes are all silent or not
+        wts = self.pos_wt if np.sum(target_spikes) > 0 else self.neg_wt
         # Apply weights to the reward
-        wts = self.pos_wt if reward > 0 else self.neg_wt
         reward *= wts
         return error, reward
 

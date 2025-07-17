@@ -524,6 +524,9 @@ class CustomTimingGenerator(SpikeGenerator):
 
     def _validate_timings(self):
         for timing in self.timings:
+            if timing.size == 0:
+                # Ignore empty timings
+                continue
             # First check for appropriate dimension
             assert np.ndim(timing) == 2, "Timings must be a list of 2D arrays."
             # Second check if second axis has length 2
@@ -549,6 +552,10 @@ class CustomTimingGenerator(SpikeGenerator):
         self.array.fill(0)
 
         timings = self.timings[class_id].copy()
+
+        # Check if timings is empty
+        if timings.size == 0:
+            return
 
         # Apply spike failure
         if self._failure:
@@ -670,6 +677,82 @@ def create_spikegen(class_name, input_size, **kwargs):
     else:
         raise ValueError(f"Spike generator class {class_name} not found or does not inherit from SpikeGenerator.")
     return spikegen
+
+
+def construct_poisson_spike_times_1(r, dt, T, rng, n):
+    """
+    Threshold-based Poisson spike time generation. Random numbers for determining spike sampled from [0, 1] Uniform distribution.
+
+    1. Sample random numbers uniformly in [0, 1] in shape (n, T)
+    2. Determine if spike occurs according to threshold of r * dt
+    3. Determine timestep where spikes occur in each neuron, and return (neuron, time) pairs
+    """
+    x = rng.random((n, T))
+    sp = (x < r * dt).astype(int)
+    # times = [(nid, t) for nid, t in zip(*np.nonzero(sp))]
+    times = np.stack(np.nonzero(sp), axis=1)
+    return times
+
+def construct_poisson_spike_times_2(r, dt, T, rng, n):
+    """
+    Interval-based Poisson spike time generation. Intervals between spikes sampled from exponential distribution.
+
+    1. Sample spike interval from exponential
+    2. Cumulatively sum intervals to get spike times
+    3. Cut off spike times beyond T
+    4. Concatenate into (neuron, time) pairs
+    """
+    x = rng.exponential(1 / (r*dt), (n, T))
+    xc = np.cumsum(x, axis=1).round().astype(int)
+    times = np.array([(i, t) for i, tm in enumerate(xc) for t in np.unique(tm) if t < T], dtype=np.int32)
+    return times
+
+def construct_poisson_spike_times_3(r, dt, T, rng, n):
+    """
+    Count-based Poisson spike time generation. Counts for each neuron sampled from Poisson distribution.
+    
+    1. Sample number of spikes for each neuron from Poisson distribution
+    2. Sample spike times uniformly in [0, T] according to the number of spikes for each neuron
+    3. Return spike times as (neuron, time) pairs
+    """
+    counts = rng.poisson(T * dt * r, n)
+    times = [np.sort(np.unique(rng.uniform(0.0 + dt, T-0.5, size=c).round())) for c in counts]
+    # times = [tm - tm % dt for tm in times]
+    times = np.array([(i, t) for i, tm in enumerate(times) for t in tm], dtype=np.int32)
+    return times
+
+_poisson_dict = {
+    "threshold": construct_poisson_spike_times_1,
+    "interval": construct_poisson_spike_times_2,
+    "count": construct_poisson_spike_times_3
+}
+
+def create_poisson_class_timing(input_size, duration, rate, *, 
+                                dt=1e-3, num_classes=2, rng: np.random.default_rng=None,
+                                method: Literal["threshold", "interval", "count"] = "threshold") -> List[np.ndarray]:
+    """
+    Creates a list of Poisson spike timings for classification tasks.
+    Each class has a different rate and the timings are generated based on the specified duration and dt.
+    
+    Args:
+        input_size (int): The number of neurons in the input layer.
+        duration (int): The total duration of the spike pattern.
+        rate (float): The average firing rate of spikes per neuron.
+        dt (float): The time step size.
+        num_classes (int): The number of classes to generate timings for.
+        num_neurons (int): The number of neurons to generate timings for.
+
+    Returns:
+        List[np.ndarray]: A list of timing arrays for each class, where each array contains (neuron_id, time_step) pairs.
+    """
+    if rng is None:
+        rng = np.random.default_rng()
+    func = _poisson_dict.get(method, construct_poisson_spike_times_1)
+    timings = []
+    for i in range(num_classes):
+        times = func(rate, dt, duration, rng, input_size)
+        timings.append(times)
+    return timings
 
 
 
