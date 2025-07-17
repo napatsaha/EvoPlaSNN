@@ -189,13 +189,18 @@ class SimpleRewarder(RewarderProtocol):
         self.count += 1
         return target_spikes
     
-    def get_reward(self, target_spikes, output_spikes):
+    def get_reward(self, current_class, output_spikes):
+        target_spikes = self.get_target(current_class)
+        error, reward = self._calculate_error_and_reward(target_spikes, output_spikes)
+        return error, reward
+
+    def _calculate_error_and_reward(self, target_spikes, output_spikes):
         # Sum the absolute differences between target and output spikes
         error = np.sum(np.abs(target_spikes - output_spikes))
         # Reward = +1 for Error = 0,
         # Reward = -1 for Error > 0, etc
         reward = 1.0 if error == 0 else -1.0
-        return error, reward
+        return error,reward
     
     def get_max_reward(self):
         """
@@ -347,11 +352,12 @@ class WeightedRewarder(SimpleRewarder):
     #     """
     #     return np.sum(self.weights, axis=1).mean()
 
-    def get_reward(self, target_spikes, output_spikes):
+    def get_reward(self, current_class, output_spikes):
+        target_spikes = self.get_target(current_class)
         # Get Binary rewards (sum of errors)
-        error, reward = super().get_reward(target_spikes, output_spikes)
+        error, reward = self._calculate_error_and_reward(target_spikes, output_spikes)
         # Apply weights based on whether target spikes are all silent or not
-        wts = self.pos_wt if np.sum(target_spikes) > 0 else self.neg_wt
+        wts = self.pos_wt[current_class] if np.sum(target_spikes) > 0 else self.neg_wt[current_class]
         # Apply weights to the reward
         reward *= wts
         return error, reward

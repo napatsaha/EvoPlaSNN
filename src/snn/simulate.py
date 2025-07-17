@@ -144,8 +144,10 @@ class SNNSimulator:
 
             # If using Rewarder-Collector scheme
             elif self._post_process_type == 1:
-                target = self.rewarder.get_target(self.spike_generator.get_label())
-                error, reward = self.rewarder.get_reward(target, spk_out)
+                if self.spike_generator.count == 1:
+                    self.rewarder.update_target_array(self.spike_generator.array, self.spike_generator.get_label())
+                # target = self.rewarder.get_target(self.spike_generator.get_label())
+                error, reward = self.rewarder.get_reward(self.spike_generator.get_label(), spk_out)
                 if self.spike_generator.active:
                     self.collector.record(reward, error)
 
@@ -159,25 +161,6 @@ class SNNSimulator:
                     # Update synaptic weights every timestep
                     self.network.update_synapses(reward=None)
 
-
-            # TODO: Remove
-            # Evaluate reward
-            # update_signal = self.spike_generator.return_signal()
-            # if update_signal and self._supervised:
-            #     # label = self.spike_generator.get_label()
-            #     # prediction = np.argmax(spk_out) if spk_out.size > 1 else spk_out
-            #     # reward = 1.0 if np.equal(label, prediction) else 0.0
-            #     # self.reward_collector.append((t, label, prediction, reward))
-            #     reward = self.reward_manager.calculate_reward(self.spike_generator.get_label(), spk_out, t)
-            # else:
-            #     reward = None
-
-            # TODO: Remove
-            # Update synaptic weights
-            # if self.learning_rule is not None:
-            #     if update_signal:
-            #         self.network.update_synapses(reward=reward)
-            
             # Record membrane potentials
             if self.record_membrane:
                 for i, membrane in enumerate(self.network.membranes):
