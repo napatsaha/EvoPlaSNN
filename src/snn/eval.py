@@ -6,7 +6,7 @@ import numpy as np
 from evo.base import Evaluator
 from snn import SNN, SNNSimulator
 # from snn.spikegen import BinaryClassGenerator
-from snn.spikegen import create_spikegen
+from snn.spikegen import create_spikegen, create_poisson_class_timing
 # import snn.spikegen
 
 from lrule import ANN_Rule, LearningRule
@@ -26,11 +26,27 @@ class SNN_Evaluator(Evaluator):
         params = copy.deepcopy(params)
         self.num_simulation_steps = params["num_sim_steps"]
 
-        # spikegen_cls = getattr(snn.spikegen, params["spikegen_params"].pop("class", "BinaryClassGenerator"))
-        # self.spikegen = spikegen_cls(input_size=params["snn_params"].get("input_size"), **params["spikegen_params"])
-        self.spikegen = create_spikegen(params["spikegen_params"].pop("class", "BinaryClassGenerator"), 
-                                        input_size=params["snn_params"].get("input_size"),
-                                        **params["spikegen_params"])
+        # Initialise spike patterns and spike generator
+        self.pattern_params = params.pop("pattern_params", None)
+        if self.pattern_params is not None:
+            self.pattern_type = self.pattern_params.pop("type", "poisson")
+            if self.pattern_type == "poisson":
+                self.timings = create_poisson_class_timing(
+                    **self.pattern_params
+                )
+                self.spikegen = create_spikegen(
+                    params["spikegen_params"].pop("class", "CustomTimingGenerator"),
+                    input_size=self.pattern_params.get("input_size"),
+                    duration=self.pattern_params.get("duration"),
+                    timings=self.timings[0],
+                    **params["spikegen_params"]
+                )
+            else:
+                raise ValueError(f"Unknown pattern type: {self.pattern_type}")
+        else:
+            self.spikegen = create_spikegen(params["spikegen_params"].pop("class", "BinaryClassGenerator"), 
+                                            input_size=params["snn_params"].get("input_size"),
+                                            **params["spikegen_params"])
         self.arule = ANN_Rule(**params["arule_params"]) if learning_rule is None else learning_rule
         self.snn = SNN(learning_rule=self.arule, **params["snn_params"])
 
@@ -87,9 +103,12 @@ class SNN_Evaluator(Evaluator):
             self.logger.info(f"\nEvaluating genome: {genome}")
 
         for i in range(num_trials):
-            # self.spikegen.reset()
+            # Reset everything
             self.simulator.reset()
-            # self.snn.reset()
+
+            # Generate new set of spike pattern sets
+            if not self.spikegen.is_static() and self.pattern_params is not None:
+                self.spikegen.update_timings(self.timings[i])
 
             self.simulator.run(self.num_simulation_steps)
 
@@ -101,3 +120,9 @@ class SNN_Evaluator(Evaluator):
             self.logger.info(f"Average Fitness over {num_trials} trials: {np.mean(fitnesses):.2f}\tStd Dev = {np.std(fitnesses):.2f}")
 
         return np.mean(fitnesses)
+    
+    def update_classes(self):
+        if self.pattern_params is not None:
+            self.timings = create_poisson_class_timing(
+                **self.pattern_params
+            )

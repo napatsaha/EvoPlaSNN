@@ -62,6 +62,9 @@ class EvoManager:
 
                 fitness_list = np.zeros(self.solver.popsize)
 
+                # Update set of classes
+                self.evaluator.update_classes()
+
                 # Evaluate solution
                 for i, solution in tqdm(enumerate(solutions), desc="Populations", total=self.solver.popsize, position=1, leave=False):
                     fitness_list[i] = self.evaluator.evaluate(solution, num_trials=self.num_trials)

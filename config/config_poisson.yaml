@@ -1,0 +1,59 @@
+num_sim_steps: 1000
+pattern_params:
+  type: poisson
+  input_size: 5
+  duration: 15
+  rate: 100
+  dt: 0.001
+  num_classes: 2
+  num_sets: 10
+spikegen_params:
+  class: CustomTimingGenerator
+  binary: false
+  spacing: 10
+  jitter_std: 0.5
+  failure_rate: 0.05
+  randomise_class: False
+snn_params:
+  input_size: 5
+  hidden_size: 0
+  output_size: 2
+  dt: 0.001
+  neuron_params:
+    tau_mem: 0.004
+    tau_trace: 0.004
+  synapse_params:
+    clip_weights: false
+    normalise_weights: false
+    normalise_method: L2
+  winner_take_all: false
+rewarder_params:
+  type: weighted
+  ignore_silent_inputs: false
+  log_scale: false
+collector_params:
+  type: simple
+  fitness_type: reward
+  agg_func: sum
+arule_params:
+  learning_rate: 0.1
+  hidden_size: 4
+  bias: true
+  hidden_activation: relu
+  output_activation: tanh
+  use_weights: true
+  use_reward: true
+  use_trace_pre: true
+  use_trace_post: true
+evo_params:
+  manager:
+    type: original
+    max_generations: 1
+    tolerance: 0.02
+    num_trials: 10
+    save_best: 3
+  solver:
+    # ndim: 25
+    type: CMA-ES
+    popsize: 30
+    # minimise: false

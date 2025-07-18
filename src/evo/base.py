@@ -48,6 +48,13 @@ class Evaluator(Protocol):
         Returns the size of the parameter space.
         """
         raise NotImplementedError("get_parameter_size method must be implemented by subclasses.")
+    
+    def update_classes(self) -> None:
+        """
+        Update set of classes used for spike generation.
+        Meant to be called at beginning of each generation.
+        """
+        pass
 
 class BaseSolver(Solver):
     def __init__(self, ndim: int = 2, popsize: int = None, minimise: bool = True):

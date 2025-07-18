@@ -647,7 +647,7 @@ def create_binary_class_array(input_size, interval, failure_rate=0.0, jitter=0) 
 
 
 # Factory function to create a spike generator based on class name and input size.
-def create_spikegen(class_name, input_size, **kwargs):
+def create_spikegen(class_name, input_size, binary:bool=True, **kwargs):
     """
     Creates an instance of a spike generator based on the specified class name.
 
@@ -671,12 +671,15 @@ def create_spikegen(class_name, input_size, **kwargs):
           of `SpikeGenerator`.
     """
     spikegen_cls = globals().get(class_name, None)
-    if class_name == "CustomTimingGenerator":
+    binary = kwargs.pop("binary", binary)
+    if class_name == "CustomTimingGenerator" and binary:
         interval = kwargs.pop("interval", 1)
         timings = create_binary_class_timing(input_size, interval)
         duration = (input_size - 1) * interval + 1
         spikegen = spikegen_cls(input_size, duration, timings, **kwargs)
-    elif class_name == "CustomArrayGenerator":
+    elif class_name == "CustomTimingGenerator" and not binary:
+        spikegen = spikegen_cls(input_size, **kwargs)
+    elif class_name == "CustomArrayGenerator" and binary:
         interval = kwargs.pop("interval", 1)
         arrays = create_binary_class_array(input_size, interval)
         spikegen = spikegen_cls(input_size, arrays=arrays, **kwargs)
