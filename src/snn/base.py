@@ -16,10 +16,12 @@ class SpikeGenerator(ABC):
     _full_length: int
     _pattern_length: int
     _finished: bool
+    _static: bool
 
     def __init__(self, input_size: int, seed=None):
         self.input_size = input_size
         self.rng = np.random.default_rng(seed)
+        self._static = False
 
     def reset(self):
         """
@@ -49,6 +51,13 @@ class SpikeGenerator(ABC):
         Returns the current class label.
         """
         return self.current_class
+
+    def is_static(self) -> bool:
+        """
+        Determines whether the generator will always return the same spike train for each class,
+        or if there is some stochasticity in how each pattern is presented.
+        """
+        return self._static
 
     def __len__(self):
         return self._full_length

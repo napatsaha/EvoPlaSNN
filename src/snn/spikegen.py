@@ -500,12 +500,13 @@ class CustomTimingGenerator(SpikeGenerator):
                  failure_rate: float = 0.0, jitter_std: int = 0, randomise_class: bool = True,
                  seed=None):
         super().__init__(input_size, seed)
+        self._static = True
         self.num_classes = len(timings)
         self.spacing = max(0, int(spacing)) if spacing is not None else 0
         self._pattern_length = duration
         self._full_length = self._pattern_length + self.spacing
         # TODO: Validate timings
-        self.timings = timings
+        self.timings = timings.copy()
         self._validate_timings()
         self.array = np.zeros((input_size, self._full_length), dtype=np.int8)
 
@@ -537,6 +538,13 @@ class CustomTimingGenerator(SpikeGenerator):
             assert np.all(timing[:, 1] < self._pattern_length) and np.all(timing[:, 1] >= 0), f"Time steps must be in range [0, {self._pattern_length - 1}]."
             # Fifth check if pairings are unique
             assert np.all(np.unique(timing, axis=0, return_counts=True)[1] == 1), "Each (neuron, time) pairing must be unique."
+
+    def update_timings(self, timings: List[np.ndarray]):
+        """
+        Updates the timings with a new list of timings.
+        """
+        self.timings = timings.copy()
+        self._validate_timings()
 
     def reset(self):
         self.count = 0
@@ -728,7 +736,8 @@ _poisson_dict = {
 }
 
 def create_poisson_class_timing(input_size, duration, rate, *, 
-                                dt=1e-3, num_classes=2, rng: np.random.default_rng=None,
+                                dt=1e-3, num_classes=2, num_sets: int= 1, simplify: bool= True,
+                                rng: np.random.default_rng=None,
                                 method: Literal["threshold", "interval", "count"] = "threshold") -> List[np.ndarray]:
     """
     Creates a list of Poisson spike timings for classification tasks.
@@ -739,8 +748,9 @@ def create_poisson_class_timing(input_size, duration, rate, *,
         duration (int): The total duration of the spike pattern.
         rate (float): The average firing rate of spikes per neuron.
         dt (float): The time step size.
-        num_classes (int): The number of classes to generate timings for.
-        num_neurons (int): The number of neurons to generate timings for.
+        num_classes (int): The number of classes of patterns within a set.
+        num_sets (int): The number of sets of num_classes patterns to generate.
+        simplify (bool): If True (default), for num_sets=1, returns a single list of length num_classes.
 
     Returns:
         List[np.ndarray]: A list of timing arrays for each class, where each array contains (neuron_id, time_step) pairs.
@@ -748,11 +758,18 @@ def create_poisson_class_timing(input_size, duration, rate, *,
     if rng is None:
         rng = np.random.default_rng()
     func = _poisson_dict.get(method, construct_poisson_spike_times_1)
-    timings = []
-    for i in range(num_classes):
-        times = func(rate, dt, duration, rng, input_size)
-        timings.append(times)
-    return timings
+    sets = []
+    for s in range(num_sets):
+        # Generate timings for each class
+        in_sets = []
+        for i in range(num_classes):
+            times = func(rate, dt, duration, rng, input_size)
+            in_sets.append(times)
+        sets.append(in_sets)
+    if simplify and num_sets == 1:
+        return sets[0]
+    else:
+        return sets
 
 
 
