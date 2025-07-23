@@ -5,11 +5,12 @@ from matplotlib import ticker
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib as mpl
+from .base import SpikeGenerator
 
 from .utils import LayerRecorder, MatrixRecorder
 from .snn import SNN
 # from lrule import LearningRule
-from .spikegen import BinaryClassGenerator, SpikeGenerator
+from .spikegen import BinaryClassGenerator
 from .decoding import get_decoder_class, get_fitnessor_class, BaseDecoder, BaseFitnessor
 from .rewarder import create_rewarder, create_collector, RewarderProtocol, CollectorProtocol
 
@@ -142,7 +143,7 @@ class SNNSimulator:
 
             # If using Rewarder-Collector scheme
             elif self._post_process_type == 1:
-                target = self.rewarder.get_target(self.spike_generator.current_class)
+                target = self.rewarder.get_target(self.spike_generator.get_label())
                 error, reward = self.rewarder.get_reward(target, spk_out)
                 if self.spike_generator.active:
                     self.collector.record(reward, error)
