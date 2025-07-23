@@ -58,14 +58,15 @@ class EvoManager:
     Main class for managing loop of evolutionary optimisation using EvoSax.
     """
     def __init__(self, solver: EvolutionaryAlgorithm, evaluator: Problem, *, 
-                 num_trials: int = 1, log_file: str = None, logging_freq: int = 1,
+                 num_trials: int = 1, results_path: str = None, logging_freq: int = 1,
                  max_generations: int = 1000, target_fitness: float = 0.0, tolerance: float = 1e-6, save_best: int = 1,
                  num_stagnations: int = 100, stag_tolerance: float = 1e-8
                  ):
 
         self.num_trials = num_trials
         self.save_best = save_best
-        self.log_file = log_file
+        self.results_path = Path(results_path) if results_path is not None else None
+        self.log_file = self.results_path / "best.log" if self.results_path is not None else None
         self.logging_freq = logging_freq
 
         # Optimsation parameters

@@ -61,7 +61,6 @@ def main(config_file: str | Path, config_overrides: dict = None, parent_run: str
         results_path = results_path / parent_run
     results_path = results_path / time.strftime("%y-%m-%d_%H-%M")
     results_path.mkdir(parents=True, exist_ok=True)
-    log_file = Path(results_path, "best.log")
 
     manager_type = config["evo_params"]["manager"].pop("type", "original")
 
@@ -69,7 +68,8 @@ def main(config_file: str | Path, config_overrides: dict = None, parent_run: str
         from evo.manager import EvoManager
         # Configure SNN Evaluator object
         evaluator = SNN_Evaluator(
-            params=config
+            params=config,
+            **config["evo_params"]["evaluator"]
         )
 
         # Configure Evolution Solver object
@@ -81,7 +81,7 @@ def main(config_file: str | Path, config_overrides: dict = None, parent_run: str
             config["evo_params"]["solver"]["popsize"] = solver.popsize
         
         # Configure Evolution Manager object
-        manager = EvoManager(solver, evaluator, log_file=log_file, **config["evo_params"]["manager"])
+        manager = EvoManager(solver, evaluator, results_path=results_path, **config["evo_params"]["manager"])
 
     elif manager_type == "evosax":
         from evo.manager_evosax import EvoManager, ProblemWrapper
@@ -99,7 +99,7 @@ def main(config_file: str | Path, config_overrides: dict = None, parent_run: str
         popsize = config["evo_params"]["solver"].get("popsize")
         solver = solver_class(population_size=popsize, solution=jnp.zeros(ndim, dtype=jnp.float32))
         # Configure Evolution Manager object
-        manager = EvoManager(solver, evaluator, log_file=log_file, **config["evo_params"]["manager"])
+        manager = EvoManager(solver, evaluator, results_path=results_path, **config["evo_params"]["manager"])
 
     # Re-insert the manager type into the config
     config["evo_params"]["manager"]["type"] = manager_type

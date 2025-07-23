@@ -49,6 +49,12 @@ class Evaluator(Protocol):
         """
         raise NotImplementedError("get_parameter_size method must be implemented by subclasses.")
     
+    def setup_logger(self, log_file: str = None):
+        """
+        Sets up a logger for the evaluator.
+        """
+        pass
+
     def update_classes(self) -> None:
         """
         Update set of classes used for spike generation.

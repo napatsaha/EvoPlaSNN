@@ -1,3 +1,4 @@
+from typing import List
 import numpy as np
 
 
@@ -21,7 +22,7 @@ class SpikeGenerator(ABC):
     def __init__(self, input_size: int, seed=None):
         self.input_size = input_size
         self.rng = np.random.default_rng(seed)
-        self._static = False
+        self._static = True
 
     def reset(self):
         """
@@ -58,6 +59,12 @@ class SpikeGenerator(ABC):
         or if there is some stochasticity in how each pattern is presented.
         """
         return self._static
+    
+    def update_classes(self, new_classes: List) -> None:
+        """
+        Allows spike generator to use a new set of classes of length num_classes.
+        """
+        pass
 
     def __len__(self):
         return self._full_length

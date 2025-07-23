@@ -1,11 +1,7 @@
 num_sim_steps: 1000
 pattern_params:
-  type: poisson
-  duration: 15
-  rate: 100
-  dt: 0.001
-  num_classes: 2
-  num_sets: 10
+  type: binary
+  interval: 3
 spikegen_params:
   class: CustomTimingGenerator
   binary: false
@@ -47,13 +43,15 @@ arule_params:
 evo_params:
   manager:
     type: original
-    max_generations: 5
+    max_generations: 10
     tolerance: 0.02
-    num_trials: 5
+    num_trials: 10
     save_best: 3
     record_classes: true
   solver:
     # ndim: 25
     type: CMA-ES
-    popsize: 10
+    popsize: 30
     # minimise: false
+  evaluator:
+    update_inputs: false

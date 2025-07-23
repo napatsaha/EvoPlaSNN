@@ -500,7 +500,6 @@ class CustomTimingGenerator(SpikeGenerator):
                  failure_rate: float = 0.0, jitter_std: int = 0, randomise_class: bool = True,
                  seed=None):
         super().__init__(input_size, seed)
-        self._static = True
         self.num_classes = len(timings)
         self.spacing = max(0, int(spacing)) if spacing is not None else 0
         self._pattern_length = duration
@@ -515,6 +514,7 @@ class CustomTimingGenerator(SpikeGenerator):
         self._failure = True if self.failure_rate > 0 else False
         self.jitter_std = np.abs(jitter_std)
         self._jitter = True if self.jitter_std > 0 else False
+        self._static = True if (self._failure and self._jitter) else False
         self.randomise_class = randomise_class
 
         # Tracking parameters
@@ -539,7 +539,7 @@ class CustomTimingGenerator(SpikeGenerator):
             # Fifth check if pairings are unique
             assert np.all(np.unique(timing, axis=0, return_counts=True)[1] == 1), "Each (neuron, time) pairing must be unique."
 
-    def update_timings(self, timings: List[np.ndarray]):
+    def update_classes(self, timings: List[np.ndarray]) -> None:
         """
         Updates the timings with a new list of timings.
         """

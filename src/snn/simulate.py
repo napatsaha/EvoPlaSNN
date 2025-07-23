@@ -146,8 +146,9 @@ class SNNSimulator:
             elif self._post_process_type == 1:
                 # Since Rewarder relies on precise timing of spikes and whether the input spikes is active,
                 # it needs to be updated whenever the spike input pattern changes.
-                if self.spike_generator.is_static() and self.spike_generator.count == 1:
+                if not self.spike_generator.is_static() and self.spike_generator.count == 1:
                     self.rewarder.update_target_array(self.spike_generator.array, self.spike_generator.get_label())
+                    
                 # target = self.rewarder.get_target(self.spike_generator.get_label())
                 error, reward = self.rewarder.get_reward(self.spike_generator.get_label(), spk_out)
                 if self.spike_generator.active:
