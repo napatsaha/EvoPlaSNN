@@ -6,7 +6,7 @@ from .neurons import NeuronLayer
 from .spikegen import RandomSpikeGenerator, PatternSpikeGenerator, BinaryClassGenerator
 # from .lrule import LearningRule, STDP_Rule
 
-from . import snn_old
+# from . import snn_old
 
 # This is the __init__.py file for the snn package.
 # It can be used to initialize the package and define what is accessible
