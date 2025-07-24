@@ -113,7 +113,7 @@ class SNN_Evaluator(Evaluator):
         self.results_path = results_path
         # Set up logging to record runtime information
         if self._log_info and self.results_path is not None:
-            self._logfile_name = "trials.log"
+            self._logfile_name = "log_trials.log"
             handler = logging.StreamHandler() if results_path is None else logging.FileHandler(results_path / self._logfile_name)
             formatter = logging.Formatter('%(asctime)s - %(message)s')
             handler.setFormatter(formatter)

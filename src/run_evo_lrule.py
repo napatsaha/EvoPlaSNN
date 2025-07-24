@@ -43,7 +43,7 @@ def update_dictionary(config: dict, overrides: dict) -> dict:
     return config
 
 
-def main(config_file: str | Path, config_overrides: dict = None, parent_run: str = None) -> Path:
+def main(config_file: str | Path, config_overrides: dict = None, parent_run: str = None, default_dir: str = "binary_es") -> Path:
     """Main function to run the evolutionary learning rule experiment."""
     # Default config file
     config_path = Path(ROOT, "config", config_file)
@@ -56,10 +56,12 @@ def main(config_file: str | Path, config_overrides: dict = None, parent_run: str
 
     # Directory to save new results
 
-    results_path = Path(ROOT, "results", "binary_es")
+    
     if parent_run is not None:
-        results_path = results_path / parent_run
-    results_path = results_path / time.strftime("%y-%m-%d_%H-%M")
+        results_path = Path(ROOT, parent_run)
+    else:
+        results_path = Path(ROOT, "results", default_dir)
+    results_path = results_path / time.strftime("%y-%m-%d_%H-%M-%S")
     results_path.mkdir(parents=True, exist_ok=True)
 
     manager_type = config["evo_params"]["manager"].pop("type", "original")
@@ -198,5 +200,4 @@ if __name__ == "__main__":
     # Run main function
     results_path = main(config_file=args.config, config_overrides=config_overrides, parent_run=args.parent)
     # Evaluation of best solution
-    # results_path = "/Users/90961365/Projects/SNN-Test/results/binary_es/25-07-08_20-44"
     eval(results_path, save_plots=True)

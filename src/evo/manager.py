@@ -22,7 +22,7 @@ class EvoManager:
         self.num_trials = num_trials
         self.save_best = save_best
         self.results_path = Path(results_path)
-        self._logfile_name = "best.log"
+        self._logfile_name = "log_generation.log"
         # self.update_inputs = update_inputs
 
         # Termination control
@@ -86,14 +86,18 @@ class EvoManager:
                 # Check stopping criteria
                 if self._check_target_fitness and np.abs(best_fitness - self.target_fitness) < self.tolerance:
                     # Reached target fitness
+                    pbar.update(1)
                     self.logger.info(f"Target fitness {self.target_fitness} reached at generation {gen_count}.")
                     break
 
                 if gen_count >= (self.max_generations - 1):
                     # Reached maximum generations
+                    pbar.update(1)
                     self.logger.info(f"Maximum generations {self.max_generations} reached.")
                     break
                 
+                # TODO: Add stagnation termination
+
                 gen_count += 1
                 pbar.update(1)
         finally:

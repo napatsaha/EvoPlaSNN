@@ -17,13 +17,13 @@ def convert_name(x):
 
 if __name__ == "__main__":
     argparser = argparse.ArgumentParser()
-    argparser.add_argument("group_dir", type=str, default=None,
+    argparser.add_argument("run_dir", type=str, default=None,
                         help="Directory name where the results are stored.")
     argparser.add_argument("--num_trials", type=int, default=100,
                         help="Number of trials to run for each evaluation.")
     args = argparser.parse_args()
 
-    results_dir = Path(f"results/binary_es/{args.group_dir}")   
+    results_dir = Path(f"{args.run_dir}")   
 
     if (results_dir / "eval_result.csv").exists():
         existing_evals = pd.read_csv(results_dir / "eval_result.csv", index_col=0, usecols=["run_name", "mean_fts", "std_fts"])
@@ -61,12 +61,12 @@ if __name__ == "__main__":
     # Removes "aaa_params__" in config names
     cfgs.rename(columns=convert_name, inplace=True)
     # Conbime rewarder_type and fitness_type into one column
-    cfgs["fitness_type"] = cfgs["fitness_type"].where(cfgs["rewarder_type"] != "weighted", cfgs["rewarder_type"])
-    cfgs.drop(columns=["rewarder_type"], inplace=True)
+    # cfgs["fitness_type"] = cfgs["fitness_type"].where(cfgs["rewarder_type"] != "weighted", cfgs["rewarder_type"])
+    # cfgs.drop(columns=["rewarder_type"], inplace=True)
     # For this experiment, before clip_weights was specified in config, it has a default of True
-    cfgs.fillna({"clip_weights": True}, inplace=True)
+    # cfgs.fillna({"clip_weights": True}, inplace=True)
     # Sort by chronological order
     cfgs.sort_index(inplace=True)
-    cfgs = cfgs.round({"target_fitness": 1})
+    # cfgs = cfgs.round({"target_fitness": 1})
 
     cfgs.to_csv(results_dir / "eval_result.csv")

@@ -17,14 +17,15 @@ snn_params:
   neuron_params:
     tau_mem: 0.006
     tau_trace: 0.006
+    trace_type: dx3
   synapse_params:
     clip_weights: false
-    normalise_weights: false
+    normalise_weights: true
     normalise_method: L2
-  winner_take_all: false
+  winner_take_all: true
 rewarder_params:
   type: weighted
-  target_position: rate
+  target_position: last
   ignore_silent_inputs: false
   log_scale: false
 collector_params:
