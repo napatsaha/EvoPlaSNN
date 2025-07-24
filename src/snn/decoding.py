@@ -1,5 +1,5 @@
 import numpy as np
-from typing import Literal, Protocol, Tuple, override, Union
+from typing import List, Literal, Protocol, Tuple, override, Union
 
 from common.utils import make_target_times, make_target_spikes, check_max_ties
 from common import math
@@ -145,6 +145,14 @@ class BaseFitnessor(Fitnessor):
             return fitnesses
         else:
             return self._aggregate(fitnesses)
+
+    def get_intermediate_fitness(self) -> List[float]:
+        """
+        Get the intermediate fitness values for the current trial.
+        This is useful for tracking progress during the simulation.
+        """
+        outputs, labels = self._prepare_buffers()
+        return self._calculate_fitness(outputs, labels, return_array=True)
 
     def _prepare_buffers(self) -> Tuple[np.ndarray, np.ndarray]:
         """

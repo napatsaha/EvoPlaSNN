@@ -69,13 +69,14 @@ def main(config_file: str | Path, config_overrides: dict = None, parent_run: str
         # Configure SNN Evaluator object
         evaluator = SNN_Evaluator(
             params=config,
-            **config["evo_params"]["evaluator"]
+            # **config["evo_params"]["evaluator"]
         )
 
         # Configure Evolution Solver object
         config["evo_params"]["solver"]["ndim"] = evaluator.get_parameter_size()
         config["evo_params"]["solver"]["minimise"] = evaluator.is_minimise()
-        config["evo_params"]["manager"]["target_fitness"] = evaluator.get_target_fitness()
+        if config["evo_params"]["manager"].get("target_fitness") is not None:
+            config["evo_params"]["manager"]["target_fitness"] = evaluator.get_target_fitness()
         solver = create_solver(config["evo_params"]["solver"])
         if "popsize" not in config["evo_params"]["solver"]:
             config["evo_params"]["solver"]["popsize"] = solver.popsize
@@ -151,7 +152,8 @@ def eval(results_path: Path | str, num_steps: int = None, rule_id: int = 1, num_
     evaluator = SNN_Evaluator(
         params=config,
         record_info=True,
-        learning_rule=arule
+        learning_rule=arule,
+        log_info=False
     )
     simulator = evaluator.simulator
     

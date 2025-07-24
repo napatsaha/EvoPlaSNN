@@ -15,8 +15,8 @@ snn_params:
   output_size: 2
   dt: 0.001
   neuron_params:
-    tau_mem: 0.004
-    tau_trace: 0.004
+    tau_mem: 0.006
+    tau_trace: 0.006
   synapse_params:
     clip_weights: false
     normalise_weights: false
@@ -24,6 +24,7 @@ snn_params:
   winner_take_all: false
 rewarder_params:
   type: weighted
+  target_position: rate
   ignore_silent_inputs: false
   log_scale: false
 collector_params:
@@ -43,11 +44,11 @@ arule_params:
 evo_params:
   manager:
     type: original
-    max_generations: 10
+    max_generations: 100
     tolerance: 0.02
     num_trials: 10
-    save_best: 3
-    record_classes: true
+    save_best: 5
+    target_fitness: None
   solver:
     # ndim: 25
     type: CMA-ES
@@ -55,3 +56,4 @@ evo_params:
     # minimise: false
   evaluator:
     update_inputs: false
+    record_classes: false

@@ -198,6 +198,20 @@ class SNNSimulator:
         else:
             return None
 
+    def get_intermediate_fitness(self) -> List[float] | None:
+        if self._post_process_type == 0:
+            if self.fitnessor is None:
+                Warning("Fitnessor is not set. Intermediate fitness cannot be calculated.")
+                return None
+            return self.fitnessor.get_intermediate_fitness()
+        elif self._post_process_type == 1:
+            if self.collector is None:
+                Warning("Collector is not set. Intermediate fitness cannot be calculated.")
+                return None
+            return self.collector.get_intermediate_fitness()
+        else:
+            return None
+
     def get_target_fitness(self) -> float | None:
         if self._post_process_type == 0:
             if self.fitnessor.minimise:

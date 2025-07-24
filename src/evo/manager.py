@@ -25,9 +25,10 @@ class EvoManager:
         self._logfile_name = "best.log"
         # self.update_inputs = update_inputs
 
-        # Optimsation parameters
-        self.max_generations = max_generations
+        # Termination control
+        self.max_generations = max(max_generations, 1) # Ensure non-zero and non-negative
         self.target_fitness = target_fitness
+        self._check_target_fitness = target_fitness is not None
         self.tolerance = tolerance
         # self.minimise = minimise
 
@@ -55,10 +56,10 @@ class EvoManager:
         if self.max_generations is None:
             self.max_generations = 1000  # Default maximum generations
         
-        self.logger.info("Starting evolutionary optimisation.")
-        gen_count = 0
         try:
             pbar = tqdm(total=self.max_generations, desc="Generations", position=0, leave=True)
+            self.logger.info("Starting evolutionary optimisation.")
+            gen_count = 0
             while True:
                 # Ask for new solutions
                 solutions = self.solver.ask()
@@ -70,7 +71,7 @@ class EvoManager:
 
                 # Evaluate solution
                 for i, solution in tqdm(enumerate(solutions), desc="Populations", total=self.solver.popsize, position=1, leave=False):
-                    fitness_list[i] = self.evaluator.evaluate(solution, num_trials=self.num_trials)
+                    fitness_list[i] = self.evaluator.evaluate(solution, num_trials=self.num_trials, gen_count=gen_count, indiv_count=i)
 
                 # Inform solver about fitnesses
                 self.solver.tell(fitness_list)
@@ -83,12 +84,12 @@ class EvoManager:
                     self.logger.info(f"Generation {gen_count}: Best fitness = {best_fitness:.3f}, Best solution = {best_solution.round(2)}")
 
                 # Check stopping criteria
-                if np.abs(best_fitness - self.target_fitness) < self.tolerance:
+                if self._check_target_fitness and np.abs(best_fitness - self.target_fitness) < self.tolerance:
                     # Reached target fitness
                     self.logger.info(f"Target fitness {self.target_fitness} reached at generation {gen_count}.")
                     break
 
-                if gen_count >= self.max_generations:
+                if gen_count >= (self.max_generations - 1):
                     # Reached maximum generations
                     self.logger.info(f"Maximum generations {self.max_generations} reached.")
                     break

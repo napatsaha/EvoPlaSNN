@@ -438,16 +438,15 @@ class SimpleCollector(CollectorProtocol):
         self._in_sample_errors.append(error)
 
     def collate(self):
-        # Map total errors to reward using designated mapping function
-        total_errors = np.sum(self._in_sample_errors)
-        fitness = self.map_func(total_errors, **self.map_func_kwargs)
-        self.fitnesses.append(float(fitness))
-        # Append the aggregated rewards and errors to the lists
-        self.rewards.append(float(self.agg_func(self._in_sample_rewards)))
-        self.errors.append(float(self.agg_func(self._in_sample_errors)))
-        # self.rewards.append(self.agg_func(self.reward_buffer))
-        # self.errors.append(self.agg_func(self.error_buffer))
-
+        if self.fitness_type == "mapped":
+            # Map total errors to reward using designated mapping function
+            total_errors = np.sum(self._in_sample_errors)
+            fitness = self.map_func(total_errors, **self.map_func_kwargs)
+            self.fitnesses.append(float(fitness))
+        elif self.fitness_type in ["reward", "error"]:
+            # Append the aggregated rewards and errors to the lists
+            self.rewards.append(float(self.agg_func(self._in_sample_rewards)))
+            self.errors.append(float(self.agg_func(self._in_sample_errors)))
         # Clear existing buffer for this sample
         self._in_sample_rewards.clear()
         self._in_sample_errors.clear()
@@ -461,3 +460,15 @@ class SimpleCollector(CollectorProtocol):
             return np.mean(self.fitnesses)
         else:
             return 0.0
+        
+    def get_intermediate_fitness(self) -> list[float]:
+        """
+        Get the intermediate fitnesses calculated during the collection process.
+        This is useful for tracking progress during training.
+        """
+        if self.fitness_type == "reward":
+            return self.rewards
+        elif self.fitness_type == "error":
+            return self.errors
+        elif self.fitness_type == "mapped":
+            return self.fitnesses
