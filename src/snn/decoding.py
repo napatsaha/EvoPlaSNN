@@ -152,7 +152,7 @@ class BaseFitnessor(Fitnessor):
         This is useful for tracking progress during the simulation.
         """
         outputs, labels = self._prepare_buffers()
-        return self._calculate_fitness(outputs, labels, return_array=True)
+        return self._calculate_fitness(outputs, labels)
 
     def _prepare_buffers(self) -> Tuple[np.ndarray, np.ndarray]:
         """
@@ -185,7 +185,7 @@ class MeanRewardFitnessor(BaseFitnessor):
         super().__init__(num_classes)
         self.minimise = False  # Mean reward is typically maximised
 
-    def _calculate_fitness(self, outputs: np.ndarray, labels: np.ndarray) -> np.ndarray:
+    def _calculate_fitness(self, outputs: np.ndarray, labels: np.ndarray, return_array: bool = False) -> np.ndarray:
         """
         Calculate the mean reward from the recorded rewards.
         """
@@ -207,7 +207,7 @@ class AccuracyFitnessor(BaseFitnessor):
         super().__init__(num_classes)
         self.minimise = False  # Accuracy is typically maximised
 
-    def _calculate_fitness(self, outputs: np.ndarray, labels: np.ndarray) -> np.ndarray:
+    def _calculate_fitness(self, outputs: np.ndarray, labels: np.ndarray, return_array: bool = False) -> np.ndarray:
         ties = check_max_ties(outputs, axis=0)
         pred = np.argmax(outputs, axis=0)
         label = np.argmax(labels, axis=0)
@@ -229,7 +229,7 @@ class CrossEntropyFitnessor(BaseFitnessor):
         super().__init__(num_classes)
         self.minimise = True  # Cross-entropy loss is typically minimised
 
-    def _calculate_fitness(self, outputs: np.ndarray, labels: np.ndarray) -> np.ndarray:
+    def _calculate_fitness(self, outputs: np.ndarray, labels: np.ndarray, return_array: bool = False) -> np.ndarray:
         """
         Calculate the cross-entropy loss between the predicted outputs and the target labels.
         """
@@ -265,7 +265,7 @@ class MSEFitnessor(BaseFitnessor):
 
         return outputs, labels
 
-    def _calculate_fitness(self, outputs: np.ndarray, labels: np.ndarray) -> float:
+    def _calculate_fitness(self, outputs: np.ndarray, labels: np.ndarray, return_array: bool = False) -> float:
         """
         Calculate the mean squared error between the predicted outputs and the target labels.
         """

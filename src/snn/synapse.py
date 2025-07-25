@@ -1,10 +1,11 @@
 from typing import Literal
 import numpy as np
-from .neurons import NeuronLayer
+# from .neurons import NeuronLayer
+from .base import SynapseLayerProtocol, NeuronLayerProtocol
 from lrule import ANN_Rule, LearningRule, Empty_Rule, STDP_Rule
 # from .utils import tile
 
-class SynapseLayer:
+class SynapseLayer(SynapseLayerProtocol):
     """
     Purpose: To represent a collection of synapse that connects one layer of neurons to another.
     (Assuming a Sequential Linear Layer network with all-to-all connections)
@@ -13,13 +14,16 @@ class SynapseLayer:
     `forward()`: computes the output current to next neuron layer given a spike current input 
     from previous neuron layer -- i.e. weighted spike current
     `update()`: Update the entire synaptic weight efficacies based on a particular LearningRule
+    `reset()`: Reset the synaptic weights to their initial state.
+    `eligibility_trace`: If using eligibility traces, return the eligibility trace.
+    `update_eligibility_trace()`: Update the eligibility trace based on the pre and post neuron layer spikes.
     """
-    post_layer: NeuronLayer
-    pre_layer: NeuronLayer
+    post_layer: NeuronLayerProtocol
+    pre_layer: NeuronLayerProtocol
     weights: np.ndarray
     learning_rule: LearningRule
     
-    def __init__(self, pre_layer: NeuronLayer, post_layer: NeuronLayer, *, 
+    def __init__(self, pre_layer: NeuronLayerProtocol, post_layer: NeuronLayerProtocol, *, 
                  learning_rule: LearningRule = None,
                  eligibility_trace: bool = False, tau_syn: float = 1e-1, dt: float = 1e-3,
                  weight_init: str = 'uniform', weight_init_params: dict = None, 

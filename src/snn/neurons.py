@@ -1,5 +1,6 @@
 import numpy as np
 from typing import List, Literal
+from .base import NeuronLayerProtocol
 
 
 def leaky_integrate_and_fire(membrane, input_current, beta, threshold):
@@ -31,7 +32,7 @@ def trace_x3(t, dt, tau, A):
     return x
 
 
-class NeuronLayer:
+class NeuronLayer(NeuronLayerProtocol):
     """
     A class represnting a single vertical layer of spiking neurons.
     Must store:

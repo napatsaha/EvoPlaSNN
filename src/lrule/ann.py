@@ -1,6 +1,7 @@
 from typing import Callable, List, Literal
 
 from common.utils import solve_hidden, calculate_size
+# from snn.base import SynapseLayerProtocol
 from .base import LearningRule
 from .utils import tile_array
 
@@ -266,6 +267,7 @@ class ANN_Rule(LearningRule):
     """
     def __init__(self, parameters = None, *, learning_rate: float = 1.0,
                  use_trace_pre: bool = True, use_trace_post: bool = True, use_weights: bool = True, use_reward: bool = True, 
+                 use_eligibility: bool = False,
                  **kwargs):
         super().__init__()
         self.learning_rate = learning_rate
@@ -273,28 +275,32 @@ class ANN_Rule(LearningRule):
         self.use_trace_post = use_trace_post
         self.use_weights = use_weights
         self.use_reward = use_reward
-        self.input_size = int(use_trace_pre) + int(use_trace_post) + int(use_weights) + int(use_reward)
+        self.use_eligibility = use_eligibility
+        self.input_size = int(use_trace_pre) + int(use_trace_post) + int(use_weights) + int(use_reward) + int(use_eligibility)
         # self.parameters = parameters
         self.ann = ANN(input_size=self.input_size, output_size=1, parameters=parameters, **kwargs)
 
 
-    def update(self, synapse: 'SynapseLayer', reward: float = None, return_inputs: bool = False) -> np.ndarray: # type: ignore
+    def update(self, synapse: "SynapseLayerProtocol", reward: float = None, return_inputs: bool = False) -> np.ndarray: 
         """
         Apply the ANN Rule to an external set of weights.
         """
         inp = []
         w_shape = synapse.weights.shape
-        trace_pre, trace_post = tile_array(w_shape, synapse.pre_layer.trace, synapse.post_layer.trace)
-        if self.use_trace_pre:
-            inp.append(trace_pre.reshape(-1, 1))
-        if self.use_trace_post:
-            inp.append(trace_post.reshape(-1, 1))
+        if self.use_trace_pre or self.use_trace_post:
+            trace_pre, trace_post = tile_array(w_shape, synapse.pre_layer.trace, synapse.post_layer.trace)
+            if self.use_trace_pre:
+                inp.append(trace_pre.reshape(-1, 1))
+            if self.use_trace_post:
+                inp.append(trace_post.reshape(-1, 1))
         if self.use_weights:
             inp.append(synapse.weights.reshape(-1, 1))
         if self.use_reward:
             if reward is None:
                 reward = 0
             inp.append(np.full((np.prod(w_shape), 1), fill_value=reward))
+        if self.use_eligibility:
+            inp.append(synapse.eligibility_trace.reshape(-1, 1))
 
         inp = np.concatenate(inp, axis=1)
         # inp = np.concatenate([trace_pre.reshape(-1, 1), trace_post.reshape(-1, 1)], axis=1)
@@ -338,10 +344,12 @@ class ANN_Rule(LearningRule):
         use_trace_post = data['use_trace_post'].item()
         use_weights = data['use_weights'].item()
         use_reward = data['use_reward'].item()
+        use_eligibility = data.get('use_eligibility', False).item()  # Optional, defaults to False if not present
         
         return cls(parameters=parameters,
                    use_trace_pre=use_trace_pre, use_trace_post=use_trace_post,
                    use_weights=use_weights, use_reward=use_reward,
+                    use_eligibility=use_eligibility,
                    hidden_size=data["hidden_size"].tolist(),
                    bias=data["bias"].item(),
                    hidden_activation=data["hidden_activation"].item(),

@@ -25,6 +25,8 @@ snn_params:
     clip_weights: false
     normalise_weights: false
     normalise_method: L2
+    eligibility_trace: true
+    tau_syn: 0.015
   winner_take_all: false
 rewarder_params:
   type: weighted
@@ -44,6 +46,7 @@ arule_params:
   use_reward: true
   use_trace_pre: true
   use_trace_post: true
+  use_eligibility: false
 evo_params:
   manager:
     type: original
