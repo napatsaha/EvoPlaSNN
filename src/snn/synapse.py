@@ -2,7 +2,7 @@ from typing import Literal
 import numpy as np
 from .neurons import NeuronLayer
 from lrule import ANN_Rule, LearningRule, Empty_Rule, STDP_Rule
-
+# from .utils import tile
 
 class SynapseLayer:
     """
@@ -19,16 +19,23 @@ class SynapseLayer:
     weights: np.ndarray
     learning_rule: LearningRule
     
-    def __init__(self, pre_layer: NeuronLayer, post_layer: NeuronLayer, weight_init: str = 'uniform',
-                 weight_init_params: dict = None, learning_rule: LearningRule = None,
+    def __init__(self, pre_layer: NeuronLayer, post_layer: NeuronLayer, *, 
+                 learning_rule: LearningRule = None,
+                 eligibility_trace: bool = False, tau_syn: float = 1e-1, dt: float = 1e-3,
+                 weight_init: str = 'uniform', weight_init_params: dict = None, 
                  weight_min: float = 0.0, weight_max: float = 1.0,
-                 clip_weights: bool = True, 
-                 normalise_weights: bool = False, normalise_method: Literal["sum", "L2", "P"] = "sum", normalise_params: dict = None):
+                 clip_weights: bool = True, normalise_weights: bool = False, 
+                 normalise_method: Literal["sum", "L2", "P"] = "sum", normalise_params: dict = None):
 
         self.pre_layer = pre_layer
         self.post_layer = post_layer
         self.learning_rule = learning_rule if learning_rule is not None else Empty_Rule()
         self._learning_rule_type = self._get_lrule_type()
+        self._use_elig = eligibility_trace
+        if self._use_elig:
+            self._etrace = np.zeros((self.pre_layer.size, self.post_layer.size), dtype=np.float32)
+        self.tau_syn = tau_syn
+        self.dt = dt
 
         # Initialize weights
         self.weight_init = weight_init
@@ -91,6 +98,14 @@ class SynapseLayer:
         output_current = np.dot(spike_input, self.weights)
         return output_current
     
+    def update_eligibility_trace(self) -> None:
+        if self._use_elig:
+            pre_trace = self.pre_layer.get_trace()
+            post_spike = self.post_layer.spike
+            pre_trace, post_spike = self._tile(pre_trace, post_spike)
+            de = - self._etrace * self.dt / self.tau_syn + pre_trace * post_spike
+            self._etrace += de
+
     def update(self, reward=None) -> None:
         """
         Update the synaptic weights based on the learning rule.
@@ -129,6 +144,16 @@ class SynapseLayer:
     def __repr__(self):
         return f"SynapseLayer({self.weights.shape})"
     
+    @property
+    def eligibility_trace(self):
+        """
+        Return the eligibility trace if it is being used, otherwise return None.
+        """
+        if self._use_elig:
+            return self._etrace
+        else:
+            return None
+    
 
 def safe_norm(array, method, params={}, eps=1e-10):
     if method == "sum":
@@ -145,3 +170,4 @@ def safe_norm(array, method, params={}, eps=1e-10):
     denom = np.where(denom == 0, eps, denom)
     array = array / denom
     return array
+

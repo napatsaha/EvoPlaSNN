@@ -51,6 +51,7 @@ class SNN:
         ] if neuron_params is not None else [{}] * self.num_layers
 
         self.synapse_params = synapse_params if synapse_params is not None else {}
+        self.use_etrace = self.synapse_params.get("eligibility_trace", False)
 
         # Create each neuron layers
         self.neuron_layers = []
@@ -72,7 +73,9 @@ class SNN:
         for i in range(self.num_layers - 1):
             pre_layer = self.neuron_layers[i]
             post_layer = self.neuron_layers[i + 1]
-            synapse = SynapseLayer(pre_layer, post_layer, learning_rule=self.learning_rule, **self.synapse_params)
+            synapse = SynapseLayer(pre_layer, post_layer, learning_rule=self.learning_rule, 
+                                   dt=self.dt,
+                                   **self.synapse_params)
             self.synapse_layers.append(synapse)
     
     def forward(self, spike_in:np.array) -> np.ndarray:
@@ -81,6 +84,10 @@ class SNN:
             spk = self.neuron_layers[i].forward(curr)
             curr = self.synapse_layers[i].forward(spk)
         spike_out = self.neuron_layers[-1].forward(curr)
+        # Update eligibility traces if applicable
+        if self.use_etrace:
+            for synapse in self.synapse_layers:
+                synapse.update_eligibility_trace()
         return spike_out
 
     def update_synapses(self, reward=None):
@@ -115,6 +122,10 @@ class SNN:
     @property
     def thresholds(self):
         return [layer.threshold for layer in self.neuron_layers]
+
+    @property
+    def eligibility_traces(self):
+        return [synapse.eligibility_trace for synapse in self.synapse_layers]
 
     def __repr__(self):
         return f"SpikingNetwork(input_size={self.input_size}, hidden_size={self.hidden_size}, output_size={self.output_size})"

@@ -25,7 +25,8 @@ class SNNSimulator:
                 #  decoder_type: Literal["final", "rate", "latency"] = "final", decoder_params: dict = {},
                 #  fitnessor_type: Literal["accuracy", "reward", "cross-entropy", "mse"] = "accuracy", fitnessor_params: dict = {},
                  supervised: bool = True,
-                 record_membrane: bool = True, record_spikes: bool = True, record_traces: bool = True, record_weights: bool = False):
+                 record_membrane: bool = True, record_spikes: bool = True, record_traces: bool = True, record_weights: bool = False,
+                 record_eligibility: bool = False):
         self.num_steps = 0
         self.network = network
         self.spike_generator = spike_generator
@@ -36,10 +37,12 @@ class SNNSimulator:
         self.record_spikes = record_spikes
         self.record_traces = record_traces
         self.record_weights = record_weights
+        self.record_eligibility = record_eligibility if self.network.use_etrace else False
         self.mem_recorder = LayerRecorder(network.layer_sizes_active) if self.record_membrane else None
         self.spike_recorder = LayerRecorder(network.layer_sizes, dtype=np.int8) if self.record_spikes else None
         self.trace_recorder = LayerRecorder(network.layer_sizes, dtype=np.float32) if self.record_traces else None
         self.weight_recorder = MatrixRecorder([synapse.weights.shape for synapse in network.synapse_layers]) if self.record_weights else None
+        self.eligibility_recorder = MatrixRecorder([synapse.weights.shape for synapse in network.synapse_layers]) if self.record_eligibility else None
 
         # For supervised learning
         self._supervised = supervised
@@ -102,6 +105,8 @@ class SNNSimulator:
             self.trace_recorder.reset()
         if self.record_weights:
             self.weight_recorder.reset()
+        if self.record_eligibility:
+            self.eligibility_recorder.reset()
         # self.reward_manager.reset()
         if hasattr(self, 'decoder') and self.decoder is not None:
             self.decoder.reset()
@@ -184,6 +189,11 @@ class SNNSimulator:
                 for i, weights in enumerate(self.network.weights):
                     self.weight_recorder.record(i, t, weights)
 
+            # Record eligibility traces
+            if self.record_eligibility:
+                for i, etraces in enumerate(self.network.eligibility_traces):
+                    self.eligibility_recorder.record(i, t, etraces)
+
     def get_fitness(self) -> float | None:
         if self._post_process_type == 0:
             if self.fitnessor is None:
@@ -263,6 +273,8 @@ class SNNSimulator:
             self.trace_recorder.setup(num_steps)
         if self.record_weights:
             self.weight_recorder.setup(num_steps)
+        if self.record_eligibility:
+            self.eligibility_recorder.setup(num_steps)
 
     def plot_membranes(self, *args, **kwargs):
         Warning("SNNSimulator.plot_membranes is deprecated. Use plot.plot_membranes(SNN.Simulator) instead.")
