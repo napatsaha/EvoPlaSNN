@@ -10,7 +10,8 @@ from snn.eval import SNN_Evaluator
 # from evo.es import EvolutionStrategy
 from evo.utils import create_solver
 
-from snn.plot import plot_weight_over_time, plot_weights, plot_spikes, plot_membranes
+# from snn.plot import plot_weight_over_time, plot_weights, plot_spikes, plot_membranes
+import snn.plot as snn_plot
 
 
 ROOT = Path(__file__).parent.parent
@@ -179,19 +180,23 @@ def eval(results_path: Path | str, num_steps: int = None, rule_id: int = 1, num_
         simulator.run(T)
         fitness = simulator.get_fitness()
         prefix = f"eval_rule_{rule_id:02d}"
-        plot_spikes(simulator, x_min=T-100, x_max=T, x_eps=2, savepath=Path(results_path, f"{prefix}_spikes.png"), show=False)
-        plot_membranes(simulator, x_min=T-100, x_max=T, plot_inputs=False, col_width=20, row_height=7, savepath=Path(results_path, f"{prefix}_membranes.png"), show=False)
-        plot_weights(simulator, div=10, savepath=Path(results_path, f"{prefix}_weights.png"), show=False)
-        plot_weight_over_time(simulator, savepath=Path(results_path, f"{prefix}_weight_over_time.png"), show=False)
+        snn_plot.plot_spikes(simulator, x_min=T-100, x_max=T, x_eps=2, savepath=Path(results_path, f"{prefix}_spikes.png"), show=False)
+        snn_plot.plot_membranes(simulator, x_min=T-100, x_max=T, plot_inputs=False, col_width=20, row_height=7, savepath=Path(results_path, f"{prefix}_membranes.png"), show=False)
+        # snn_plot.plot_weights(simulator, div=10, savepath=Path(results_path, f"{prefix}_weights.png"), show=False)
+        snn_plot.plot_weight_over_time(simulator, savepath=Path(results_path, f"{prefix}_weight_over_time.png"), show=False)
+        snn_plot.plot_weight_heatmap(simulator, savepath=Path(results_path, f"{prefix}_weight_heatmap.png"), show=False, log_scale=True)
+        if simulator.record_eligibility:
+            snn_plot.plot_eligibility_traces(simulator, savepath=Path(results_path, f"{prefix}_eligibility_traces.png"), show=False)
+
 
     return mean_fits, std_fits
 
 if __name__ == "__main__":
     # Argument parser
     argparser = argparse.ArgumentParser(description="Run Evolutionary Learning Rule Experiment")
-    argparser.add_argument("--config", type=str, default="binary_es_v2.yaml", help="Path to the configuration file")
-    argparser.add_argument("--override", type=str, nargs="*", help="Override specific config values (e.g., snn_params.neuron_params.tau_mem=0.05)")
-    argparser.add_argument("--parent", type=str, default=None, help="Parent run directory to save results in. Useful for running series of related results.")
+    argparser.add_argument("--config", "-c", type=str, default="binary_es_v2.yaml", help="Path to the configuration file")
+    argparser.add_argument("--override", "-o", type=str, nargs="*", help="Override specific config values (e.g., snn_params.neuron_params.tau_mem=0.05)")
+    argparser.add_argument("--parent", "-p", type=str, default=None, help="Parent run directory to save results in. Useful for running series of related results.")
     args = argparser.parse_args()
 
     # Parse overrides

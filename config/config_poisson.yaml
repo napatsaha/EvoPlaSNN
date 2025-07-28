@@ -28,14 +28,27 @@ snn_params:
     eligibility_trace: true
     tau_syn: 0.015
   winner_take_all: false
-rewarder_params:
-  type: weighted
-  ignore_silent_inputs: false
-  log_scale: false
-collector_params:
-  type: simple
-  fitness_type: reward
-  agg_func: sum
+# rewarder_params:
+#   type: weighted
+#   ignore_silent_inputs: false
+#   log_scale: false
+# collector_params:
+#   type: simple
+#   fitness_type: reward
+#   agg_func: sum
+decoder_params:
+  type: rate
+  # type: final
+  # direction: last
+  # convert_type: negate
+  reward_null: 0.0
+  reward_correct: 1.0
+  reward_incorrect: -1.0
+fitnessor_params:
+  type: reward
+  # type: accuracy
+  # type: cross_entropy
+  # type: mse
 arule_params:
   learning_rate: 0.1
   hidden_size: 4

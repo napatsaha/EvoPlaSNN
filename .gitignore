@@ -6,6 +6,7 @@ media/
 misc/
 results/
 config/*.ini
+config/*.yaml
 
 .vscode/
 build/
@@ -17,3 +18,4 @@ __pycache__/
 *_old.py
 
 test.zsh
+script.zsh
