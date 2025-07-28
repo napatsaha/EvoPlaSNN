@@ -83,6 +83,7 @@ class SNN_Evaluator(Evaluator):
                                       record_traces=False if not record_info else True,
                                       record_membrane=False if not record_info else True,
                                       record_spikes=False if not record_info else True,
+                                      record_eligibility=False if not record_info else True,
                                       params=params
                                     #   decoder_type=decoder_type, decoder_params=decoder_params, 
                                     #   fitnessor_type=fitnessor_type, fitnessor_params=fitnessor_params

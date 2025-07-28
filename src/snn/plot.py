@@ -15,7 +15,7 @@ import numpy as np
 def plot_spikes(simulator: 'SNNSimulator', x_scale: float = 0.2, y_scale: float = 0.5,
                 y_eps: float = 0.5, x_eps: float | int = 1, spk_eps: float = 0.25, 
                 title: str = None, cmap = None, color: str = "black", cmap_range: tuple = (0, 1),
-                linewidth=2, x_min = None, x_max = None,
+                linewidth=2, x_min = None, x_max = None, x_range: int = 100,
                 savepath: str | Path = None, show: bool = True, **kwargs):
     """
     Plot spike trains with time on x-axis and neuron index on y-axis.
@@ -27,7 +27,7 @@ def plot_spikes(simulator: 'SNNSimulator', x_scale: float = 0.2, y_scale: float 
     if x_max is None:
         x_max = simulator.num_steps
     if x_min is None:
-        x_min = max(0, x_max - 100)
+        x_min = max(0, x_max - x_range)
     if cmap is None:
         cm = color
     else:
@@ -74,8 +74,9 @@ def plot_spikes(simulator: 'SNNSimulator', x_scale: float = 0.2, y_scale: float 
     plt.close(fig)
 
 
-def plot_traces(simulator: 'SNNSimulator', x_scale: float = 0.2, y_scale: float = 1.0,
-                y_eps: float = 0.1, x_eps: float = 0.0, trace_scale: float = 0.8, x_min = 0, x_max = None,
+def plot_traces(simulator: 'SNNSimulator', x_scale: float = 0.2, y_scale: float = 0.8,
+                y_eps: float = 0.1, x_eps: int | float = 1, trace_scale: float = 0.8, x_min = None, x_max = None, x_range: int = 100,
+                drawstyle: str = 'steps-post',
                 title: str = None, cmap = None, color: str = "black", cmap_range: tuple = (0, 1),
                 savepath: str | Path = None, show: bool = True, **kwargs):
     """
@@ -87,6 +88,8 @@ def plot_traces(simulator: 'SNNSimulator', x_scale: float = 0.2, y_scale: float 
         x_eps = x_eps * simulator.num_steps
     if x_max is None:
         x_max = simulator.num_steps
+    if x_min is None:
+        x_min = max(0, x_max - x_range)
     if cmap is None:
         cm = color
     else:
@@ -109,7 +112,7 @@ def plot_traces(simulator: 'SNNSimulator', x_scale: float = 0.2, y_scale: float 
                 c = cm(c)
             y = layer_traces[j, :]
             y = np.interp(y, (0, y.max()), (j, j + trace_scale))
-            ax.plot(y, color=c, alpha=1.0, drawstyle='steps-post', **kwargs)
+            ax.plot(y, color=c, alpha=1.0, drawstyle=drawstyle, **kwargs)
 
         ax.set_ylim(0 - y_eps, n_neurons + y_eps)
         ax.set_xlim(x_min - x_eps, x_max + x_eps)
@@ -121,10 +124,9 @@ def plot_traces(simulator: 'SNNSimulator', x_scale: float = 0.2, y_scale: float 
         ax.xaxis.set_minor_locator(ticker.MultipleLocator(1))
         ax.xaxis.grid(visible=True, which="both", color="gray", linewidth=0.5, alpha=0.2)
 
-    ax.set_xlabel(f"Time ({simulator.dt} s)", fontsize=16)
-    # ax.set_ylabel("Neuron Index")
+    ax.set_xlabel(f"Time ({simulator.dt} s)")
     fig.suptitle(title if title is not None else "Neuron Traces", fontsize=20)
-    fig.supylabel("Neuron Index", fontsize=16)
+    fig.supylabel("Neuron Index")
     if savepath is not None:
         plt.savefig(savepath)
     if show:
@@ -135,6 +137,7 @@ def plot_traces(simulator: 'SNNSimulator', x_scale: float = 0.2, y_scale: float 
 def plot_weights(simulator: 'SNNSimulator', div: int = 5, col_width: float = 6.0, row_height: float = 8.0,
                 title: str = None, cmap: str = "gray",
                 savepath: str | Path = None, show: bool = True):
+    assert simulator.record_weights, "Weight recording is not enabled."
     num_layers = len(simulator.network.synapse_layers)
 
     ts = np.linspace(0, simulator.num_steps-1, div+1).astype(int)
@@ -166,9 +169,11 @@ def plot_weights(simulator: 'SNNSimulator', div: int = 5, col_width: float = 6.0
     plt.close(fig)
 
 
-def plot_weight_over_time(simulator: 'SNNSimulator', title="", x_min=0, x_max=None,
+def plot_weight_over_time(simulator: 'SNNSimulator', title="", x_min=None, x_max=None,
                           savepath=None, show=True, ):
+    assert simulator.record_weights, "Weight recording is not enabled."
     x_max = simulator.num_steps if x_max is None else x_max
+    x_min = 0 if x_min is None else x_min
     for L in range(len(simulator.weight_recorder.layer_shapes)):
         nrow, ncol = simulator.weight_recorder.layer_shapes[L]
         w_mat = simulator.weight_recorder.values[L]
@@ -190,20 +195,23 @@ def plot_weight_over_time(simulator: 'SNNSimulator', title="", x_min=0, x_max=No
     plt.close(fig)
 
 
-def plot_weight_heatmap(simulator: 'SNNSimulator', *, synapse_layer: int = 0, t_min: int = None, t_max: int = None, cmap: str = "viridis",
-                        log_scale: bool = False,
+def plot_weight_heatmap(simulator: 'SNNSimulator', *, x_scale: float = 0.2, y_scale: float = 0.8,
+                        synapse_layer: int = 0, t_min: int = None, t_max: int = None, t_range: int = 100,
+                        log_scale: bool = False, cmap: str = "viridis",
                        savepath: str | Path = None, show: bool = True):
-    num_outputs = simulator.network.output_size
     if simulator.record_weights is False:
         raise ValueError("Weight recording is not enabled. Please enable it in the simulator configuration.")
-    if t_min is None:
-        t_min = 0
     if t_max is None:
         t_max = simulator.num_steps
+    if t_min is None:
+        t_min = max(0, t_max - t_range)
 
     # Start plotting
     w_mat = simulator.weight_recorder.values[synapse_layer]
-    fig, axs = plt.subplots(num_outputs, 1, figsize=(15, 6), sharex=True)
+    num_outputs = simulator.network.output_size
+    num_inputs = simulator.network.input_size
+    fig_size = ((t_max - t_min) * x_scale, num_outputs * num_inputs * y_scale)
+    fig, axs = plt.subplots(num_outputs, 1, figsize=fig_size, sharex=True, layout="constrained", gridspec_kw={"hspace": 0.0})
     axs: List[Axes]
     for i in range(num_outputs):
         ax = axs[i]
@@ -212,7 +220,7 @@ def plot_weight_heatmap(simulator: 'SNNSimulator', *, synapse_layer: int = 0, t_
         ax.set_ylabel(f"Neuron {i}", fontsize=12)
     axs[-1].set_xlabel("Time Steps", fontsize=12)
     fig.colorbar(m, ax=axs, orientation='vertical', label='Weight Value')
-    fig.suptitle(f"Weight Heatmap for Synapse Layer {synapse_layer}", fontsize=16)
+    fig.suptitle(f"Weight Heatmap\nSynapse Layer {synapse_layer}", fontsize=16)
     if savepath is not None:
         plt.savefig(savepath)
     if show:
@@ -220,9 +228,42 @@ def plot_weight_heatmap(simulator: 'SNNSimulator', *, synapse_layer: int = 0, t_
     plt.close(fig)
 
 
+def plot_eligibility_traces(simulator: 'SNNSimulator', *, x_scale: float = 0.2, y_scale: float = 0.8,
+                            synapse_layer: int = 0, t_min: int = None, t_max: int = None, t_range: int = 100,
+                            cmap: str = "viridis", 
+                            savepath: str | Path = None, show: bool = True):
+    num_outputs = simulator.network.output_size
+    if simulator.record_eligibility is False:
+        raise ValueError("Eligibility trace recording is not enabled. Please enable it in the simulator configuration.")
+    if t_max is None:
+        t_max = simulator.num_steps
+    if t_min is None:
+        t_min = max(0, t_max - t_range)
+
+    eg = simulator.eligibility_recorder.values[synapse_layer]
+    num_outputs = simulator.network.output_size
+    num_inputs = simulator.network.input_size
+    fig_size = ((t_max - t_min) * x_scale, num_outputs * num_inputs * y_scale)
+    fig, axs = plt.subplots(num_outputs, 1, figsize=fig_size, sharex=True, layout="constrained", gridspec_kw={"hspace": 0.0})
+
+    for i, j in enumerate(reversed(range(num_outputs))):
+        ax = axs[i]
+        m = ax.imshow(eg[:, j, t_min:t_max], cmap=cmap, aspect='auto', origin="lower")
+        ax.xaxis.set_ticks(np.arange(0, t_max - t_min, 10), labels= np.arange(t_min, t_max, 10))
+        ax.set_ylabel(f'Neuron {j}')
+
+    fig.colorbar(m, label='Eligibility Traces', ax=axs)
+    axs[-1].set_xlabel("Time steps")
+    fig.suptitle(f"Eligibility Traces\nSynapse Layer {synapse_layer}", fontsize=16)
+    if savepath is not None:
+        plt.savefig(savepath)
+    if show:
+        plt.show()
+    plt.close(fig)
+
 
 def plot_membranes(simulator: 'SNNSimulator', col_width: float = 10.0, row_height: float = 2.5, title: str = None, plot_inputs: bool = True, 
-                    color: str = "blue", cmap: str = None, cmap_range: tuple = (0, 1), x_min = 0, x_max = None,
+                    color: str = "blue", cmap: str = None, cmap_range: tuple = (0, 1), x_min = None, x_max = None, x_range: int = 100,
                 savepath: str | Path = None, show: bool = True):
     """
     Plot membrane potentials of all neurons in the network.
@@ -232,6 +273,8 @@ def plot_membranes(simulator: 'SNNSimulator', col_width: float = 10.0, row_heigh
 
     if x_max is None:
         x_max = simulator.num_steps
+    if x_min is None:
+        x_min = max(0, x_max - x_range)
     if cmap is None:
         cm = color
     else:
