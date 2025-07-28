@@ -30,9 +30,9 @@ class SNN_Evaluator(Evaluator):
         params = copy.deepcopy(params)
         self.num_simulation_steps = params["num_sim_steps"]
         self.results_path: Path = None
-        self.record_classes = params["evo_params"]["evaluator"].get("record_classes", False)
+        self.record_classes = params["evo_params"].get("evaluator", {}).get("record_classes", False)
         self._log_info = bool(log_info)
-        self._update_inputs = bool(params["evo_params"]["evaluator"].get("update_inputs", update_inputs))
+        self._update_inputs = bool(params["evo_params"].get("evaluator", {}).get("update_inputs", update_inputs))
 
         # Initialise spike patterns and spike generator
         self.pattern_params = params.pop("pattern_params", None)

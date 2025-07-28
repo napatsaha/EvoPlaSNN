@@ -190,6 +190,37 @@ def plot_weight_over_time(simulator: 'SNNSimulator', title="", x_min=0, x_max=No
     plt.close(fig)
 
 
+def plot_weight_heatmap(simulator: 'SNNSimulator', *, synapse_layer: int = 0, t_min: int = None, t_max: int = None, cmap: str = "viridis",
+                        log_scale: bool = False,
+                       savepath: str | Path = None, show: bool = True):
+    num_outputs = simulator.network.output_size
+    if simulator.record_weights is False:
+        raise ValueError("Weight recording is not enabled. Please enable it in the simulator configuration.")
+    if t_min is None:
+        t_min = 0
+    if t_max is None:
+        t_max = simulator.num_steps
+
+    # Start plotting
+    w_mat = simulator.weight_recorder.values[synapse_layer]
+    fig, axs = plt.subplots(num_outputs, 1, figsize=(15, 6), sharex=True)
+    axs: List[Axes]
+    for i in range(num_outputs):
+        ax = axs[i]
+        m = ax.imshow(w_mat[:, i, t_min:t_max], aspect='auto', cmap=cmap, norm=mpl.colors.LogNorm() if log_scale else None)
+        ax.xaxis.set_ticks(np.arange(0, t_max - t_min, 10), labels= np.arange(t_min, t_max, 10))
+        ax.set_ylabel(f"Neuron {i}", fontsize=12)
+    axs[-1].set_xlabel("Time Steps", fontsize=12)
+    fig.colorbar(m, ax=axs, orientation='vertical', label='Weight Value')
+    fig.suptitle(f"Weight Heatmap for Synapse Layer {synapse_layer}", fontsize=16)
+    if savepath is not None:
+        plt.savefig(savepath)
+    if show:
+        plt.show()
+    plt.close(fig)
+
+
+
 def plot_membranes(simulator: 'SNNSimulator', col_width: float = 10.0, row_height: float = 2.5, title: str = None, plot_inputs: bool = True, 
                     color: str = "blue", cmap: str = None, cmap_range: tuple = (0, 1), x_min = 0, x_max = None,
                 savepath: str | Path = None, show: bool = True):
