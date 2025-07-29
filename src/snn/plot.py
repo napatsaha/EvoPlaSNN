@@ -8,8 +8,15 @@ import matplotlib.ticker as ticker
 import matplotlib.gridspec as gridspec
 from matplotlib.figure import Figure
 import numpy as np
+import os
+
+import pandas as pd
+import seaborn as sns
 
 # from .simulate import SNNSimulator
+
+
+### Plotting functions that require Simulator ###
 
 
 def plot_spikes(simulator: 'SNNSimulator', x_scale: float = 0.2, y_scale: float = 0.5,
@@ -314,6 +321,59 @@ def plot_membranes(simulator: 'SNNSimulator', col_width: float = 10.0, row_heigh
     if show:
         plt.show()
     plt.close(fig)
+
+
+### Plotting functions for Evolutionary Results ###
+
+
+def plot_fitness_generation(file_path: str | Path, *, estimator: str = "mean", errorband: str | tuple = ("pi", 100),
+                            linecolor_best: str = "black", linecolor_est: str = "blue", pointcolor: str = "gray",
+                            sns_style: str = "whitegrid", sns_palette: str = "muted",
+                            x_eps: int = 2, x_scale: float = 0.3, y_scale: float = 1.3, y_size: float = 10,
+                            savepath: str | Path = None, show: bool = True):
+    assert os.path.exists(file_path), f"File {file_path} does not exist."
+    res = pd.read_csv(f"{file_path}")
+    run_name = Path(file_path).parent.stem
+
+    # Calulate best all-time fitness
+    best_fts = res.groupby("gen")["avg_fitness"].max().cummax()
+    best_fts.rename("best_fitness", inplace=True)
+    res = res.join(best_fts, on="gen", how="left")
+
+    num_gens = res["gen"].max() + 1
+    best_fts = res["best_fitness"].max()
+    fts_range = res["avg_fitness"].max() - res["avg_fitness"].min()
+
+    fig, ax = plt.subplots(1, 1, figsize=(num_gens * x_scale, y_size))
+    sns.set_theme(palette=sns_palette, style=sns_style)
+    # Fitness per individual
+    sns.stripplot(data=res, x="gen", y="avg_fitness",  size=5, ax=ax, alpha=0.5, color=pointcolor)
+    # Best cumulative fitness
+    sns.lineplot(data=res, x="gen", y="best_fitness", color=linecolor_best, linewidth=2, ax=ax, label="Best Fitness")
+    # Average fitness for each generation
+    sns.lineplot(data=res, x="gen", y="avg_fitness", estimator=estimator, errorbar=errorband, ax=ax, color=linecolor_est, linewidth=2, label=f"{estimator.title()} Fitness")
+    ax.set_xlim(0-x_eps, num_gens+x_eps)
+    ax.xaxis.set_major_locator(plt.MultipleLocator(5))
+    ax.set_xlabel("Generation", fontsize=12)
+    ax.set_ylabel("Fitness", fontsize=12)
+    # ax.legend(loc="upper right", fontsize=10)
+    ax.grid(True, which='both', linestyle='--', linewidth=0.5, alpha=0.5)
+
+    ax.text(num_gens - 1, best_fts, f"{best_fts:.2f}", ha='right', va="bottom", fontsize=16, transform=ax.transData, color=linecolor_best)
+    title_main = f"Fitness Over Generations"
+    subtitle = f"({estimator.title()} Fitness +/- {errorband[1]} {errorband[0].upper()})"
+    fig.text(0.5, 0.95, title_main, ha='center', fontsize=24)
+    fig.text(0.5, 0.90, subtitle, ha='center', fontsize=16)
+    ax.text(1.00, 1.05, f"Run: {run_name}", ha='right', fontsize=16, transform=ax.transAxes)
+
+    if savepath is not None:
+        plt.savefig(savepath)
+    if show:
+        plt.show()
+    plt.close(fig)
+
+
+### Helper functions ###
 
 
 def _plot_spikes_single(ax: Axes, tf_spikes: np.ndarray, x_max: int, label: str = "", x_min: int = 0):
