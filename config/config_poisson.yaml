@@ -1,4 +1,4 @@
-num_sim_steps: 1000
+num_sim_steps: 2000
 pattern_params:
   type: poisson
   duration: 15
@@ -9,10 +9,10 @@ pattern_params:
 spikegen_params:
   class: CustomTimingGenerator
   binary: false
-  spacing: 10
-  jitter_std: 0.5
-  failure_rate: 0.05
-  randomise_class: False
+  spacing: 15
+  jitter_std: 0.0
+  failure_rate: 0.0
+  randomise_class: true
 snn_params:
   input_size: 5
   hidden_size: 0
@@ -57,19 +57,22 @@ arule_params:
   output_activation: tanh
   use_weights: true
   use_reward: true
-  use_trace_pre: true
-  use_trace_post: true
-  use_eligibility: false
+  use_trace_pre: false
+  use_trace_post: false
+  use_eligibility: true
 evo_params:
   manager:
     type: original
-    max_generations: 5
+    max_generations: 200
     tolerance: 0.02
-    num_trials: 5
+    num_trials: 10
     save_best: 3
     record_classes: true
   solver:
     # ndim: 25
     type: CMA-ES
-    popsize: 10
+    popsize: 30
     # minimise: false
+  evaluator:
+    update_inputs: true
+    # record_classes: true

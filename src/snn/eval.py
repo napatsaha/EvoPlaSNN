@@ -22,6 +22,7 @@ class SNN_Evaluator(Evaluator):
                  log_info: bool = True,
                  update_inputs: bool = True,
                  learning_rule: LearningRule = None,
+                #  record_classes: bool = False,
                 #  num_simulation_steps: int = 100, snn_params: dict = {}, spikegen_params: dict = {}, arule_params: dict = {}, 
                 #  decoder_params: dict = {}, fitnessor_params: dict = {}
                  ):
@@ -30,7 +31,7 @@ class SNN_Evaluator(Evaluator):
         params = copy.deepcopy(params)
         self.num_simulation_steps = params["num_sim_steps"]
         self.results_path: Path = None
-        self.record_classes = params["evo_params"].get("evaluator", {}).get("record_classes", False)
+        # self.record_classes = record_classes #params["evo_params"].get("evaluator", {}).get("record_classes", False)
         self._log_info = bool(log_info)
         self._update_inputs = bool(params["evo_params"].get("evaluator", {}).get("update_inputs", update_inputs))
 
@@ -195,10 +196,14 @@ class SNN_Evaluator(Evaluator):
                     **self.pattern_params
                 )
             # Record generated classes
-        if self.record_classes and self.results_path is not None:
-            with open(self.results_path / "classes.txt", "a") as f:
-                for cls in self.classes:
-                    f.write(f"{cls}\n")
+        # self.write_classes()
+
+    def write_classes(self, results_path, gen):
+        with open(results_path / "classes.txt", "a") as f:
+            f.write(f"Generation: {gen}\n")
+            for i, pairs in enumerate(self.classes):
+                for j, cls in enumerate(pairs):
+                    f.write(f"Pair: {i:>2}, Class: {j:>2}, {cls.tolist()}\n")
 
     def write_trial(self, gen: int, indiv: int, trial: int, fitness: float, inter_fitness: List[float], precision: int = 1):
         """

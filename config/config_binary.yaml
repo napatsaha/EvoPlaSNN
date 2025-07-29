@@ -53,6 +53,7 @@ evo_params:
     num_trials: 10
     save_best: 5
     target_fitness: None
+    record_classes: false
   solver:
     # ndim: 25
     type: CMA-ES
@@ -60,4 +61,3 @@ evo_params:
     # minimise: false
   evaluator:
     update_inputs: false
-    record_classes: false

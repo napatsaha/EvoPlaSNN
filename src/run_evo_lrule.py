@@ -115,6 +115,11 @@ def main(config_file: str | Path, config_overrides: dict = None, parent_run: str
     # Begin experiment
     manager.run()
 
+    # Plot fitness
+    if hasattr(evaluator, "_fits_indiv_file"):
+        file_path = results_path / evaluator._fits_indiv_file 
+        snn_plot.plot_fitness_generation(file_path, savepath=results_path / "fitness_gen.png", show=False, estimator="median", errorband=("pi", 100))
+
     return results_path 
 
 

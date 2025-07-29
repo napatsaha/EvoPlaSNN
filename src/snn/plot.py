@@ -345,7 +345,7 @@ def plot_fitness_generation(file_path: str | Path, *, estimator: str = "mean", e
     fts_range = res["avg_fitness"].max() - res["avg_fitness"].min()
 
     fig, ax = plt.subplots(1, 1, figsize=(num_gens * x_scale, y_size))
-    sns.set_theme(palette=sns_palette, style=sns_style)
+    # sns.set_theme(palette=sns_palette, style=sns_style)
     # Fitness per individual
     sns.stripplot(data=res, x="gen", y="avg_fitness",  size=5, ax=ax, alpha=0.5, color=pointcolor)
     # Best cumulative fitness
