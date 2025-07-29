@@ -59,6 +59,12 @@ class SpikeGenerator(ABC):
         """
         return self._static
     
+    def is_final(self) -> bool:
+        """
+        Returns whether or not this is the final timestep over the entire sample (including spacing).
+        """
+        return self.count >= self._full_length
+
     def update_classes(self, new_classes: List) -> None:
         """
         Allows spike generator to use a new set of classes of length num_classes.

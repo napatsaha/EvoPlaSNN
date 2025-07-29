@@ -90,6 +90,15 @@ class SynapseLayer(SynapseLayerProtocol):
         # self._init_weights()
         self.weights[:] = np.random.uniform(self.weight_min, self.weight_max, size=(self.pre_layer.size, self.post_layer.size))
         self._normalise_weights()
+        if self._use_elig:
+            self._etrace.fill(0.0)
+
+    def soft_reset(self) -> None:
+        """
+        Reset only eligibility traces, but keep the synaptic weights unchanged.
+        """
+        if self._use_elig:
+            self._etrace.fill(0.0)
 
     def forward(self, spike_input: np.ndarray) -> np.ndarray:
         """

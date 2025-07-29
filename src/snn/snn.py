@@ -17,21 +17,13 @@ class SNN:
 
     def __init__(self, input_size: int, hidden_size: list[int] | int | None, output_size: int, dt, *, 
                  learning_rule: LearningRule = None, synapse_params: dict = None, neuron_params: dict = None,
-                 winner_take_all: bool = False,
+                 winner_take_all: bool = False, soft_reset: bool = False,
                 #  tau_mem: float | List[float] = 5e-3, tau_trace: float | List[float] = 1e-1, threshold: float | List[float] = 1.0, 
                 #  membrane_start: float = 0.0, reset_mechanism = "subtract"
                  ):
         # Network architecture parameters
         self.input_size = input_size
         self.hidden_size = solve_hidden(hidden_size)
-        # if hidden_size is None or hidden_size == 0 or len(hidden_size) == 0:
-        #     self.hidden_size = []
-        # elif isinstance(hidden_size, int):
-        #     self.hidden_size = [hidden_size]
-        # elif isinstance(hidden_size, list):
-        #     self.hidden_size = hidden_size
-        # else:
-        #     raise TypeError("hidden_size must be an int or a list of ints.")
         self.output_size = output_size
         self.layer_sizes = [input_size] + self.hidden_size + [output_size]
         self.layer_sizes_active = self.layer_sizes
@@ -77,6 +69,9 @@ class SNN:
                                    dt=self.dt,
                                    **self.synapse_params)
             self.synapse_layers.append(synapse)
+
+        # Other parameters
+        self._soft_reset = soft_reset
     
     def forward(self, spike_in:np.array) -> np.ndarray:
         curr = spike_in
@@ -102,6 +97,21 @@ class SNN:
             neuron_layer.reset()
         for synapse_layer in self.synapse_layers:
             synapse_layer.reset()
+
+    def soft_reset(self):
+        """
+        Reset only neuron membrane potentials, spikes and  synapse eligibility traces.
+        """
+        for neuron_layer in self.neuron_layers:
+            neuron_layer.reset()
+        for synapse_layer in self.synapse_layers:
+            synapse_layer.soft_reset()
+
+    def use_soft_reset(self) -> bool:
+        """
+        Return whether the network uses soft reset or not
+        """
+        return self._soft_reset
 
     @property
     def membranes(self):

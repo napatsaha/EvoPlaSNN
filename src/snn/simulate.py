@@ -44,11 +44,12 @@ class SNNSimulator:
         self.weight_recorder = MatrixRecorder([synapse.weights.shape for synapse in network.synapse_layers]) if self.record_weights else None
         self.eligibility_recorder = MatrixRecorder([synapse.weights.shape for synapse in network.synapse_layers]) if self.record_eligibility else None
 
-        # For supervised learning
+        # Learning related attributes
         self._supervised = supervised
         # Enforce unsupervised learning if the learning rule update condition is on-spike
         if hasattr(self.learning_rule, "condition") and self.learning_rule.condition == "on-spike":
             self._supervised = False
+        self._soft_reset = self.network.use_soft_reset()
 
         # Initialize post-processing components
         params = copy.deepcopy(params)
@@ -126,7 +127,9 @@ class SNNSimulator:
     def run(self, num_steps: int):
         t_start = self.num_steps
         self._setup_run(num_steps)
+        _new_sample = True
         for t in range(t_start, self.num_steps):
+
             # Random input spikes
             spk_in = self.spike_generator.generate()
 
@@ -151,7 +154,7 @@ class SNNSimulator:
             elif self._post_process_type == 1:
                 # Since Rewarder relies on precise timing of spikes and whether the input spikes is active,
                 # it needs to be updated whenever the spike input pattern changes.
-                if not self.spike_generator.is_static() and self.spike_generator.count == 1:
+                if not self.spike_generator.is_static() and _new_sample:
                     self.rewarder.update_target_array(self.spike_generator.array, self.spike_generator.get_label())
                     
                 # target = self.rewarder.get_target(self.spike_generator.get_label())
@@ -193,6 +196,13 @@ class SNNSimulator:
             if self.record_eligibility:
                 for i, etraces in enumerate(self.network.eligibility_traces):
                     self.eligibility_recorder.record(i, t, etraces)
+
+            # Check for start of new sample
+            _new_sample = self.spike_generator.is_final()
+
+            # Refresh neuron and synaptic states
+            if self._soft_reset and _new_sample:
+                    self.network.soft_reset()
 
     def get_fitness(self) -> float | None:
         if self._post_process_type == 0:
