@@ -4,6 +4,7 @@ from pathlib import Path
 import numpy as np
 
 from run_evo_lrule import eval
+import snn.plot as snn_plot
 
 def convert_name(x):
     tokens = x.split('__')
@@ -16,15 +17,8 @@ def convert_name(x):
     else:
         return tokens[-1]
 
-if __name__ == "__main__":
-    argparser = argparse.ArgumentParser()
-    argparser.add_argument("run_dir", type=str, default=None,
-                        help="Directory name where the results are stored.")
-    argparser.add_argument("--num_trials", type=int, default=100,
-                        help="Number of trials to run for each evaluation.")
-    args = argparser.parse_args()
-
-    results_dir = Path(f"{args.run_dir}")   
+def make_eval_result(run_dir, num_trials):
+    results_dir = Path(run_dir)   
 
     if (results_dir / "eval_result.csv").exists():
         existing_evals = pd.read_csv(results_dir / "eval_result.csv", index_col=0, usecols=["run_name", "mean_fts", "std_fts"])
@@ -33,7 +27,7 @@ if __name__ == "__main__":
     existing_evals 
 
     config_list = []
-    num_trials = args.num_trials
+    num_trials = num_trials
 
     for dirpath, dirnames, filenames in os.walk(results_dir):
         if "config.yaml" in filenames:
@@ -83,3 +77,27 @@ if __name__ == "__main__":
     # cfgs = cfgs.round({"target_fitness": 1})
 
     cfgs.to_csv(results_dir / "eval_result.csv")
+
+if __name__ == "__main__":
+    argparser = argparse.ArgumentParser()
+    argparser.add_argument("run_dir", type=str, default=None,
+                        help="Directory name where the results are stored.")
+    argparser.add_argument("--num_trials", type=int, default=100,
+                        help="Number of trials to run for each evaluation.")
+    argparser.add_argument("--plot", "-p", action="store_true", default=False,
+                        help="Whether or not to plot comparison between different runs in current experiment dir." \
+                        "(Requires x_var, hue_var, and col_var (optional) to be set.)")
+    argparser.add_argument("--x_var", type=str, default=None,
+                        help="Variable to use for x-axis in evaluation comparison plots.")
+    argparser.add_argument("--hue_var", type=str, default=None,
+                        help="Variable to use for hue in evaluation comparison plots.")
+    argparser.add_argument("--col_var", type=str, default=None,
+                        help="Variable to use for columns in evaluation comparison plots.")
+    args = argparser.parse_args()
+
+    make_eval_result(run_dir=args.run_dir, num_trials=args.num_trials)
+    if args.plot:
+        if args.x_var is None or args.hue_var is None:
+            raise ValueError("x_var and hue_var must be specified for plotting comparison results.")
+        snn_plot.plot_compare_run(args.run_dir, x_var=args.x_var, hue_var=args.hue_var, col_var=args.col_var,
+                              savepath=f"{args.run_dir}/eval_comparison.png", show=False)

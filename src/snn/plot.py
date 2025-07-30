@@ -373,6 +373,92 @@ def plot_fitness_generation(file_path: str | Path, *, estimator: str = "mean", e
     plt.close(fig)
 
 
+## Plotting functions for entire experiment (containing multiple runs) ##
+def plot_compare_run(exp_dir: str | Path, x_var: str, hue_var: str = None, col_var: str = None, *,
+                     savepath: str | Path = None, show: bool = True):
+    exp_path = Path(exp_dir)
+    eval_file = exp_path / "eval_result.csv"
+    assert eval_file.exists(), f"Evaluation results file {eval_file} does not exist."
+
+    # Load previously evaluated results
+    cfgs = pd.read_csv(eval_file)
+    num_evals = cfgs["num_evals"].unique()[0]
+    num_sim_steps = cfgs["num_sim_steps"].unique()[0]
+    exp_name = exp_path.name
+
+    # Create the bar plot
+    g = sns.catplot(
+        data=cfgs,
+        x=x_var,
+        y="mean_fts",
+        hue=hue_var,
+        col=col_var,
+        kind="bar",
+        errorbar=None, 
+        height=8,
+        aspect=1.2,
+        sharey=False,
+    )
+    fig = g.figure
+
+    # Add error bars manually using std_fts
+    if col_var is not None:
+        for ax, col_val in zip(g.axes.flat, cfgs[col_var].unique()):
+            subset = cfgs[cfgs[col_var] == col_val].sort_values(by=[hue_var, x_var])
+            # ax = g.axes[0, 0]  # Get the first axis
+            # subset = cfgs.sort_values(by=[hue_var, x_var])
+            for i, bar in enumerate(ax.patches):
+                if i >= len(subset):
+                    continue
+                # Get the corresponding std_fts value
+                std_err = subset.iloc[i]["std_fts"]
+                # Add error bar
+                ax.errorbar(
+                    bar.get_x() + bar.get_width() / 2,
+                    bar.get_height(),
+                    yerr=std_err,
+                    fmt="none",
+                    c="gray",
+                    capsize=3,
+                    elinewidth=1,
+                )
+                ax.grid(axis='y', linestyle='--', linewidth=0.5, alpha=0.7)
+    else:
+        ax = g.axes[0, 0]  # Get the first axis
+        subset = cfgs.groupby([hue_var, x_var])["std_fts"].mean().reset_index().sort_values(by=[hue_var, x_var])
+        for i, bar in enumerate(ax.patches):
+            if i >= len(subset):
+                continue
+            # Get the corresponding std_fts value
+            std_err = subset.iloc[i]["std_fts"]
+            # Add error bar
+            ax.errorbar(
+                bar.get_x() + bar.get_width() / 2,
+                bar.get_height(),
+                yerr=std_err,
+                fmt="none",
+                c="gray",
+                capsize=3,
+                elinewidth=1,
+            )
+        ax.grid(axis='y', linestyle='--', linewidth=0.5, alpha=0.7)
+    # Adjust the plot
+
+    if col_var is not None:
+        g.set_titles("{col_var} = {col_name}")
+    g.set_axis_labels(x_var.replace("_", " ").title(), "Fitness")
+    g.legend.set_title(hue_var.replace("_", " ").title())
+    plt.text(0.5, 1.1, " -- ".join([var.replace("_", " ").title() for var in [x_var, hue_var, col_var] if var is not None]),
+            transform=fig.transFigure, ha='center', fontsize=20)
+    plt.text(0.5, 1.05, f"{exp_name} | {num_sim_steps} Simulation timesteps", transform=fig.transFigure, ha='center', fontsize=16)
+    plt.text(0.5, 1.02, f"Mean Fitness +/- Std ({num_evals} Evaluations)", transform=fig.transFigure, ha='center', fontsize=12)
+    if savepath is not None:
+        plt.savefig(savepath, dpi=300, bbox_inches='tight')
+    if show:
+        plt.show()
+    plt.close(fig)
+
+
 ### Helper functions ###
 
 
