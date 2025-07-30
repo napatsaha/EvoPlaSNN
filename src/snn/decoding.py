@@ -112,8 +112,9 @@ class BaseFitnessor(Fitnessor):
     """
     minimise: bool = None
     
-    def __init__(self, num_classes: int):
+    def __init__(self, num_classes: int, portion: float = 1.0):
         self.num_classes = num_classes
+        self.portion = min(1.0, max(0.0, portion)) 
         self.reward_buffer = []
         self.output_buffer = []
         self.label_buffer = []
@@ -144,7 +145,8 @@ class BaseFitnessor(Fitnessor):
         if return_array:
             return fitnesses
         else:
-            return self._aggregate(fitnesses)
+            idx = int((1 - self.portion) * len(fitnesses))
+            return self._aggregate(fitnesses[idx:])
 
     def get_intermediate_fitness(self) -> List[float]:
         """
@@ -181,8 +183,8 @@ class MeanRewardFitnessor(BaseFitnessor):
     """
     A fitnessor that calculates the mean reward from the recorded rewards.
     """
-    def __init__(self, num_classes: int):
-        super().__init__(num_classes)
+    def __init__(self, num_classes: int, portion: float = 1.0):
+        super().__init__(num_classes, portion)
         self.minimise = False  # Mean reward is typically maximised
 
     def _calculate_fitness(self, outputs: np.ndarray, labels: np.ndarray, return_array: bool = False) -> np.ndarray:
@@ -203,8 +205,8 @@ class AccuracyFitnessor(BaseFitnessor):
     A fitnessor that calculates the accuracy of the predictions.
     Predicted outputs with more than one maximum values are treated as ties, and hence considered as incorrect.
     """
-    def __init__(self, num_classes: int):
-        super().__init__(num_classes)
+    def __init__(self, num_classes: int, portion: float = 1.0):
+        super().__init__(num_classes, portion)
         self.minimise = False  # Accuracy is typically maximised
 
     def _calculate_fitness(self, outputs: np.ndarray, labels: np.ndarray, return_array: bool = False) -> np.ndarray:
@@ -225,8 +227,8 @@ class CrossEntropyFitnessor(BaseFitnessor):
     """
     A fitnessor that calculates the cross-entropy loss between the predicted outputs and the target labels.
     """
-    def __init__(self, num_classes: int):
-        super().__init__(num_classes)
+    def __init__(self, num_classes: int, portion: float = 1.0):
+        super().__init__(num_classes, portion)
         self.minimise = True  # Cross-entropy loss is typically minimised
 
     def _calculate_fitness(self, outputs: np.ndarray, labels: np.ndarray, return_array: bool = False) -> np.ndarray:
@@ -245,9 +247,9 @@ class MSEFitnessor(BaseFitnessor):
     Target labels differ based on whether a rate decoder or latency decoder is used.
     For latency
     """
-    def __init__(self, num_classes: int, decoder_type: Literal["rate", "latency"] = "rate",
+    def __init__(self, num_classes: int, portion: float = 1.0, decoder_type: Literal["rate", "latency"] = "rate",
                  buffer_length: int = 10, max_value: float = None):
-        super().__init__(num_classes)
+        super().__init__(num_classes, portion)
         self.minimise = True  # MSE is typically minimised
         self.decoder_type = decoder_type
         self.buffer_length = buffer_length

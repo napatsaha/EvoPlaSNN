@@ -1,17 +1,18 @@
 num_sim_steps: 2000
 pattern_params:
   type: poisson
-  duration: 10
-  rate: 100
+  method: count
+  duration: 20
+  rate: 50
   dt: 0.001
   num_classes: 2
   num_sets: 10
 spikegen_params:
   class: CustomTimingGenerator
   binary: false
-  spacing: 0
-  jitter_std: 0.0
-  failure_rate: 0.0
+  spacing: 5
+  jitter_std: 0.5
+  failure_rate: 0.1
   randomise_class: true
 snn_params:
   input_size: 5
@@ -19,17 +20,17 @@ snn_params:
   output_size: 2
   dt: 0.001
   neuron_params:
-    tau_mem: 0.004
-    tau_trace: 0.004
+    tau_mem: 0.005
+    tau_trace: 0.005
     trace_type: dx3
-    delayed_wta: false
+    delayed_wta: true
   synapse_params:
     clip_weights: false
-    normalise_weights: false
+    normalise_weights: true
     normalise_method: L2
     eligibility_trace: true
-    tau_syn: 0.015
-  winner_take_all: false
+    tau_syn: 0.02
+  winner_take_all: true
   soft_reset: true
 # rewarder_params:
 #   type: weighted
@@ -52,6 +53,7 @@ fitnessor_params:
   # type: accuracy
   # type: cross_entropy
   # type: mse
+  portion: 0.5
 arule_params:
   learning_rate: 0.1
   hidden_size: 4
@@ -67,6 +69,7 @@ evo_params:
   manager:
     type: original
     max_generations: 200
+    max_stagnation: 50
     tolerance: 0.02
     num_trials: 10
     save_best: 3
@@ -78,4 +81,3 @@ evo_params:
     # minimise: false
   evaluator:
     update_inputs: true
-    # record_classes: true
