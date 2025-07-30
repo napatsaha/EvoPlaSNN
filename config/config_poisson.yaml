@@ -21,6 +21,8 @@ snn_params:
   neuron_params:
     tau_mem: 0.004
     tau_trace: 0.004
+    trace_type: dx3
+    delayed_wta: false
   synapse_params:
     clip_weights: false
     normalise_weights: false

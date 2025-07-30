@@ -18,6 +18,7 @@ snn_params:
     tau_mem: 0.006
     tau_trace: 0.006
     trace_type: dx3
+    delayed_wta: false
   synapse_params:
     clip_weights: false
     normalise_weights: true
@@ -25,6 +26,7 @@ snn_params:
     eligibility_trace: false
     tau_syn: 0.015
   winner_take_all: true
+  soft_reset: true
 rewarder_params:
   type: weighted
   target_position: last

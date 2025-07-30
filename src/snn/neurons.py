@@ -47,20 +47,26 @@ class NeuronLayer(NeuronLayerProtocol):
     Can also get the trace which will convert the time since last spike to a value that decays since the last spike.
     Assumming each new spike resets the trace to its maximum value.
     """
-    def __init__(self, size: int, *, tau_mem: float = 1e-1, tau_trace: float = 1e-1, dt: float = 1e-1, threshold: float = 1.0, 
-                 wta: bool = False,
+    def __init__(self, size: int, *, tau_mem: float = None, tau_trace: float = None, dt: float = 1e-3, threshold: float = 1.0, 
+                 wta: bool = False, delayed_wta: bool = False,
                  membrane_start: float = 0.0, reset_mechanism: Literal["zero", "subtract"] = "zero",
                  trace_amp: float = 1.0, trace_type: Literal["dx1", "dx2", "dx3"] = "dx3"):
         # Basic parameters
         self.size = size
         self.dt = dt
 
+        # Deals with positive integer tau's as a unit of dt
+        if tau_mem is not None and isinstance(tau_trace, int):
+            tau_mem = tau_mem * dt
+        if tau_trace is not None and isinstance(tau_trace, int):
+            tau_trace = tau_trace * dt
+
         # Membrane potential parameters
         self.membrane_start = membrane_start
-        self.tau_mem = tau_mem
+        self.tau_mem = tau_mem if tau_mem is not None else tau_trace if tau_trace is not None else dt
         self.beta_mem = np.exp(-dt / tau_mem) # Decay rate
         # Trace parameters
-        self.tau_trace = tau_trace
+        self.tau_trace = tau_trace if tau_trace is not None else tau_mem if tau_mem is not None else dt
         self.trace_amp = trace_amp
         self.trace_type = trace_type
         # Threshold parameters
@@ -68,6 +74,7 @@ class NeuronLayer(NeuronLayerProtocol):
         self.reset_mechanism = reset_mechanism if reset_mechanism in ["zero", "subtract"] else "zero"
         # Spike parameters
         self.wta = wta
+        self.delayed_wta = delayed_wta
 
         # Membrane potential
         self.membrane = np.full((size,), membrane_start)
@@ -92,24 +99,32 @@ class NeuronLayer(NeuronLayerProtocol):
         Update the neuron layer state based on the input current and time step.
         """
         # Reset the membrane potential for spiking neurons
-        if self.reset_mechanism == "zero":
-            self.membrane = np.where(self.membrane >= self.threshold, 0, self.membrane)
-        elif self.reset_mechanism == "subtract":
-            self.membrane = np.where(self.membrane >= self.threshold, self.membrane - self.threshold, self.membrane)
+        self._reset_membrane()
         # Calculate the new membrane potential
-        self.membrane = self.beta_mem * self.membrane + input_current
+        self._update_membrane(input_current)
         # Check for spikes
         self._set_spike()
         # Update the time since last spike
-        self.tssp = np.where(self.spike, 0, self.tssp + 1)
+        self._update_tssp()
         # Update trace
-        self.update_trace()
+        self._update_trace()
 
         return self.spike.astype(np.int8)
+
+    def _reset_membrane(self):
+        cond = self.membrane >= self.threshold if not self.delayed_wta else self.spike
+        if self.reset_mechanism == "zero":
+            self.membrane = np.where(cond, self.membrane_start, self.membrane)
+        elif self.reset_mechanism == "subtract":
+            self.membrane = np.where(cond, self.membrane - self.threshold, self.membrane)
+
+    def _update_membrane(self, input_current):
+        self.membrane = self.beta_mem * self.membrane + input_current
 
     def _set_spike(self):
         # Winner Takes All (WTA)
         if self.wta:
+            # above_thr = self.membrane >= self.threshold
             self.spike.fill(0)
             if np.all(self.membrane < self.threshold):
                 return
@@ -120,7 +135,10 @@ class NeuronLayer(NeuronLayerProtocol):
         else:
             self.spike = (self.membrane >= self.threshold)
 
-    def update_trace(self):
+    def _update_tssp(self):
+        self.tssp = np.where(self.spike, 0, self.tssp + 1)
+
+    def _update_trace(self):
         """
         Update the trace based on the time since last spike and the trace type.
         """
