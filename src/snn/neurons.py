@@ -74,7 +74,7 @@ class NeuronLayer(NeuronLayerProtocol):
         # Spike status
         self.spike = np.zeros(size, dtype=np.int8)
         # Time since last spike
-        self.tssp = np.zeros(size, dtype=np.int32)
+        self.tssp = np.full(size, dtype=np.float32, fill_value=np.inf)
         # Trace
         self.trace = np.zeros(size, dtype=np.float32)
 
@@ -84,7 +84,7 @@ class NeuronLayer(NeuronLayerProtocol):
         """
         self.membrane.fill(self.membrane_start)
         self.spike.fill(0)
-        self.tssp.fill(0)
+        self.tssp.fill(np.inf)
         self.trace.fill(0.0)
 
     def forward(self, input_current: np.ndarray):
