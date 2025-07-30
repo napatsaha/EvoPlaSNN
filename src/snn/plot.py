@@ -323,6 +323,45 @@ def plot_membranes(simulator: 'SNNSimulator', col_width: float = 10.0, row_heigh
     plt.close(fig)
 
 
+def plot_intermediate_fitness(simulator: 'SNN_Simulator', *, x_scale: float = 0.01, y_scale: float = 1.0, x_eps: int = 1,
+                              t_min: int = None, t_max: int = None, t_range: int = None, window_size: int = 10,
+                              savepath: str | Path = None, show: bool = True):
+    fts = simulator.get_intermediate_fitness()
+    ft = simulator.get_fitness()
+    T = simulator.num_steps
+    # ts = np.linspace(0, T, len(fts))
+    ts = np.arange(simulator.spike_generator.pattern_length - 1, T, simulator.spike_generator.length)
+    runavg = np.convolve(fts, np.ones(window_size) / window_size, mode='same')
+
+    if t_range is None:
+        t_range = simulator.num_steps
+    if t_max is None:
+        t_max = T
+    if t_min is None:
+        t_min = max(0, t_max - t_range)
+
+    fig, ax = plt.subplots(1, 1, figsize=((t_max - t_min) * x_scale, 10 * y_scale), layout="constrained")
+    ax.plot(
+        ts, fts,
+        color="gray", alpha=0.8,
+        drawstyle="steps-post",
+        linewidth=1, label="Intermediate Fitness"
+    )
+    ax.plot(ts, runavg, color="blue", linewidth=2, label=f"Running Average ({window_size})")
+    ax.legend(loc="lower right", fontsize=12)
+    ax.xaxis.set_major_locator(plt.MultipleLocator(100))
+    ax.set_xlim(t_min - x_eps, t_max + x_eps)
+    ax.set_xlabel("Time (steps)")
+    ax.set_ylabel("Fitness")
+    fig.text(0.5, 1.07, "Intermediate Fitness Over Time", ha='center', fontsize=20)
+    fig.text(0.5, 1.02, f"Average Fitness: {ft:.2f}", ha='center', fontsize=14)
+    if savepath is not None:
+        plt.savefig(savepath)
+    if show:
+        plt.show()
+    plt.close(fig)
+
+
 ### Plotting functions for Evolutionary Results ###
 
 

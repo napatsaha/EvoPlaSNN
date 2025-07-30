@@ -202,6 +202,7 @@ def eval(results_path: Path | str, num_steps: int = None, rule_id: int = 1, num_
         snn_plot.plot_weight_heatmap(simulator, savepath=Path(results_path, f"{prefix}_weight_heatmap.png"), show=False, log_scale=True)
         if simulator.record_eligibility:
             snn_plot.plot_eligibility_traces(simulator, savepath=Path(results_path, f"{prefix}_eligibility_traces.png"), show=False)
+        snn_plot.plot_intermediate_fitness(simulator, savepath=Path(results_path, f"{prefix}_intermediate_fitness.png"), show=False)
 
     if not return_evaluator:
         return mean_fts, std_fts
