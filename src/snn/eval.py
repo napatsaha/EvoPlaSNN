@@ -2,7 +2,7 @@ import logging
 import copy
 import time
 from pathlib import Path
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Union, Tuple
 import numpy as np
 
 from evo.base import Evaluator
@@ -142,7 +142,8 @@ class SNN_Evaluator(Evaluator):
         else:
             self.logger.info("No results path provided. Logging to console only.")
 
-    def evaluate(self, genome: np.ndarray = None, num_trials=1, gen_count: int = None, indiv_count: int = None) -> float:
+    def evaluate(self, genome: np.ndarray = None, num_trials=1, gen_count: int = None, indiv_count: int = None,
+                 return_std: bool = False, return_fitness_list: bool = False) -> Union[float, Tuple[float, float], List[float]]:
         if genome is not None:
             self.arule.parameters = genome
 
@@ -161,7 +162,7 @@ class SNN_Evaluator(Evaluator):
 
             # Generate new set of spike pattern sets
             if self._update_inputs:
-                self.spikegen.update_classes(self.classes[i])
+                self.spikegen.update_classes(self.classes[i % len(self.classes)])
 
             t0 = time.time()
             self.simulator.run(self.num_simulation_steps)
@@ -175,6 +176,10 @@ class SNN_Evaluator(Evaluator):
             if self._log_info:
                 self.logger.info(f"Trial {i+1}/{num_trials}: Finished Evaluation. Time taken: {t1 - t0:.4f} seconds.")
                 self.write_trial(gen_count, indiv_count, i, fitness, intermediate_fitness)
+        
+        if return_fitness_list:
+            return fitnesses        
+        
         avg_fitness = np.mean(fitnesses)
         std_fitness = np.std(fitnesses)
         
@@ -183,7 +188,11 @@ class SNN_Evaluator(Evaluator):
             self.write_indiv(gen_count, indiv_count, avg_fitness, std_fitness)
             self.logger.info(f"Individual evalution time: {t10 - t00:.4f} seconds")
 
-        return avg_fitness
+        if return_std:
+            return avg_fitness, std_fitness
+
+        else:
+            return avg_fitness
     
     def update_classes(self):
         if self._update_inputs:

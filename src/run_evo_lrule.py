@@ -123,7 +123,8 @@ def main(config_file: str | Path, config_overrides: dict = None, parent_run: str
     return results_path 
 
 
-def eval(results_path: Path | str, num_steps: int = None, rule_id: int = 1, num_evals: int = 10, save_plots: bool = False, verbose: bool = True) -> Tuple[float, float]:
+def eval(results_path: Path | str, num_steps: int = None, rule_id: int = 1, num_evals: int = 10, save_results: bool = False,
+         save_plots: bool = False, verbose: bool = True, return_evaluator: bool = False) -> Tuple[float, float] | SNN_Evaluator:
 
     if not isinstance(results_path, Path):
         results_path = Path(results_path)
@@ -138,6 +139,7 @@ def eval(results_path: Path | str, num_steps: int = None, rule_id: int = 1, num_
     
     # Load the best ANN learning rule
     arule = read_ANN_Rule(results_path / rule_id_name, config_path=results_path / "config.yaml")
+    prefix = f"eval_rule_{rule_id:02d}"
 
     # spikegen_cls = getattr(spkgen, config["spikegen_params"].pop("class", "BinaryClassGenerator"))
     # spikegen = spikegen_cls(input_size=config["snn_params"].get("input_size"), **config["spikegen_params"])
@@ -163,28 +165,36 @@ def eval(results_path: Path | str, num_steps: int = None, rule_id: int = 1, num_
         learning_rule=arule,
         log_info=False
     )
-    simulator = evaluator.simulator
-    
-    fits = []
-    for _ in range(num_evals):
-        simulator.reset()
-        simulator.run(T)
-        fitness = simulator.get_fitness()
-        fits.append(fitness)
 
-    mean_fits = sum(fits) / len(fits)
-    std_fits = np.std(fits)
+    evaluator.update_classes()
+    fitnesses = evaluator.evaluate(num_trials=num_evals, return_fitness_list=True)
+    if save_results:
+        with open(results_path / f"{prefix}_eval_result.csv", "w") as f:
+            f.write("trial,fitness\n")
+            for i, fitness in enumerate(fitnesses):
+                f.write(f"{i},{fitness}\n")
+    
+    # fits = []
+    # for _ in range(num_evals):
+    #     simulator.reset()
+    #     simulator.run(T)
+    #     fitness = simulator.get_fitness()
+    #     fits.append(fitness)
+
+    mean_fts = np.mean(fitnesses)
+    std_fts = np.std(fitnesses)
 
     if verbose:
         fitness_type = config.get("fitnessor_params", {}).get("type", "unknown")
-        print(f"Mean fitness (Type: {fitness_type}): {mean_fits:.2f} ({num_evals} evaluations)")
+        print(f"Mean fitness (Type: {fitness_type}): {mean_fts:.2f} +/- {std_fts:.2f} SD ({num_evals} evaluations)")
 
     # Plotting
     if save_plots:
+        evaluator.update_classes()
+        simulator = evaluator.simulator
         simulator.reset()
         simulator.run(T)
         fitness = simulator.get_fitness()
-        prefix = f"eval_rule_{rule_id:02d}"
         snn_plot.plot_spikes(simulator, x_min=T-100, x_max=T, x_eps=2, savepath=Path(results_path, f"{prefix}_spikes.png"), show=False)
         snn_plot.plot_membranes(simulator, x_min=T-100, x_max=T, plot_inputs=False, col_width=20, row_height=7, savepath=Path(results_path, f"{prefix}_membranes.png"), show=False)
         # snn_plot.plot_weights(simulator, div=10, savepath=Path(results_path, f"{prefix}_weights.png"), show=False)
@@ -193,8 +203,12 @@ def eval(results_path: Path | str, num_steps: int = None, rule_id: int = 1, num_
         if simulator.record_eligibility:
             snn_plot.plot_eligibility_traces(simulator, savepath=Path(results_path, f"{prefix}_eligibility_traces.png"), show=False)
 
-
-    return mean_fits, std_fits
+    if not return_evaluator:
+        return mean_fts, std_fts
+    else:
+        # Return the evaluator object if requested
+        return evaluator
+    # return mean_fts, std_fts
 
 if __name__ == "__main__":
     # Argument parser
@@ -210,4 +224,4 @@ if __name__ == "__main__":
     # Run main function
     results_path = main(config_file=args.config, config_overrides=config_overrides, parent_run=args.parent)
     # Evaluation of best solution
-    eval(results_path, save_plots=True)
+    eval(results_path, save_plots=True, save_results=True)

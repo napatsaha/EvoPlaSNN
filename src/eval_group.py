@@ -1,6 +1,7 @@
 import pandas as pd
 import os, yaml, argparse
 from pathlib import Path
+import numpy as np
 
 from run_evo_lrule import eval
 
@@ -36,27 +37,39 @@ if __name__ == "__main__":
 
     for dirpath, dirnames, filenames in os.walk(results_dir):
         if "config.yaml" in filenames:
-            run_name = Path(dirpath).name
+            dirpath = Path(dirpath)
+            run_name = dirpath.name
             config_path = os.path.join(dirpath, "config.yaml")
-            if run_name in existing_evals.index:
+            eval_result_csv = [f for f in filenames if f.endswith("eval_result.csv")]
+            if len(eval_result_csv) > 0:
+                print(f"Found existing evaluation results for {run_name} at {eval_result_csv[0]}")
+                result = pd.read_csv(dirpath / eval_result_csv[0])
+                mean_fts = result["fitness"].mean()
+                std_fts = result["fitness"].std()
+                num_evals = result["trial"].max() + 1
+            elif run_name in existing_evals.index:
                 print(f"Skipping {run_name} as it has already been evaluated.")
                 mean_fts = existing_evals.loc[run_name, "mean_fts"]
                 std_fts = existing_evals.loc[run_name, "std_fts"]
+                num_evals = num_trials
             else:
                 print(f"Evaluating {run_name}...")
                 # Run evaluation and get mean and std of fitness trials
-                mean_fts, std_fts = eval(Path(dirpath), save_plots=False, num_evals=num_trials, verbose=False)
+                mean_fts, std_fts = eval(dirpath, save_plots=False, num_evals=num_trials, verbose=False)
+                num_evals = num_trials
             with open(config_path, 'r') as f:
                 config = yaml.safe_load(f)
                 config['run_name'] = run_name
-                config['mean_fts'] = mean_fts.round(5)
-                config['std_fts'] = std_fts.round(5)
+                config['mean_fts'] = np.round(mean_fts, 5)
+                config['std_fts'] = np.round(std_fts, 5)
+                config['num_evals'] = num_evals
                 config_list.append(config)
 
     # Convert list of dicts to DataFrame
     cfgs = pd.json_normalize(config_list, sep="__").set_index('run_name', drop=True)
     # Select only variables with differing values (disregarding NA)
     main_vars = cfgs.nunique(axis=0, dropna=True) > 1
+    main_vars[["num_sim_steps", "num_evals"]] = True
     cfgs = cfgs.loc[:, main_vars]
     # Removes "aaa_params__" in config names
     cfgs.rename(columns=convert_name, inplace=True)

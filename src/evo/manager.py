@@ -63,7 +63,7 @@ class EvoManager:
         if self.max_generations is None:
             self.max_generations = 1000  # Default maximum generations
 
-        global_best_fitness = -np.inf if self.solver.minimise else np.inf
+        global_best_fitness = np.inf if self.solver.minimise else -np.inf
         stag_count = 0  # Counter for stagnation
         
         try:
