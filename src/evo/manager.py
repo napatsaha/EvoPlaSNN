@@ -25,7 +25,7 @@ class EvoManager:
 
         self.num_trials = num_trials
         self.save_best = save_best
-        self.results_path = Path(results_path)
+        self.results_path = Path(results_path) if results_path is not None else None
         self._logfile_name = "log_generation.log"
         # self.update_inputs = update_inputs
         self.record_classes = record_classes
@@ -139,6 +139,7 @@ class EvoManager:
         self.logger.info(f"Best fitness: {best_fitness:.3f}")
         self.logger.info(f"Total time taken: {dt // 3600} hours, {(dt % 3600) // 60} minutes, {dt % 60:.2f} seconds")
         self.logger.info(f"Total generations: {gen_count}")
+        self.logger.info(f"Results saved to directory: {self.results_path}")
 
         # Save best solution
         if self.results_path is not None:

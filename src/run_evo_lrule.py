@@ -128,6 +128,8 @@ def main(config_file: str | Path | dict, *, config_overrides: dict = None, paren
         file_path = results_path / evaluator._fits_indiv_file 
         snn_plot.plot_fitness_generation(file_path, savepath=results_path / "fitness_gen.png", show=False, estimator="median", errorband=("pi", 100))
 
+    print(f"Evolution run completed. Results saved to {results_path}")
+
     return results_path 
 
 

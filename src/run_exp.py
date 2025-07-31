@@ -63,6 +63,7 @@ def run(search_config: str | Path, exp_dir: str | Path, num_search: int, num_rep
         # Repeat same config for num_rep times
         for ri in range(num_rep):
             try:
+                print(f"Running iteration {si}, repeat {ri}:")
                 run_path = run_evo_lrule.main(new_config, parent_run=exp_dir)
                 mean_fts, std_fts = run_evo_lrule.eval(run_path, save_plots=True, save_results=True, num_evals=num_evals, return_evaluator=False)
                 # Save evaluation result (+full config used) straight away to shared file
