@@ -17,5 +17,5 @@ __pycache__/
 
 *_old.py
 
-test.zsh
+test*
 script.zsh

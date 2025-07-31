@@ -1,0 +1,83 @@
+num_sim_steps: 2000
+pattern_params:
+  type: poisson
+  method: count
+  duration: 50
+  rate: scipy.stats.randint(50, 200)
+  dt: 0.001
+  num_classes: 2
+  num_sets: 10
+spikegen_params:
+  class: CustomTimingGenerator
+  binary: false
+  spacing: 5
+  jitter_std: scipy.stats.gamma(a=2.5, scale=0.05)
+  failure_rate: scipy.stats.gamma(a=1.5, scale=0.05)
+  randomise_class: [true, false]
+snn_params:
+  input_size: 5
+  hidden_size: 0
+  output_size: 2
+  dt: 0.001
+  neuron_params:
+    tau_mem: scipy.stats.randint(1, 10)
+    # tau_trace: scipy.stats.randint(1, 10)
+    trace_type: dx3
+    delayed_wta: true
+  synapse_params:
+    clip_weights: [false, true]
+    normalise_weights: [true, false]
+    normalise_method: [L2, sum]
+    eligibility_trace: true
+    tau_syn: scipy.stats.randint(5, 50)
+  winner_take_all: [true, false]
+  soft_reset: true
+# rewarder_params:
+#   type: weighted
+#   ignore_silent_inputs: false
+#   log_scale: false
+# collector_params:
+#   type: simple
+#   fitness_type: reward
+#   agg_func: sum
+decoder_params:
+  type: [latency, rate]
+  # type: final
+  direction: [last, first]
+  # convert_type: negate
+  reward_null: 0.0
+  reward_correct: 1.0
+  reward_incorrect: -1.0
+fitnessor_params:
+  type: reward
+  # type: accuracy
+  # type: cross_entropy
+  # type: mse
+  portion: scipy.stats.uniform(0.2, 1.0)
+arule_params:
+  learning_rate: scipy.stats.loguniform(0.001, 0.1, loc=0, scale=1)
+  hidden_size: scipy.stats.randint(0, 5)
+  bias: [true, false]
+  hidden_activation: [relu, linear]
+  output_activation: [sigmoid, tanh]
+  use_weights: [true, false]
+  use_reward: [true, false]
+  use_trace_pre: [true, false]
+  use_trace_post: [true, false]
+  use_eligibility: [true, false]
+evo_params:
+  manager:
+    type: original
+    max_generations: 200
+    max_stagnation: 50
+    tolerance: 0.02
+    num_trials: 10
+    save_best: 5
+    record_classes: true
+  solver:
+    # ndim: 25
+    type: CMA-ES
+    popsize: 10
+    # minimise: false
+  evaluator:
+    update_inputs: true

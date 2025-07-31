@@ -194,15 +194,19 @@ class SNN_Evaluator(Evaluator):
         else:
             return avg_fitness
     
-    def update_classes(self):
+    def update_classes(self, num_sets: int = None):
+        params = self.pattern_params.copy()
+        if num_sets is not None:
+            if hasattr(params, "num_sets"):
+                params["num_sets"] = num_sets
         if self._update_inputs:
             if self.pattern_type == "poisson":
                 self.classes = create_poisson_class_timing(
-                    **self.pattern_params
+                    **params
                 )
             elif self.pattern_type == "binary":
                 self.classes = create_binary_class_timing(
-                    **self.pattern_params
+                    **params
                 )
             # Record generated classes
         # self.write_classes()

@@ -25,7 +25,7 @@ class SynapseLayer(SynapseLayerProtocol):
     
     def __init__(self, pre_layer: NeuronLayerProtocol, post_layer: NeuronLayerProtocol, *, 
                  learning_rule: LearningRule = None,
-                 eligibility_trace: bool = False, tau_syn: float = 1e-1, dt: float = 1e-3,
+                 eligibility_trace: bool = False, tau_syn: float = None, dt: float = 1e-3,
                  weight_init: str = 'uniform', weight_init_params: dict = None, 
                  weight_min: float = 0.0, weight_max: float = 1.0,
                  clip_weights: bool = True, normalise_weights: bool = False, 
@@ -38,7 +38,9 @@ class SynapseLayer(SynapseLayerProtocol):
         self._use_elig = eligibility_trace
         if self._use_elig:
             self._etrace = np.zeros((self.pre_layer.size, self.post_layer.size), dtype=np.float32)
-        self.tau_syn = tau_syn
+        if tau_syn is not None and isinstance(tau_syn, int):
+            tau_syn = tau_syn * dt
+        self.tau_syn = tau_syn if tau_syn is not None else dt
         self.dt = dt
 
         # Initialize weights

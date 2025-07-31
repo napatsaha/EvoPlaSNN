@@ -17,7 +17,7 @@ def convert_name(x):
     else:
         return tokens[-1]
 
-def make_eval_result(run_dir, num_trials):
+def make_eval_result(run_dir, num_trials=None, save_all=False, change_name=True):
     results_dir = Path(run_dir)   
 
     if (results_dir / "eval_result.csv").exists():
@@ -62,11 +62,13 @@ def make_eval_result(run_dir, num_trials):
     # Convert list of dicts to DataFrame
     cfgs = pd.json_normalize(config_list, sep="__").set_index('run_name', drop=True)
     # Select only variables with differing values (disregarding NA)
-    main_vars = cfgs.nunique(axis=0, dropna=True) > 1
-    main_vars[["num_sim_steps", "num_evals"]] = True
-    cfgs = cfgs.loc[:, main_vars]
+    if not save_all:
+        main_vars = cfgs.nunique(axis=0, dropna=True) > 1
+        main_vars[["num_sim_steps", "num_evals"]] = True
+        cfgs = cfgs.loc[:, main_vars]
     # Removes "aaa_params__" in config names
-    cfgs.rename(columns=convert_name, inplace=True)
+    if change_name:
+        cfgs.rename(columns=convert_name, inplace=True)
     # Conbime rewarder_type and fitness_type into one column
     # cfgs["fitness_type"] = cfgs["fitness_type"].where(cfgs["rewarder_type"] != "weighted", cfgs["rewarder_type"])
     # cfgs.drop(columns=["rewarder_type"], inplace=True)

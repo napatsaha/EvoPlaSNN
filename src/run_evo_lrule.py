@@ -44,12 +44,20 @@ def update_dictionary(config: dict, overrides: dict) -> dict:
     return config
 
 
-def main(config_file: str | Path, config_overrides: dict = None, parent_run: str = None, default_dir: str = "binary_es") -> Path:
+def main(config_file: str | Path | dict, *, config_overrides: dict = None, parent_run: str = None, default_dir: str = "binary_es") -> Path:
     """Main function to run the evolutionary learning rule experiment."""
-    # Default config file
-    config_path = Path(ROOT, "config", config_file)
-    with open(config_path, "r") as f:
-        config = yaml.safe_load(f)
+    # Config file handling
+    if isinstance(config_file, dict):
+        config = config_file
+    elif isinstance(config_file, str | Path):
+        if Path(config_file).exists():
+            config_path = Path(config_file)
+        else:
+            config_path = Path(ROOT, "config", config_file)
+        with open(config_path, "r") as f:
+            config = yaml.safe_load(f)
+    else:
+        raise ValueError("config_file must be a path to a YAML file or a dictionary.")
 
     # Apply overrides to the configuration
     if config_overrides:
@@ -166,7 +174,7 @@ def eval(results_path: Path | str, num_steps: int = None, rule_id: int = 1, num_
         log_info=False
     )
 
-    evaluator.update_classes()
+    evaluator.update_classes(num_sets=num_evals)
     fitnesses = evaluator.evaluate(num_trials=num_evals, return_fitness_list=True)
     if save_results:
         with open(results_path / f"{prefix}_eval_result.csv", "w") as f:
@@ -217,6 +225,7 @@ if __name__ == "__main__":
     argparser.add_argument("--config", "-c", type=str, default="binary_es_v2.yaml", help="Path to the configuration file")
     argparser.add_argument("--override", "-o", type=str, nargs="*", help="Override specific config values (e.g., snn_params.neuron_params.tau_mem=0.05)")
     argparser.add_argument("--parent", "-p", type=str, default=None, help="Parent run directory to save results in. Useful for running series of related results.")
+    argparser.add_argument("--num_evals", "-e", type=int, default=10, help="Number of evaluation trials to run for the best rule at the end.")
     args = argparser.parse_args()
 
     # Parse overrides
@@ -225,4 +234,4 @@ if __name__ == "__main__":
     # Run main function
     results_path = main(config_file=args.config, config_overrides=config_overrides, parent_run=args.parent)
     # Evaluation of best solution
-    eval(results_path, save_plots=True, save_results=True)
+    eval(results_path, save_plots=True, save_results=True, num_evals=args.num_evals, verbose=True)

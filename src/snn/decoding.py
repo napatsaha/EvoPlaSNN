@@ -284,7 +284,7 @@ class BaseDecoder(Decoder):
     Deals with converting a spike train from each output neuron into a scalar value.
     """
     def __init__(self, buffer_size: int, neuron_size: int, #fitness_type: Literal["reward", "mse", "cross_entropy"] = "reward",
-                 reward_null: float = 0.0, reward_correct: float = 1.0, reward_incorrect: float = -1.0):
+                 reward_null: float = 0.0, reward_correct: float = 1.0, reward_incorrect: float = -1.0, **kwargs):
         super().__init__()
         # if fitness_type not in ["reward", "mse", "cross_entropy"]:
         #     raise ValueError("fitness_type must be one of ['reward', 'mse', 'cross_entropy']")
