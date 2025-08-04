@@ -115,10 +115,14 @@ class SynapseLayer(SynapseLayerProtocol):
     
     def update_eligibility_trace(self) -> None:
         if self._use_elig:
-            pre_trace = self.pre_layer.get_trace()
             post_spike = self.post_layer.spike
-            pre_trace, post_spike = self._tile(pre_trace, post_spike)
-            de = - self._etrace * self.dt / self.tau_syn + pre_trace * post_spike
+            if sum(post_spike) == 0:
+                rise = 0.0
+            else:        
+                pre_trace = self.pre_layer.get_trace()
+                pre_trace, post_spike = self._tile(pre_trace, post_spike)
+                rise = pre_trace * post_spike
+            de = - self._etrace * self.dt / self.tau_syn + rise
             self._etrace += de
 
     def update(self, reward=None) -> None:

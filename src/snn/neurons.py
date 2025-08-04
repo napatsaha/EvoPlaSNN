@@ -124,9 +124,9 @@ class NeuronLayer(NeuronLayerProtocol):
     def _set_spike(self):
         # Winner Takes All (WTA)
         if self.wta:
-            # above_thr = self.membrane >= self.threshold
+            above_thr = self.membrane >= self.threshold
             self.spike.fill(0)
-            if np.all(self.membrane < self.threshold):
+            if sum(above_thr) == 0:
                 return
             else:
                 idx = np.argmax(self.membrane)
