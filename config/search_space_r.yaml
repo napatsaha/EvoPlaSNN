@@ -1,9 +1,9 @@
-num_sim_steps: 2000
+num_sim_steps: 1000
 pattern_params:
   type: poisson
   method: count
-  duration: 50
-  rate: scipy.stats.randint(50, 200)
+  duration: 20
+  rate: scipy.stats.poisson(mu=50, loc=50)
   dt: 0.001
   num_classes: 2
   num_sets: 10
@@ -20,7 +20,7 @@ snn_params:
   output_size: 2
   dt: 0.001
   neuron_params:
-    tau_mem: scipy.stats.randint(1, 10)
+    tau_mem: scipy.stats.randint(1, 5)
     # tau_trace: scipy.stats.randint(1, 10)
     trace_type: dx3
     delayed_wta: true
@@ -29,7 +29,7 @@ snn_params:
     normalise_weights: [true, false]
     normalise_method: [L2, sum]
     eligibility_trace: true
-    tau_syn: scipy.stats.randint(5, 50)
+    tau_syn: scipy.stats.randint(5, 20)
   winner_take_all: [true, false]
   soft_reset: true
 # rewarder_params:
@@ -59,16 +59,16 @@ arule_params:
   hidden_size: scipy.stats.randint(0, 5)
   bias: [true, false]
   hidden_activation: [relu, linear]
-  output_activation: [sigmoid, tanh]
+  output_activation: [sigmoid]
   use_weights: [true, false]
-  use_reward: [true, false]
+  use_reward: true
   use_trace_pre: [true, false]
   use_trace_post: [true, false]
   use_eligibility: [true, false]
 evo_params:
   manager:
     type: original
-    max_generations: 200
+    max_generations: 150
     max_stagnation: 50
     tolerance: 0.02
     num_trials: 10
@@ -77,7 +77,7 @@ evo_params:
   solver:
     # ndim: 25
     type: CMA-ES
-    popsize: 10
+    popsize: 20
     # minimise: false
   evaluator:
     update_inputs: true

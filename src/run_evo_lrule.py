@@ -209,7 +209,7 @@ def eval(results_path: Path | str, num_steps: int = None, rule_id: int = 1, num_
         snn_plot.plot_membranes(simulator, x_min=T-100, x_max=T, plot_inputs=False, col_width=20, row_height=7, savepath=Path(results_path, f"{prefix}_membranes.png"), show=False)
         # snn_plot.plot_weights(simulator, div=10, savepath=Path(results_path, f"{prefix}_weights.png"), show=False)
         snn_plot.plot_weight_over_time(simulator, savepath=Path(results_path, f"{prefix}_weight_over_time.png"), show=False)
-        snn_plot.plot_weight_heatmap(simulator, savepath=Path(results_path, f"{prefix}_weight_heatmap.png"), show=False, log_scale=True)
+        snn_plot.plot_weight_heatmap(simulator, savepath=Path(results_path, f"{prefix}_weight_heatmap.png"), show=False, log_scale=False, t_range=500)
         if simulator.record_eligibility:
             snn_plot.plot_eligibility_traces(simulator, savepath=Path(results_path, f"{prefix}_eligibility_traces.png"), show=False)
         snn_plot.plot_intermediate_fitness(simulator, savepath=Path(results_path, f"{prefix}_intermediate_fitness.png"), show=False)

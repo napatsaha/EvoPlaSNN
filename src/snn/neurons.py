@@ -56,7 +56,7 @@ class NeuronLayer(NeuronLayerProtocol):
         self.dt = dt
 
         # Deals with positive integer tau's as a unit of dt
-        if tau_mem is not None and isinstance(tau_trace, int):
+        if tau_mem is not None and isinstance(tau_mem, int):
             tau_mem = tau_mem * dt
         if tau_trace is not None and isinstance(tau_trace, int):
             tau_trace = tau_trace * dt
@@ -64,7 +64,7 @@ class NeuronLayer(NeuronLayerProtocol):
         # Membrane potential parameters
         self.membrane_start = membrane_start
         self.tau_mem = tau_mem if tau_mem is not None else tau_trace if tau_trace is not None else dt
-        self.beta_mem = np.exp(-dt / tau_mem) # Decay rate
+        self.beta_mem = np.exp(-dt / self.tau_mem) # Decay rate
         # Trace parameters
         self.tau_trace = tau_trace if tau_trace is not None else tau_mem if tau_mem is not None else dt
         self.trace_amp = trace_amp
