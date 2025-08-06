@@ -2,6 +2,7 @@ from typing import Literal
 import numpy as np
 from abc import ABC, abstractmethod
 
+# from snn.base import SynapseLayerProtocol
 from .base import LearningRule
 from .utils import tile_array
 
@@ -74,4 +75,25 @@ class STDP_Rule(LearningRule):
         # Clip the weights
         # if self.clip_w:
         #     w = np.clip(w, self.w_min, self.w_max)
+        return dw
+    
+
+class R_STDP(LearningRule):
+    """
+    An STDP-Rule that only uses Reward and Eligibility Trace as inputs.
+    """
+    def __init__(self, learning_rate: float = 0.01,):
+        super().__init__()
+        self.learning_rate = learning_rate
+
+    def update(self, synapse: 'SynapseLayerProtocol', reward=None) -> np.ndarray:
+        if reward is None:
+            reward = 1.0
+
+        # Get the eligibility trace
+        etrace = synapse.eligibility_trace # shape: [N_pre, N_post]
+
+        # Compute the weight change
+        dw = self.learning_rate * reward * etrace
+
         return dw

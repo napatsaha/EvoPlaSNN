@@ -218,7 +218,7 @@ def plot_weight_heatmap(simulator: 'SNNSimulator', *, x_scale: float = 0.2, y_sc
     num_outputs = simulator.network.output_size
     num_inputs = simulator.network.input_size
     fig_size = ((t_max - t_min) * x_scale, num_outputs * num_inputs * y_scale)
-    fig, axs = plt.subplots(num_outputs, 1, figsize=fig_size, sharex=True, layout="constrained", gridspec_kw={"hspace": 0.0})
+    fig, axs = plt.subplots(num_outputs, 1, figsize=fig_size, sharex=True, gridspec_kw={"hspace": 0.0})
     axs: List[Axes]
     for i in range(num_outputs):
         ax = axs[i]
@@ -227,7 +227,8 @@ def plot_weight_heatmap(simulator: 'SNNSimulator', *, x_scale: float = 0.2, y_sc
         ax.set_ylabel(f"Neuron {i}", fontsize=12)
     axs[-1].set_xlabel("Time Steps", fontsize=12)
     fig.colorbar(m, ax=axs, orientation='vertical', label='Weight Value')
-    fig.suptitle(f"Weight Heatmap\nSynapse Layer {synapse_layer}", fontsize=16)
+    fig.text(0.5, 1.05, f"Weight Heatmap", fontsize=16)
+    fig.text(0.5, 1.02, f"Synapse Layer {synapse_layer}", fontsize=12)
     if savepath is not None:
         plt.savefig(savepath)
     if show:

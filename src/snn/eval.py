@@ -19,7 +19,7 @@ class SNN_Evaluator(Evaluator):
     def __init__(self, 
                  params: Dict = {},
                  record_info: bool = False,
-                 log_info: bool = True,
+                 log_info: bool = False,
                  update_inputs: bool = True,
                  learning_rule: LearningRule = None,
                 #  record_classes: bool = False,
@@ -67,6 +67,7 @@ class SNN_Evaluator(Evaluator):
                     timings=self.classes,
                     **params["spikegen_params"]
                 )
+                self._update_inputs = False
             else:
                 raise ValueError(f"Unknown pattern type: {self.pattern_type}")
         else:
@@ -113,34 +114,33 @@ class SNN_Evaluator(Evaluator):
 
     def setup_logger(self, results_path: Path = None):
         self.results_path = results_path
+        self._log_info = True
         # Set up logging to record runtime information
-        if self._log_info and self.results_path is not None:
-            self._logfile_name = "log_trials.log"
-            handler = logging.StreamHandler() if results_path is None else logging.FileHandler(results_path / self._logfile_name)
-            formatter = logging.Formatter('%(asctime)s - %(message)s')
-            handler.setFormatter(formatter)
-            self.logger = logging.getLogger("SNN_Evaluator")
-            self.logger.setLevel(logging.INFO)
-            if self.logger.hasHandlers():
-                # Prevent adding multiple handlers if logger is already configured
-                self.logger.handlers.clear()
-            self.logger.addHandler(handler)
+        self._logfile_name = "log_trials.log"
+        handler = logging.StreamHandler() if results_path is None else logging.FileHandler(results_path / self._logfile_name)
+        formatter = logging.Formatter('%(asctime)s - %(message)s')
+        handler.setFormatter(formatter)
+        self.logger = logging.getLogger("SNN_Evaluator")
+        self.logger.setLevel(logging.INFO)
+        if self.logger.hasHandlers():
+            # Prevent adding multiple handlers if logger is already configured
+            self.logger.handlers.clear()
+        self.logger.addHandler(handler)
 
-            # Setup three csv files: 
-            # one for recording fitnesses in each trial
-            # one for recording average fitness for each individual
-            # one for recording genome of each individual
-            self._fits_trial_file = "fitness_per_trial.csv"
-            with open(self.results_path / self._fits_trial_file, "w") as f:
-                f.write("gen,indiv,trial,fitness,intermediate\n")
-            self._fits_indiv_file = "fitness_per_indiv.csv"
-            with open(self.results_path / self._fits_indiv_file, "w") as f:
-                f.write("gen,indiv,avg_fitness,std_fitness\n")
-            self._genome_file = "genome.csv"
-            with open(self.results_path / self._genome_file, "w") as f:
-                f.write("gen,indiv,genome\n")
-        else:
-            self.logger.info("No results path provided. Logging to console only.")
+        # Setup three csv files: 
+        # one for recording fitnesses in each trial
+        # one for recording average fitness for each individual
+        # one for recording genome of each individual
+        self._fits_trial_file = "fitness_per_trial.csv"
+        with open(self.results_path / self._fits_trial_file, "w") as f:
+            f.write("gen,indiv,trial,fitness,intermediate\n")
+        self._fits_indiv_file = "fitness_per_indiv.csv"
+        with open(self.results_path / self._fits_indiv_file, "w") as f:
+            f.write("gen,indiv,avg_fitness,std_fitness\n")
+        self._genome_file = "genome.csv"
+        with open(self.results_path / self._genome_file, "w") as f:
+            f.write("gen,indiv,genome\n")
+
 
     def evaluate(self, genome: np.ndarray = None, num_trials=1, gen_count: int = None, indiv_count: int = None,
                  return_std: bool = False, return_fitness_list: bool = False) -> Union[float, Tuple[float, float], List[float]]:
