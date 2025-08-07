@@ -50,7 +50,7 @@ class NeuronLayer(NeuronLayerProtocol):
     def __init__(self, size: int, *, tau_mem: float = None, tau_trace: float = None, dt: float = 1e-3, threshold: float = 1.0, 
                  wta: bool = False, delayed_wta: bool = False, sim_method: Literal["event-driven", "step-wise"] = "step-wise",
                  membrane_start: float = 0.0, reset_mechanism: Literal["zero", "subtract"] = "zero",
-                 trace_amp: float = 1.0, trace_type: Literal["dx1", "dx2", "dx3"] = "dx3",
+                 trace_amp: float = 1.0, trace_type: Literal["dx1", "dx2", "dx3", "dx4"] = "dx4",
                  trace_last: Literal["cumulative", "recent"] = "recent"):
         # Simulation parameters
         self.size = size
@@ -69,12 +69,12 @@ class NeuronLayer(NeuronLayerProtocol):
         # Membrane potential parameters
         self.membrane_start = membrane_start
         self.tau_mem = tau_mem if tau_mem is not None else tau_trace if tau_trace is not None else dt
-        self.beta_mem = np.exp(-dt / self.tau_mem) # Decay rate
+        self.beta_mem = np.exp(-self.dt / self.tau_mem) # Decay rate
         # Trace parameters
         self.tau_trace = tau_trace if tau_trace is not None else tau_mem if tau_mem is not None else dt
         self.trace_amp = trace_amp
         self.trace_type = trace_type
-        self.beta_trace = np.exp(-dt / self.tau_trace)  # Decay rate for trace
+        self.beta_trace = np.exp(-self.dt / self.tau_trace)  # Decay rate for trace
         # Threshold parameters
         self.threshold = threshold
         self.reset_mechanism = reset_mechanism if reset_mechanism in ["zero", "subtract"] else "zero"
@@ -169,7 +169,9 @@ class NeuronLayer(NeuronLayerProtocol):
         """
         Update the trace based on the time since last spike and the trace type.
         """
-        if self._step_wise:
+        if self._event_driven:
+            return
+        elif self._step_wise:
             if self.trace_type == "dx1":
                 self._trace = self._trace + trace_dx1(self._trace, self.tau_trace/self.dt, self.spike, self.trace_amp)
             elif self.trace_type == "dx2":
@@ -178,8 +180,6 @@ class NeuronLayer(NeuronLayerProtocol):
                 self._trace = trace_x3(self.tssp, self.dt, self.tau_trace, self.trace_amp)
             elif self.trace_type == "dx4":
                 self._trace = np.where(self.spike, self.trace_amp, self._trace * self.beta_trace)
-        elif self._event_driven:
-            pass
         
     # def get_trace(self):
     #     """
@@ -188,11 +188,14 @@ class NeuronLayer(NeuronLayerProtocol):
     #     t = self.dt * self.tssp
     #     return self.trace_amp * np.exp(-t / self.tau_trace)
 
-    def get_trace(self):
+    def get_trace(self, idx: List[int] | np.ndarray[int] = None) -> np.ndarray:
         if self._step_wise:
             return self._trace
         elif self._event_driven:
-            return trace_x3(self.tssp, self.dt, self.tau_trace, self.last_peak)
+            if idx is None:
+                return trace_x3(self.tssp, self.dt, self.tau_trace, self.last_peak)
+            else:
+                return trace_x3(self.tssp[idx], self.dt, self.tau_trace, self.last_peak[idx])
 
     def __repr__(self):
         return f"NeuronLayer(size={self.size}, tau_mem={self.tau_mem}, tau_trace={self.tau_trace}, threshold={self.threshold}, wta={self.wta})"

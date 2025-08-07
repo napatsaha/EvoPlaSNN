@@ -26,23 +26,36 @@ class SynapseLayer(SynapseLayerProtocol):
     def __init__(self, pre_layer: NeuronLayerProtocol, post_layer: NeuronLayerProtocol, *, 
                  learning_rule: LearningRule = None,
                  eligibility_trace: bool = False, tau_syn: float = None, dt: float = 1e-3,
+                 sim_method: Literal["event-driven", "step-wise"] = "step-wise",
                  weight_init: str = 'uniform', weight_init_params: dict = None, 
                  weight_min: float = 0.0, weight_max: float = 1.0,
                  clip_weights: bool = True, normalise_weights: bool = False, 
                  normalise_method: Literal["sum", "L2", "P"] = "sum", normalise_params: dict = None):
 
+        # Simulation parameters
+        self.dt = dt
+        self.sim_method = sim_method
+        self._event_driven = sim_method == "event-driven"
+        self._step_wise = sim_method == "step-wise"
+
         self.pre_layer = pre_layer
         self.post_layer = post_layer
         self.learning_rule = learning_rule if learning_rule is not None else Empty_Rule()
-        self._learning_rule_type = self._get_lrule_type()
+        # self._learning_rule_type = self._get_lrule_type()
+
+        # Eligibility trace parameters
         self._use_elig = eligibility_trace
         if self._use_elig:
-            self._etrace = np.zeros((self.pre_layer.size, self.post_layer.size), dtype=np.float32)
+            if self._step_wise:
+                self._etrace = np.zeros((self.pre_layer.size, self.post_layer.size), dtype=np.float32)
+            elif self._event_driven:
+                self._etssp = np.full((self.pre_layer.size, self.post_layer.size), np.inf, dtype=np.float32)
+                self._elast = np.zeros((self.pre_layer.size, self.post_layer.size), dtype=np.float32)
         if tau_syn is not None and isinstance(tau_syn, int):
             tau_syn = tau_syn * dt
         self.tau_syn = tau_syn if tau_syn is not None else dt
-        self.dt = dt
-
+        self.beta_syn = np.exp(-self.dt / self.tau_syn)  # Decay rate for eligibility trace
+        
         # Initialize weights
         self.weight_init = weight_init
         self.weight_init_params = weight_init_params
@@ -67,13 +80,13 @@ class SynapseLayer(SynapseLayerProtocol):
 
         self._normalise_weights()
 
-    def _get_lrule_type(self):
-        if isinstance(self.learning_rule, STDP_Rule):
-            return "STDP"
-        elif isinstance(self.learning_rule, ANN_Rule):
-            return "ANN"
-        elif isinstance(self.learning_rule, Empty_Rule):
-            return None
+    # def _get_lrule_type(self):
+    #     if isinstance(self.learning_rule, STDP_Rule):
+    #         return "STDP"
+    #     elif isinstance(self.learning_rule, ANN_Rule):
+    #         return "ANN"
+    #     elif isinstance(self.learning_rule, Empty_Rule):
+    #         return None
 
     def _tile(self, vec_in: np.ndarray, vec_out: np.ndarray) -> np.ndarray:
         """
@@ -92,15 +105,18 @@ class SynapseLayer(SynapseLayerProtocol):
         # self._init_weights()
         self.weights[:] = np.random.uniform(self.weight_min, self.weight_max, size=(self.pre_layer.size, self.post_layer.size))
         self._normalise_weights()
-        if self._use_elig:
-            self._etrace.fill(0.0)
+        self.soft_reset()
 
     def soft_reset(self) -> None:
         """
         Reset only eligibility traces, but keep the synaptic weights unchanged.
         """
         if self._use_elig:
-            self._etrace.fill(0.0)
+            if self._step_wise:
+                self._etrace.fill(0.0)
+            elif self._event_driven:
+                self._etssp.fill(np.inf)
+                self._elast.fill(0.0)
 
     def forward(self, spike_input: np.ndarray) -> np.ndarray:
         """
@@ -115,15 +131,29 @@ class SynapseLayer(SynapseLayerProtocol):
     
     def update_eligibility_trace(self) -> None:
         if self._use_elig:
-            post_spike = self.post_layer.spike
-            if sum(post_spike) == 0:
-                rise = 0.0
-            else:        
-                pre_trace = self.pre_layer.get_trace()
-                pre_trace, post_spike = self._tile(pre_trace, post_spike)
-                rise = pre_trace * post_spike
-            de = - self._etrace * self.dt / self.tau_syn + rise
-            self._etrace += de
+            if self._step_wise:
+                post_spike = self.post_layer.spike
+                if sum(post_spike) == 0:
+                    rise = 0.0
+                else:        
+                    pre_trace = self.pre_layer.get_trace()
+                    pre_trace, post_spike = self._tile(pre_trace, post_spike)
+                    rise = pre_trace * post_spike
+                self._etrace = self._etrace * self.beta_syn + rise
+            elif self._event_driven:
+                self._etssp += 1
+                post_spike = self.post_layer.spike
+                idx_post = post_spike.nonzero()[0]
+                if len(idx_post) == 0:
+                    return
+                else:
+                    pre_trace = self.pre_layer.get_trace() # Shape: [pre_size,]
+                    # Value before rise
+                    decay = self._elast[:, idx_post] * np.exp(-self._etssp[:, idx_post] * self.dt / self.tau_syn) # Shape: [pre_size, num_post_spikes]
+                    # Update last peak
+                    self._elast[:, idx_post] = pre_trace[:, np.newaxis] + decay
+                    # Update tssp
+                    self._etssp[:, idx_post] = 0
 
     def update(self, reward=None) -> None:
         """
@@ -152,10 +182,15 @@ class SynapseLayer(SynapseLayerProtocol):
         Return the eligibility trace if it is being used, otherwise return None.
         """
         if self._use_elig:
-            return self._etrace
+            if self._step_wise:
+                return self._etrace
+            elif self._event_driven:
+                return self._elast * np.exp(-self._etssp * self.dt / self.tau_syn)
         else:
             return None
     
+
+
 
 def safe_norm(array, method, params={}, eps=1e-10):
     if method == "sum":
