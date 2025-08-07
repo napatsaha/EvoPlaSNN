@@ -50,7 +50,7 @@ class NeuronLayer(NeuronLayerProtocol):
     def __init__(self, size: int, *, tau_mem: float = None, tau_trace: float = None, dt: float = 1e-3, threshold: float = 1.0, 
                  wta: bool = False, delayed_wta: bool = False, sim_method: Literal["event-driven", "step-wise"] = "step-wise",
                  membrane_start: float = 0.0, reset_mechanism: Literal["zero", "subtract"] = "zero",
-                 trace_amp: float = 1.0, trace_type: Literal["dx1", "dx2", "dx3", "dx4"] = "dx4",
+                 trace_amp: float = 1.0, trace_type: Literal["dx1", "dx2", "dx3", "dx4"] = None,
                  trace_last: Literal["cumulative", "recent"] = "recent"):
         # Simulation parameters
         self.size = size
@@ -58,7 +58,9 @@ class NeuronLayer(NeuronLayerProtocol):
         self.sim_method = sim_method
         self._event_driven = sim_method == "event-driven"
         self._step_wise = sim_method == "step-wise"
-        self._last_only = trace_last == "recent"
+        self._last_only = trace_last == "recent" 
+        if self._step_wise and trace_type is not None: # Backwards compatibility
+            self._last_only = True if trace_type in ["dx3", "dx4"] else False # dx2 and dx1 are cumulative traces
 
         # Deals with positive integer tau's as a unit of dt
         if tau_mem is not None and isinstance(tau_mem, int):
@@ -73,7 +75,7 @@ class NeuronLayer(NeuronLayerProtocol):
         # Trace parameters
         self.tau_trace = tau_trace if tau_trace is not None else tau_mem if tau_mem is not None else dt
         self.trace_amp = trace_amp
-        self.trace_type = trace_type
+        # self.trace_type = trace_type
         self.beta_trace = np.exp(-self.dt / self.tau_trace)  # Decay rate for trace
         # Threshold parameters
         self.threshold = threshold
@@ -117,7 +119,7 @@ class NeuronLayer(NeuronLayerProtocol):
         # Check for spikes
         self._set_spike()
         # Update the time since last spike
-        self._update_tssp()
+        # self._update_tssp()
         # Update trace
         self._update_trace()
 
@@ -148,38 +150,46 @@ class NeuronLayer(NeuronLayerProtocol):
             self.spike = (self.membrane >= self.threshold)
 
     def _update_tssp(self):
-        if self._event_driven:
-            # Get indices of only neurons that spike, instead of performing calc on whole array
-            spk_idx = self.spike.nonzero()[0]
-            # For those that spikes, update peak *before* updating tssp (since we want to get decayed value before rise)
-            if self._last_only:
-                self.last_peak[spk_idx] = self.trace_amp
-            else:
-                # Cumulative trace
-                self.last_peak[spk_idx] = trace_x3(self.tssp[spk_idx], self.dt, self.tau_trace, self.last_peak[spk_idx]) + self.trace_amp
-            # Update time since last spike
-            self.tssp += 1
-            self.tssp[spk_idx] = 0
+        # if self._event_driven:
+        # Get indices of only neurons that spike, instead of performing calc on whole array
+        spk_idx = self.spike.nonzero()[0]
+        # For those that spikes, update peak _before_ updating tssp (since we want to get decayed value before rise)
+        if self._last_only:
+            # Most recent
+            self.last_peak[spk_idx] = self.trace_amp
+        else:
+            # Cumulative trace
+            self.last_peak[spk_idx] = trace_x3(self.tssp[spk_idx], self.dt, self.tau_trace, self.last_peak[spk_idx]) + self.trace_amp
+        # Update time since last spike
+        self.tssp += 1
+        self.tssp[spk_idx] = 0
 
-        elif self._step_wise:
-            if self.trace_type == "dx3":
-                self.tssp = np.where(self.spike, 0, self.tssp + 1)
+        # elif self._step_wise:
+        #     if self.trace_type == "dx3":
+        #         self.tssp = np.where(self.spike, 0, self.tssp + 1)
 
     def _update_trace(self):
         """
         Update the trace based on the time since last spike and the trace type.
         """
         if self._event_driven:
-            return
+            self._update_tssp()
         elif self._step_wise:
-            if self.trace_type == "dx1":
-                self._trace = self._trace + trace_dx1(self._trace, self.tau_trace/self.dt, self.spike, self.trace_amp)
-            elif self.trace_type == "dx2":
-                self._trace = self._trace + trace_dx2(self._trace, self.tau_trace/self.dt, self.spike, self.trace_amp)
-            elif self.trace_type == "dx3":
-                self._trace = trace_x3(self.tssp, self.dt, self.tau_trace, self.trace_amp)
-            elif self.trace_type == "dx4":
+            if self._last_only:
+                # Most recent
                 self._trace = np.where(self.spike, self.trace_amp, self._trace * self.beta_trace)
+            else:
+                # Cumulative
+                decay = self._trace * self.beta_trace
+                self._trace = np.where(self.spike, self.trace_amp + decay, decay)
+            # if self.trace_type == "dx1":
+            #     self._trace = self._trace + trace_dx1(self._trace, self.tau_trace/self.dt, self.spike, self.trace_amp)
+            # elif self.trace_type == "dx2":
+            #     self._trace = self._trace + trace_dx2(self._trace, self.tau_trace/self.dt, self.spike, self.trace_amp)
+            # elif self.trace_type == "dx3":
+            #     self._trace = trace_x3(self.tssp, self.dt, self.tau_trace, self.trace_amp)
+            # elif self.trace_type == "dx4":
+            #     self._trace = np.where(self.spike, self.trace_amp, self._trace * self.beta_trace)
         
     # def get_trace(self):
     #     """
