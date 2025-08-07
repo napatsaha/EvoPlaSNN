@@ -49,12 +49,12 @@ class STDP_Rule(LearningRule):
         # delta_w = self.F_pos(w) * spk_post * trace_pre - self.F_neg(w) * spk_pre * trace_post
         return delta_w
         
-    def update(self, synapse, reward=None) -> np.ndarray:
+    def update(self, synapse: 'SynapseLayerProtocol', reward=None) -> np.ndarray:
 
         w = synapse.weights
         w_shape = w.shape
         # Create tiled version of traces and spikes
-        trace_pre, trace_post = tile_array(w_shape, synapse.pre_layer.trace, synapse.post_layer.trace)
+        trace_pre, trace_post = tile_array(w_shape, synapse.pre_layer.get_trace(), synapse.post_layer.get_trace())
         spk_pre, spk_post = tile_array(w_shape, synapse.pre_layer.spike, synapse.post_layer.spike)
 
         dw = self._stdp_update(w, spk_pre, spk_post, trace_pre, trace_post)

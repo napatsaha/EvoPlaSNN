@@ -120,7 +120,7 @@ class NeuronLayerProtocol(Protocol):
     membrane: np.ndarray
     spike: np.ndarray
     tssp: np.ndarray
-    trace: np.ndarray
+    _trace: np.ndarray
 
     def __init__(self, size: int, *, tau_mem: float, tau_trace: float, dt: float, threshold: float, 
                  wta: bool, membrane_start: float, reset_mechanism: Literal["zero", "subtract"], 
