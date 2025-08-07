@@ -26,7 +26,7 @@ class Empty_Rule(LearningRule):
     def __init__(self):
         super().__init__()
 
-    def update(self, **kwargs) -> float:
+    def update(self, *args, **kwargs) -> float:
         # No update
         return 0.0
     

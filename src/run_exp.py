@@ -100,7 +100,7 @@ def run(search_config: str | Path, exp_dir: str | Path, num_search: int, num_rep
 
             new_df["run_name"] = run_name
             new_df["mean_fts"] = mean_fts
-            new_df["std_fts"] = mean_fts
+            new_df["std_fts"] = std_fts
             new_df["num_evals"] = num_evals
             new_df = new_df[["run_name", "mean_fts", "std_fts", "num_evals"] + old_columns.to_list()]
             new_df.to_csv(result_file, index=False, mode='a', header=False)
