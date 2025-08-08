@@ -78,7 +78,7 @@ def plot_spikes(simulator: 'SNNSimulator', x_scale: float = 0.2, y_scale: float 
         plt.savefig(savepath)
     if show:
         plt.show()
-    plt.close(fig)
+    # plt.close(fig)
 
 
 def plot_traces(simulator: 'SNNSimulator', x_scale: float = 0.2, y_scale: float = 0.8,
@@ -138,7 +138,7 @@ def plot_traces(simulator: 'SNNSimulator', x_scale: float = 0.2, y_scale: float 
         plt.savefig(savepath)
     if show:
         plt.show()
-    plt.close(fig)
+    # plt.close(fig)
 
 
 def plot_weights(simulator: 'SNNSimulator', div: int = 5, col_width: float = 6.0, row_height: float = 8.0,
@@ -173,7 +173,7 @@ def plot_weights(simulator: 'SNNSimulator', div: int = 5, col_width: float = 6.0
         plt.savefig(savepath)
     if show:
         plt.show()
-    plt.close(fig)
+    # plt.close(fig)
 
 
 def plot_weight_over_time(simulator: 'SNNSimulator', title="", x_min=None, x_max=None,
@@ -185,7 +185,8 @@ def plot_weight_over_time(simulator: 'SNNSimulator', title="", x_min=None, x_max
         nrow, ncol = simulator.weight_recorder.layer_shapes[L]
         w_mat = simulator.weight_recorder.values[L]
 
-        fig, axs = plt.subplots(nrow, ncol, figsize=(5*ncol, 3*nrow), sharex=True, sharey=True, gridspec_kw={"hspace": 0, "wspace": 0})
+        fig, axs = plt.subplots(nrow, ncol, figsize=(5*ncol, 3*nrow), sharex=True, sharey=True, gridspec_kw={"hspace": 0, "wspace": 0},
+                                squeeze=False)
         for i in range(nrow):
             for j in range(ncol):
                 ax = axs[i, j]
@@ -199,7 +200,7 @@ def plot_weight_over_time(simulator: 'SNNSimulator', title="", x_min=None, x_max
         plt.savefig(savepath)
     if show:
         plt.show()
-    plt.close(fig)
+    # plt.close(fig)
 
 
 def plot_weight_heatmap(simulator: 'SNNSimulator', *, x_scale: float = 0.2, y_scale: float = 0.8,
@@ -218,14 +219,14 @@ def plot_weight_heatmap(simulator: 'SNNSimulator', *, x_scale: float = 0.2, y_sc
     num_outputs = simulator.network.output_size
     num_inputs = simulator.network.input_size
     fig_size = ((t_max - t_min) * x_scale, num_outputs * num_inputs * y_scale)
-    fig, axs = plt.subplots(num_outputs, 1, figsize=fig_size, sharex=True, gridspec_kw={"hspace": 0.0})
+    fig, axs = plt.subplots(num_outputs, 1, figsize=fig_size, sharex=True, gridspec_kw={"hspace": 0.0}, squeeze=False)
     axs: List[Axes]
     for i in range(num_outputs):
-        ax = axs[i]
+        ax = axs[i, 0]
         m = ax.imshow(w_mat[:, i, t_min:t_max], aspect='auto', cmap=cmap, norm=mpl.colors.LogNorm() if log_scale else None)
         ax.xaxis.set_ticks(np.arange(0, t_max - t_min, 10), labels= np.arange(t_min, t_max, 10))
         ax.set_ylabel(f"Neuron {i}", fontsize=12)
-    axs[-1].set_xlabel("Time Steps", fontsize=12)
+    axs[-1, 0].set_xlabel("Time Steps", fontsize=12)
     fig.colorbar(m, ax=axs, orientation='vertical', label='Weight Value')
     fig.text(0.5, 1.05, f"Weight Heatmap", fontsize=16)
     fig.text(0.5, 1.02, f"Synapse Layer {synapse_layer}", fontsize=12)
@@ -233,7 +234,7 @@ def plot_weight_heatmap(simulator: 'SNNSimulator', *, x_scale: float = 0.2, y_sc
         plt.savefig(savepath)
     if show:
         plt.show()
-    plt.close(fig)
+    # plt.close(fig)
 
 
 def plot_eligibility_traces(simulator: 'SNNSimulator', *, x_scale: float = 0.2, y_scale: float = 0.8,
@@ -252,22 +253,23 @@ def plot_eligibility_traces(simulator: 'SNNSimulator', *, x_scale: float = 0.2, 
     num_outputs = simulator.network.output_size
     num_inputs = simulator.network.input_size
     fig_size = ((t_max - t_min) * x_scale, num_outputs * num_inputs * y_scale)
-    fig, axs = plt.subplots(num_outputs, 1, figsize=fig_size, sharex=True, layout="constrained", gridspec_kw={"hspace": 0.0})
+    fig, axs = plt.subplots(num_outputs, 1, figsize=fig_size, sharex=True, layout="constrained", gridspec_kw={"hspace": 0.0},
+                            squeeze=False)
 
     for i, j in enumerate(reversed(range(num_outputs))):
-        ax = axs[i]
+        ax = axs[i, 0]
         m = ax.imshow(eg[:, j, t_min:t_max], cmap=cmap, aspect='auto', origin="lower")
         ax.xaxis.set_ticks(np.arange(0, t_max - t_min, 10), labels= np.arange(t_min, t_max, 10))
         ax.set_ylabel(f'Neuron {j}')
 
     fig.colorbar(m, label='Eligibility Traces', ax=axs)
-    axs[-1].set_xlabel("Time steps")
+    axs[-1, 0].set_xlabel("Time steps")
     fig.suptitle(f"Eligibility Traces\nSynapse Layer {synapse_layer}", fontsize=16)
     if savepath is not None:
         plt.savefig(savepath)
     if show:
         plt.show()
-    plt.close(fig)
+    # plt.close(fig)
 
 
 def plot_membranes(simulator: 'SNNSimulator', col_width: float = 10.0, row_height: float = 2.5, title: str = None, plot_inputs: bool = True, 
@@ -321,7 +323,7 @@ def plot_membranes(simulator: 'SNNSimulator', col_width: float = 10.0, row_heigh
 
     if show:
         plt.show()
-    plt.close(fig)
+    # plt.close(fig)
 
 
 def plot_intermediate_fitness(simulator: 'SNN_Simulator', *, x_scale: float = 0.01, y_scale: float = 1.0, x_eps: int = 1,
@@ -360,7 +362,7 @@ def plot_intermediate_fitness(simulator: 'SNN_Simulator', *, x_scale: float = 0.
         plt.savefig(savepath)
     if show:
         plt.show()
-    plt.close(fig)
+    # plt.close(fig)
 
 
 ### Plotting functions for Evolutionary Results ###
@@ -410,7 +412,7 @@ def plot_fitness_generation(file_path: str | Path, *, estimator: str = "mean", e
         plt.savefig(savepath)
     if show:
         plt.show()
-    plt.close(fig)
+    # plt.close(fig)
 
 
 ## Plotting functions for entire experiment (containing multiple runs) ##
@@ -496,7 +498,7 @@ def plot_compare_run(exp_dir: str | Path, x_var: str, hue_var: str = None, col_v
         plt.savefig(savepath, dpi=300, bbox_inches='tight')
     if show:
         plt.show()
-    plt.close(fig)
+    # plt.close(fig)
 
 
 ### Helper functions ###
