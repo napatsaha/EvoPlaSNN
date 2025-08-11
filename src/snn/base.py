@@ -11,7 +11,7 @@ class SpikeGenerator(ABC):
     input_size: int
     rng: np.random.Generator
     count: int
-    current_class: int
+    _current_class: int
     num_classes: int
     _full_length: int
     _pattern_length: int
@@ -50,7 +50,7 @@ class SpikeGenerator(ABC):
         """
         Returns the current class label.
         """
-        return self.current_class
+        return self._current_class
 
     def is_static(self) -> bool:
         """

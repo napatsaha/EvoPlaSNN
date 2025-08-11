@@ -145,7 +145,7 @@ class BinaryClassGenerator(SpikeGenerator):
         self.reset()
 
     def reset(self):
-        self.current_class = 0 if self.starting_class == "ascending" else 1
+        self._current_class = 0 if self.starting_class == "ascending" else 1
         self.count = 0
         self.switch = False
         self._finished = False
@@ -153,13 +153,13 @@ class BinaryClassGenerator(SpikeGenerator):
 
     def _generate_spikes(self):
         self.count += 1
-        gen = self.generators[self.current_class]
+        gen = self.generators[self._current_class]
         spikes = gen.generate()
         finished = gen.finished
         self.switch = self.count >= len(gen)
         if self.switch:
             self._switch_class()
-            self.generators[self.current_class].reset()
+            self.generators[self._current_class].reset()
             self.switch = False
             self.count = 0
         return spikes, finished
@@ -167,7 +167,7 @@ class BinaryClassGenerator(SpikeGenerator):
     def _switch_class(self):
         r = self.rng.random()
         if r < self.p:
-            self.current_class = 1 - self.current_class
+            self._current_class = 1 - self._current_class
         # self.current_class = int(r < self.p)
     
     def generate(self) -> np.ndarray:
@@ -187,7 +187,7 @@ class BinaryClassGenerator(SpikeGenerator):
         if not self._ready:
             return None
         else:
-            return self.current_class
+            return self._current_class
 
     def __len__(self):
         return self._full_length
@@ -443,18 +443,18 @@ class CustomArrayGenerator(SpikeGenerator):
 
     def reset(self):
         if self._starting_class is None:
-            self.current_class = self.rng.integers(0, self.num_classes)
+            self._current_class = self.rng.integers(0, self.num_classes)
         else:
             if self._starting_class < 0 or self._starting_class >= self.num_classes:
                 raise ValueError(f"Starting class must be between 0 and {self.num_classes - 1}")
-            self.current_class = self._starting_class
+            self._current_class = self._starting_class
         self.count = 0
         self._finished = False
 
     def switch(self):
         r = self.rng.random()
         if r < self.p:
-            self.current_class = (self.current_class + 1) % self.num_classes
+            self._current_class = (self._current_class + 1) % self.num_classes
 
     def generate(self) -> np.ndarray:
         idx = self.count % self._full_length
@@ -473,7 +473,7 @@ class CustomArrayGenerator(SpikeGenerator):
         self.count += 1
 
         # Slice stored array using recently resetted class
-        spikes = self.array[self.current_class, :, idx]
+        spikes = self.array[self._current_class, :, idx]
         return spikes
     
     # def get_label(self) -> int:
@@ -494,18 +494,25 @@ class CustomTimingGenerator(SpikeGenerator):
     """
     A spike generator that takes in a list of classes (represented as timings) and perform modulations (jittering, failure-rate) during generation of each sample.
     """
-    timings: List[np.ndarray]
+    patterns: List[np.ndarray]
     
-    def __init__(self, input_size: int, duration: int, timings: List[np.ndarray], *, spacing: int = None,
+    def __init__(self, input_size: int, duration: int, patterns: List[np.ndarray], labels: List[int] = None, *, spacing: int = None,
                  failure_rate: float = 0.0, jitter_std: int = 0, randomise_class: bool = True,
                  seed=None):
         super().__init__(input_size, seed)
-        self.num_classes = len(timings)
+        # Base parameters
         self.spacing = max(0, int(spacing)) if spacing is not None else 0
         self._pattern_length = duration
         self._full_length = self._pattern_length + self.spacing
-        # TODO: Validate timings
-        self.timings = timings.copy()
+
+        # Init classes separately if specified, otherwise use length of timing
+        self._validate_labels(patterns, labels)
+        self.num_classes = len(patterns) if labels is None else len(set(labels))
+        self.labels = labels if labels is not None else list(range(self.num_classes))
+        self.num_samples = len(patterns)
+
+        # Make a copy of raw timing data to prevent modifications like jittering
+        self.patterns = patterns.copy()
         self._validate_timings()
         self.array = np.zeros((input_size, self._full_length), dtype=np.int8)
 
@@ -520,11 +527,21 @@ class CustomTimingGenerator(SpikeGenerator):
         # Tracking parameters
         self.count = 0
         self._finished = False
-        self.current_class = None
+        self._current_class = None
+        self._sample_id = None
         self.reset()
 
+    def _validate_labels(self, timings, labels):
+        if labels is not None:
+            assert len(labels) == len(timings), f"If specified, the labels array must have the same length as the timings array. Got {len(labels)} classes and {len(timings)} timings."
+            assert all(label >= 0 for label in labels), "All labels must be non-negative integers."
+            if isinstance(labels, np.ndarray):
+                assert np.isdtype(labels.dtype, np.int_), "Labels must be integers."
+            else:
+                assert all(isinstance(label, int) for label in labels), "All labels must be integers."
+
     def _validate_timings(self):
-        for timing in self.timings:
+        for timing in self.patterns:
             if timing.size == 0:
                 # Ignore empty timings
                 continue
@@ -543,52 +560,69 @@ class CustomTimingGenerator(SpikeGenerator):
         """
         Updates the timings with a new list of timings.
         """
-        self.timings = timings.copy()
+        self.patterns = timings.copy()
         self._validate_timings()
 
     def reset(self):
         self.count = 0
         self._finished = False
         self.array.fill(0)
-        self.current_class = self.rng.integers(0, self.num_classes) if self.randomise_class else 0
-        self.setup_array(self.current_class)
+        self._current_class = 0
+        self._sample_id = 0
+        # pattern_id = self.rng.integers(0, self.num_samples) if self.randomise_class else 0
+        pattern_id = self.sample_pattern_id(reset=True)
+        self.setup_array(pattern_id)
 
-    def setup_array(self, class_id: int):
+    def setup_array(self, pattern_id: int):
         """
         Intrenally fill up array based on timings of chosen class.
         """
         self.array.fill(0)
 
-        timings = self.timings[class_id].copy()
+        # Sample pattern and labels by sample id
+
+        class_id = self.labels[pattern_id]
+        pattern = self.patterns[pattern_id].copy()
+
+        # Record id's
+        self._current_class = class_id
+        self._sample_id = pattern_id
 
         # Check if timings is empty
-        if timings.size == 0:
+        if pattern.size == 0:
             return
 
         # Apply spike failure
         if self._failure:
-            len_timings = timings.shape[0]
-            timings = timings[self.rng.binomial(1, p=1 - self.failure_rate, size=len_timings).astype(bool)]
+            len_timings = pattern.shape[0]
+            pattern = pattern[self.rng.binomial(1, p=1 - self.failure_rate, size=len_timings).astype(bool)]
         # Apply jitter
         if self._jitter:
-            len_timings = timings.shape[0] # Length may be reduced after applying failure
+            len_timings = pattern.shape[0] # Length may be reduced after applying failure
             # Sample timiing deviation from normal distribution
             jitter = np.round(self.rng.normal(0, scale=self.jitter_std, size=len_timings)).astype(np.int_)
             # Trim to make sure timings is within range
-            timings[:, 1] = np.clip(timings[:, 1] + jitter, 0, self._pattern_length - 1)
+            pattern[:, 1] = np.clip(pattern[:, 1] + jitter, 0, self._pattern_length - 1)
 
         # Fill up array with spikes
-        np.put(self.array, np.ravel_multi_index(timings.T, self.array.shape), 1)
+        np.put(self.array, np.ravel_multi_index(pattern.T, self.array.shape), 1)
+
+    def sample_pattern_id(self, reset: bool = False) -> int:
+        if self.randomise_class:
+            pattern_id = self.rng.integers(0, self.num_samples)
+        else:
+            if reset:
+                pattern_id = 0
+            else:
+                pattern_id = (self._sample_id + 1) % self.num_samples
+        return pattern_id
 
     def switch(self):
-        if self.randomise_class:
-            self.current_class = self.rng.integers(0, self.num_classes)
-        else:
-            self.current_class = (self.current_class + 1) % self.num_classes
-        self.setup_array(self.current_class)
+        pattern_id = self.sample_pattern_id()
+        self.setup_array(pattern_id)
 
     def generate(self) -> np.ndarray:
-        if self.current_class is None:
+        if self._current_class is None:
             self.reset()
 
         # Check if the current pattern is finished and switch classes if necessary
