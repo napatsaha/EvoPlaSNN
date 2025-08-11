@@ -496,8 +496,9 @@ class CustomTimingGenerator(SpikeGenerator):
     """
     patterns: List[np.ndarray]
     
-    def __init__(self, input_size: int, duration: int, patterns: List[np.ndarray], labels: List[int] = None, *, spacing: int = None,
+    def __init__(self, input_size: int, duration: int, patterns: List[np.ndarray] = None, labels: List[int] = None, *, spacing: int = None,
                  failure_rate: float = 0.0, jitter_std: int = 0, randomise_class: bool = True,
+                 timings: List[np.ndarray] = None,
                  seed=None):
         super().__init__(input_size, seed)
         # Base parameters
@@ -513,6 +514,8 @@ class CustomTimingGenerator(SpikeGenerator):
         self.num_samples = len(patterns)
 
         # Make a copy of raw timing data to prevent modifications like jittering
+        if timings is not None:
+            patterns = timings # Backward compatibility
         self.patterns = patterns.copy()
         self._validate_timings()
         self.array = np.zeros((input_size, self._full_length), dtype=np.int8)
