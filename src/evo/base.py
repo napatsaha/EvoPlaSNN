@@ -55,7 +55,7 @@ class Evaluator(Protocol):
         """
         pass
 
-    def update_classes(self) -> None:
+    def generate_new_classes(self) -> None:
         """
         Update set of classes used for spike generation.
         Meant to be called at beginning of each generation.

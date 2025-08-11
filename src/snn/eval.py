@@ -8,7 +8,8 @@ import numpy as np
 from evo.base import Evaluator
 from snn import SNN, SNNSimulator
 # from snn.spikegen import BinaryClassGenerator
-from snn.spikegen import create_spikegen, create_poisson_class_timing, create_binary_class_timing
+import snn.spikegen as spkgen
+# from snn.spikegen import create_spikegen, create_poisson_class_timing, create_binary_class_timing
 # import snn.spikegen
 
 from lrule import ANN_Rule, LearningRule
@@ -41,26 +42,39 @@ class SNN_Evaluator(Evaluator):
             input_size = params["snn_params"].get("input_size", None)
             self.pattern_params["input_size"] = input_size
             
-            self.pattern_type = self.pattern_params.pop("type", "poisson")
+            self.pattern_type = self.pattern_params.pop("type", "poisson").lower()
             if self.pattern_type == "poisson":
-                self.classes = create_poisson_class_timing(
+                self.classes = spkgen.create_poisson_class_timing(
                     **self.pattern_params
                 )
-                self.spikegen = create_spikegen(
+                self.spikegen = spkgen.create_spikegen(
                     params["spikegen_params"].pop("class", "CustomTimingGenerator"),
                     input_size=input_size,
                     duration=self.pattern_params.get("duration"),
                     timings=self.classes[0],
                     **params["spikegen_params"]
                 )
+            elif self.pattern_type == "poisson_b":
+                patterns, labels = spkgen.create_poisson_patterns_and_labels(
+                    **self.pattern_params
+                )
+                self.classes = patterns
+                self.spikegen = spkgen.create_spikegen(
+                    params["spikegen_params"].pop("class", "CustomTimingGenerator"),
+                    input_size=input_size,
+                    duration=self.pattern_params.get("duration"),
+                    timings=self.classes,
+                    labels=labels,
+                    **params["spikegen_params"]
+                )
             elif self.pattern_type == "binary":
-                self.classes = create_binary_class_timing(
+                self.classes = spkgen.create_binary_class_timing(
                     **self.pattern_params
                 )
                 # Create spike generator with binary class timing
                 interval = self.pattern_params.get("interval", 1)
                 duration = (input_size - 1) * interval + 1
-                self.spikegen = create_spikegen(
+                self.spikegen = spkgen.create_spikegen(
                     params["spikegen_params"].pop("class", "CustomTimingGenerator"),
                     input_size=input_size,
                     duration=duration,
@@ -71,7 +85,7 @@ class SNN_Evaluator(Evaluator):
             else:
                 raise ValueError(f"Unknown pattern type: {self.pattern_type}")
         else:
-            self.spikegen = create_spikegen(params["spikegen_params"].pop("class", "BinaryClassGenerator"), 
+            self.spikegen = spkgen.create_spikegen(params["spikegen_params"].pop("class", "BinaryClassGenerator"), 
                                             input_size=params["snn_params"].get("input_size"),
                                             **params["spikegen_params"])
         self.arule = ANN_Rule(**params["arule_params"]) if learning_rule is None else learning_rule
@@ -162,7 +176,8 @@ class SNN_Evaluator(Evaluator):
 
             # Generate new set of spike pattern sets
             if self._update_inputs:
-                self.spikegen.update_classes(self.classes[i % len(self.classes)])
+                # self.spikegen.update_classes(self.classes[i % len(self.classes)])
+                self.generate_new_classes()
 
             t0 = time.time()
             self.simulator.run(self.num_simulation_steps)
@@ -194,18 +209,24 @@ class SNN_Evaluator(Evaluator):
         else:
             return avg_fitness
     
-    def update_classes(self, num_sets: int = None):
+    def generate_new_classes(self, num_sets: int = None):
         params = self.pattern_params.copy()
         if num_sets is not None:
             if hasattr(params, "num_sets"):
                 params["num_sets"] = num_sets
         if self._update_inputs:
             if self.pattern_type == "poisson":
-                self.classes = create_poisson_class_timing(
+                self.classes = spkgen.create_poisson_class_timing(
                     **params
                 )
+            elif self.pattern_type == "poisson_b":
+                patterns, labels = spkgen.create_poisson_patterns_and_labels(
+                    **params
+                )
+                self.classes = patterns
+                self.spikegen.update_classes(self.classes, labels=labels)
             elif self.pattern_type == "binary":
-                self.classes = create_binary_class_timing(
+                self.classes = spkgen.create_binary_class_timing(
                     **params
                 )
             # Record generated classes

@@ -77,7 +77,7 @@ class EvoManager:
                 fitness_list = np.zeros(self.solver.popsize)
 
                 # Update set of classes
-                self.evaluator.update_classes()
+                self.evaluator.generate_new_classes()
                 if self.record_classes:
                     self.evaluator.write_classes(self.results_path, gen_count)
 

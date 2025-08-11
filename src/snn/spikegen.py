@@ -1,5 +1,5 @@
 
-from typing import List, Literal
+from typing import List, Literal, Tuple
 import numpy as np
 
 
@@ -506,7 +506,8 @@ class CustomTimingGenerator(SpikeGenerator):
         self._full_length = self._pattern_length + self.spacing
 
         # Init classes separately if specified, otherwise use length of timing
-        self._validate_labels(patterns, labels)
+        if labels is not None:
+            self._validate_labels(patterns, labels)
         self.num_classes = len(patterns) if labels is None else len(set(labels))
         self.labels = labels if labels is not None else list(range(self.num_classes))
         self.num_samples = len(patterns)
@@ -532,13 +533,12 @@ class CustomTimingGenerator(SpikeGenerator):
         self.reset()
 
     def _validate_labels(self, timings, labels):
-        if labels is not None:
-            assert len(labels) == len(timings), f"If specified, the labels array must have the same length as the timings array. Got {len(labels)} classes and {len(timings)} timings."
-            assert all(label >= 0 for label in labels), "All labels must be non-negative integers."
-            if isinstance(labels, np.ndarray):
-                assert np.isdtype(labels.dtype, np.int_), "Labels must be integers."
-            else:
-                assert all(isinstance(label, int) for label in labels), "All labels must be integers."
+        assert len(labels) == len(timings), f"If specified, the labels array must have the same length as the timings array. Got {len(labels)} classes and {len(timings)} timings."
+        assert all(label >= 0 for label in labels), "All labels must be non-negative integers."
+        if isinstance(labels, np.ndarray):
+            assert np.isdtype(labels.dtype, np.int_), "Labels must be integers."
+        else:
+            assert all(isinstance(label, int) for label in labels), "All labels must be integers."
 
     def _validate_timings(self):
         for timing in self.patterns:
@@ -556,10 +556,14 @@ class CustomTimingGenerator(SpikeGenerator):
             # Fifth check if pairings are unique
             assert np.all(np.unique(timing, axis=0, return_counts=True)[1] == 1), "Each (neuron, time) pairing must be unique."
 
-    def update_classes(self, timings: List[np.ndarray]) -> None:
+    def update_classes(self, timings: List[np.ndarray], labels: List[int] = None) -> None:
         """
         Updates the timings with a new list of timings.
         """
+        if labels is not None:
+            self._validate_labels(timings, labels)
+            self.labels = labels
+
         self.patterns = timings.copy()
         self._validate_timings()
 
@@ -774,7 +778,7 @@ _poisson_dict = {
 
 def create_poisson_class_timing(input_size, duration, rate, *, 
                                 dt=1e-3, num_classes=2, num_sets: int= 1, simplify: bool= True,
-                                rng: np.random.default_rng=None,
+                                rng: np.random.Generator=None,
                                 method: Literal["threshold", "interval", "count"] = "threshold") -> List[np.ndarray]:
     """
     Creates a list of Poisson spike timings for classification tasks.
@@ -808,6 +812,40 @@ def create_poisson_class_timing(input_size, duration, rate, *,
     else:
         return sets
 
+def create_poisson_patterns_and_labels(
+    input_size: int, duration: int, rate: float, *,
+    dt: float = 1e-3, num_classes: int = 2, num_stimuli: int = 5,
+    rng: np.random.Generator = None,
+    method: Literal["threshold", "interval", "count"] = "threshold"
+) -> Tuple[List[np.ndarray], np.ndarray]:
+    """
+    Creates a list of $$M$$ Poisson spike patterns and $$C$$ randomised labels.
+    
+    Args:
+        input_size (int): The number of neurons in the input layer.
+        duration (int): The total duration of the spike pattern.
+        rate (float): The average firing rate of spikes per neuron.
+        dt (float): The time step size.
+        num_classes (int): $$C$$, The number of class labels to assign to each stimuli.
+        num_stimuli (int): $$M$$, The total number of patterns to generate (regardless of number of class labels).
+        rng (np.random.default_rng): Random number generator instance.
+        method (str): Method to use for generating Poisson spike timings.
+
+    Returns:
+        patterns, labels (List[np.ndarray], np.ndarray):
+            - patterns: A list of spike patterns, where each pattern is a 2D array of shape (input_size, duration).
+            - labels: A numpy array of randomised class labels for each pattern.
+    """
+    if rng is None:
+        rng = np.random.default_rng()
+    patterns = create_poisson_class_timing(input_size, duration, rate, dt=dt, 
+                                           num_classes=num_stimuli, num_sets=1,
+                                           simplify=True, rng=rng, method=method)
+
+    # Generate random labels for each timing
+    labels = rng.binomial(num_classes - 1, p=0.5, size=num_stimuli)
+
+    return patterns, labels
 
 
 if __name__ == "__main__":
