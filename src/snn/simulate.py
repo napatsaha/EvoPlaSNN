@@ -145,8 +145,9 @@ class SNNSimulator:
                 if self._supervised and self.spike_generator.ready:
                     label = self.spike_generator.get_label()
                     output = self.decoder.decode()
-                    reward = self.decoder.calculate_reward(label, output)
-                    self.fitnessor.record(label, output, reward)
+                    pred = self.decoder.predict(output)
+                    reward = self.decoder.calculate_reward(label, pred)
+                    self.fitnessor.record(label=label, output=output, reward=reward, pred=pred) # Prevent changing of arg order
                     # self.reward_collector.append((t, label, reward))
                     self.network.update_synapses(reward=reward)
 
@@ -218,17 +219,17 @@ class SNNSimulator:
         else:
             return None
 
-    def get_intermediate_fitness(self) -> List[float] | None:
+    def get_intermediate_fitness(self, use_portion: bool = False) -> List[float] | None:
         if self._post_process_type == 0:
             if self.fitnessor is None:
                 Warning("Fitnessor is not set. Intermediate fitness cannot be calculated.")
                 return None
-            return self.fitnessor.get_intermediate_fitness()
+            return self.fitnessor.get_intermediate_fitness(use_portion=use_portion)
         elif self._post_process_type == 1:
             if self.collector is None:
                 Warning("Collector is not set. Intermediate fitness cannot be calculated.")
                 return None
-            return self.collector.get_intermediate_fitness()
+            return self.collector.get_intermediate_fitness(use_portion=use_portion)
         else:
             return None
 

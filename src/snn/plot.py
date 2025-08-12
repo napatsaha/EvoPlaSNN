@@ -329,7 +329,7 @@ def plot_membranes(simulator: 'SNNSimulator', col_width: float = 10.0, row_heigh
 def plot_intermediate_fitness(simulator: 'SNN_Simulator', *, x_scale: float = 0.01, y_scale: float = 1.0, x_eps: int = 1,
                               t_min: int = None, t_max: int = None, t_range: int = None, window_size: int = 10,
                               savepath: str | Path = None, show: bool = True):
-    fts = simulator.get_intermediate_fitness()
+    fts = simulator.get_intermediate_fitness(use_portion=False)
     ft = simulator.get_fitness()
     T = simulator.num_steps
     # ts = np.linspace(0, T, len(fts))

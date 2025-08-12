@@ -64,6 +64,18 @@ class CollectorProtocol(Protocol):
         """
         pass
 
+    def get_intermediate_fitness(self, use_portion: bool = False) -> list[float]:
+        """
+        Get the intermediate fitnesses calculated during the collection process.
+        
+        Args:
+            use_portion (bool): Whether to use a portion of the collected fitnesses or not.
+        
+        Returns:
+            list[float]: The intermediate fitnesses.
+        """
+        pass
+
     @property
     def minimise(self) -> bool:
         """
@@ -461,7 +473,7 @@ class SimpleCollector(CollectorProtocol):
         else:
             return 0.0
         
-    def get_intermediate_fitness(self) -> list[float]:
+    def get_intermediate_fitness(self, use_portion: bool = False) -> list[float]:
         """
         Get the intermediate fitnesses calculated during the collection process.
         This is useful for tracking progress during training.

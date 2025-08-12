@@ -204,11 +204,11 @@ class SNN_Evaluator(Evaluator):
 
             # Final Fitness
             fitness = self.simulator.get_fitness()
-            # Get intermediate fitness across samples
-            intermediate_fitness = self.simulator.get_intermediate_fitness()
             fitnesses.append(fitness)
             if self._log_info:
                 self.logger.info(f"Trial {i+1}/{num_trials}: Finished Evaluation. Time taken: {t1 - t0:.4f} seconds.")
+                # Get intermediate fitness across samples
+                intermediate_fitness = self.simulator.get_intermediate_fitness(use_portion=True)
                 self.write_trial(self.gen_count, self.inv_count, i, fitness, intermediate_fitness)
         
         if return_fitness_list:

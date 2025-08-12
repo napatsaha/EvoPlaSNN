@@ -8,7 +8,9 @@ decoder_dict = {
     "final": "FinalStepDecoder",
     "final_step": "FinalStepDecoder",
     "rate": "RateDecoder",
-    "latency": "LatencyDecoder"
+    "latency": "LatencyDecoder",
+    "single_output": "SingleOutputDecoder",
+    "spike_no_spike": "SpikeNoSpikeDecoder",
 }
 
 fitnessor_dict = {
@@ -81,6 +83,22 @@ class Decoder(Protocol):
         pass
 
     def decode(self, return_raw: bool = False) -> Union[int | None, Tuple[int, np.ndarray]]:
+        """
+        Decode spike train from each output neuron into a scalar value.
+        """
+        pass
+
+    def predict(self, output: np.ndarray) -> int | None:
+        """
+        Predict the class based on the decoded output.
+        If there is a tie, return None.
+        """
+        pass
+
+    def calculate_reward(self, label: int, pred: int) -> float:
+        """
+        Calculate the reward based on the decoded output and given target label.
+        """
         pass
 
     def reset(self) -> None:
@@ -112,28 +130,46 @@ class BaseFitnessor(Fitnessor):
     """
     minimise: bool = None
     
-    def __init__(self, num_classes: int, portion: float = 1.0):
+    def __init__(self, num_classes: int, portion: float = 1.0, 
+                 record_rewards: bool = True, record_outputs: bool = True, 
+                 record_labels: bool = True, record_preds: bool = True
+                 ):
         self.num_classes = num_classes
         self.portion = min(1.0, max(0.0, portion)) 
-        self.reward_buffer = []
-        self.output_buffer = []
-        self.label_buffer = []
+        self._record_rewards = record_rewards
+        self._record_outputs = record_outputs
+        self._record_labels = record_labels
+        self._record_preds = record_preds
+        self.reward_buffer = [] if self._record_rewards else None
+        self.output_buffer = [] if self._record_outputs else None
+        self.label_buffer = [] if self._record_labels else None
+        self.pred_buffer = [] if self._record_preds else None
 
     def reset(self) -> None:
         """
         Reset the reward manager buffers.
         """
-        self.reward_buffer.clear()
-        self.output_buffer.clear()
-        self.label_buffer.clear()
+        if self._record_rewards:
+            self.reward_buffer.clear()
+        if self._record_outputs:
+            self.output_buffer.clear()
+        if self._record_labels:
+            self.label_buffer.clear()
+        if self._record_preds:
+            self.pred_buffer.clear()
     
-    def record(self, label, output, reward):
+    def record(self, label, output, reward, pred):
         """
         Record the label, predicted output, and reward.
         """
-        self.reward_buffer.append(reward)
-        self.label_buffer.append(label)
-        self.output_buffer.append(output)
+        if self._record_rewards:
+            self.reward_buffer.append(reward)
+        if self._record_outputs:
+            self.output_buffer.append(output)
+        if self._record_labels:
+            self.label_buffer.append(label)
+        if self._record_preds:
+            self.pred_buffer.append(pred)
 
     @override
     def calculate_fitness(self, return_array: bool = False) -> float:
@@ -183,11 +219,32 @@ class MeanRewardFitnessor(BaseFitnessor):
     """
     A fitnessor that calculates the mean reward from the recorded rewards.
     """
-    def __init__(self, num_classes: int, portion: float = 1.0):
-        super().__init__(num_classes, portion)
+    def __init__(self, num_classes: int, portion: float = 1.0, record_labels=False, record_outputs=False, record_preds=False):
+        super().__init__(num_classes, portion, record_labels=record_labels,
+                         record_outputs=record_outputs, record_preds=record_preds)
         self.minimise = False  # Mean reward is typically maximised
 
-    def _calculate_fitness(self, outputs: np.ndarray, labels: np.ndarray, return_array: bool = False) -> np.ndarray:
+    @override
+    def calculate_fitness(self, return_array: bool = False, use_portion: bool = True) -> float:
+        """
+        Calculate fitness for entire trial.
+        """
+        fitnesses = self._calculate_fitness()
+        idx = int((1 - self.portion) * len(fitnesses)) if use_portion else 0
+        if return_array:
+            return fitnesses[idx:]
+        else:
+            return self._aggregate(fitnesses[idx:])
+
+    @override
+    def get_intermediate_fitness(self, use_portion: bool = True) -> List[float]:
+        """
+        Get the intermediate fitness values for the current trial.
+        This is useful for tracking progress during the simulation.
+        """
+        return self.calculate_fitness(return_array=True, use_portion=use_portion)
+
+    def _calculate_fitness(self) -> np.ndarray:
         """
         Calculate the mean reward from the recorded rewards.
         """
@@ -362,11 +419,11 @@ class BaseDecoder(Decoder):
         """
         raise NotImplementedError("Subclasses should implement this method.")
     
-    def calculate_reward(self, label: int, output: np.ndarray) -> float:
+    def calculate_reward(self, label: int, pred: int) -> float:
         """
         Calculate the reward based on the decoded output and given target label.
         """
-        pred = self.predict(output)
+        # pred = self.predict(output)
 
         reward = self._reward_func(label, pred)
 
@@ -401,7 +458,7 @@ class BaseDecoder(Decoder):
 
 class SingleOutputDecoder(BaseDecoder):
     """
-    A Spike / No-spike that only takes information from a single output neuron.
+    A Spike / No-spike Decoder that only takes information from a single output neuron.  
     The Decoder will predict one of two classes, based on whether or not that neuron has spiked within the duration.
     """
     def __init__(self, buffer_size, neuron_size, **kwargs):
@@ -415,6 +472,23 @@ class SingleOutputDecoder(BaseDecoder):
     @override
     def predict(self, output):
         return output
+
+
+class SpikeNoSpikeDecoder(BaseDecoder):
+    """
+    A Spike / No-spike that can use information from multiple output neurons.  
+    Makes prediction based on whether the number of spiking neurons is greater than half.
+    """
+    def __init__(self, buffer_size, neuron_size, **kwargs):
+        super().__init__(buffer_size, neuron_size, **kwargs)
+
+    @override
+    def _decode(self) -> np.ndarray:
+        return (self.buffer.sum(axis=1) > 0).astype(int)
+    
+    @override
+    def predict(self, output):
+        return 1 if output.sum(axis=0) > self.neuron_size / 2 else 0
 
 
 class FinalStepDecoder(BaseDecoder):
