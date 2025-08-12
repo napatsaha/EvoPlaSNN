@@ -505,7 +505,9 @@ class CustomTimingGenerator(SpikeGenerator):
         self.spacing = max(0, int(spacing)) if spacing is not None else 0
         self._pattern_length = duration
         self._full_length = self._pattern_length + self.spacing
-
+        if timings is not None:
+            patterns = timings # Backward compatibility
+            
         # Init classes separately if specified, otherwise use length of timing
         if labels is not None:
             self._validate_labels(patterns, labels)
@@ -514,8 +516,7 @@ class CustomTimingGenerator(SpikeGenerator):
         self.num_samples = len(patterns)
 
         # Make a copy of raw timing data to prevent modifications like jittering
-        if timings is not None:
-            patterns = timings # Backward compatibility
+
         self.patterns = patterns.copy()
         self._validate_timings()
         self.array = np.zeros((input_size, self._full_length), dtype=np.int8)

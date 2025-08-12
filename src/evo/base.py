@@ -55,10 +55,31 @@ class Evaluator(Protocol):
         """
         pass
 
-    def generate_new_classes(self) -> None:
+    # def generate_new_classes(self) -> None:
+    #     """
+    #     Update set of classes used for spike generation.
+    #     Meant to be called at beginning of each generation.
+    #     """
+    #     pass
+
+    def setup_generation(self, gen_count: int, **kwargs):
         """
-        Update set of classes used for spike generation.
-        Meant to be called at beginning of each generation.
+        Sets up at the beginning of each generation.  
+        To be called outside the class (i.e. by `Manager`), before whole population is to be evaluated.
+        """
+        pass
+
+    def setup_individual(self, inv_count: int, **kwargs):
+        """
+        Sets up at the beginning of each individual evaluation.  
+        To be called inside the class (within `evaluate()`), before trial evaluation loop is begun.
+        """
+        pass
+
+    def setup_trial(self, trial_count: int, **kwargs):
+        """
+        Sets up at the beginning of each trial evaluation.  
+        To be called inside the class (within `evaluate()`), at the start of each iteration of the trial loop.
         """
         pass
 

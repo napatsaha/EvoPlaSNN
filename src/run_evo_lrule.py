@@ -176,7 +176,7 @@ def eval(results_path: Path | str, num_steps: int = None, rule_id: int = 1, num_
         log_info=False
     )
 
-    evaluator.generate_new_classes(num_sets=num_evals)
+    evaluator.setup_generation(gen_count=0, num_sets=num_evals)
     fitnesses = evaluator.evaluate(num_trials=num_evals, return_fitness_list=True)
     if save_results:
         with open(results_path / f"{prefix}_eval_result.csv", "w") as f:
@@ -200,7 +200,7 @@ def eval(results_path: Path | str, num_steps: int = None, rule_id: int = 1, num_
 
     # Plotting
     if save_plots:
-        evaluator.generate_new_classes()
+        evaluator.setup_trial(trial_count=0)
         simulator = evaluator.simulator
         simulator.reset()
         simulator.run(T)

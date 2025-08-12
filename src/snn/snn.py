@@ -18,6 +18,7 @@ class SNN:
     def __init__(self, input_size: int, hidden_size: list[int] | int | None, output_size: int, dt, *, 
                  learning_rule: LearningRule = None, synapse_params: dict = None, neuron_params: dict = None,
                  winner_take_all: bool = False, soft_reset: bool = False,
+                 sim_method: Literal["event-driven", "step-wise"] = "step-wise",
                 #  tau_mem: float | List[float] = 5e-3, tau_trace: float | List[float] = 1e-1, threshold: float | List[float] = 1.0, 
                 #  membrane_start: float = 0.0, reset_mechanism = "subtract"
                  ):
@@ -32,8 +33,11 @@ class SNN:
         # Learning rule
         self.learning_rule = learning_rule if learning_rule is not None else Empty_Rule()
 
-        # Time related parameters
+        # Simulation related parameters
         self.dt = dt
+        self.sim_method = sim_method
+        if self.sim_method not in ["event-driven", "step-wise"]:
+            raise ValueError(f"Invalid simulation method: {self.sim_method}. Choose 'event-driven' or 'step-wise'.")
 
         # Store neuron and synapse parameters
         self.winner_take_all = winner_take_all
@@ -52,11 +56,9 @@ class SNN:
                 self.neuron_params[i]["wta"] = True
             else:
                 self.neuron_params[i]["wta"] = False
-            layer = NeuronLayer(layer_size, dt=self.dt, **self.neuron_params[i]
-                                # tau_mem=tau_mem if isinstance(tau_mem, float) else tau_mem[i],
-                                # tau_trace=tau_trace if isinstance(tau_trace, float) else tau_trace[i],
-                                # threshold=threshold if isinstance(threshold, float) else threshold[i],
-                                # membrane_start=membrane_start, reset_mechanism=reset_mechanism
+            layer = NeuronLayer(layer_size, dt=self.dt,
+                                sim_method=self.sim_method, 
+                                **self.neuron_params[i]
                                 )
             self.neuron_layers.append(layer)
 
@@ -66,7 +68,7 @@ class SNN:
             pre_layer = self.neuron_layers[i]
             post_layer = self.neuron_layers[i + 1]
             synapse = SynapseLayer(pre_layer, post_layer, learning_rule=self.learning_rule, 
-                                   dt=self.dt,
+                                   dt=self.dt, sim_method=self.sim_method,
                                    **self.synapse_params)
             self.synapse_layers.append(synapse)
 

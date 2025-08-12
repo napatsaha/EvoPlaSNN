@@ -81,8 +81,12 @@ class EvoManager:
                 # if self.record_classes:
                 #     self.evaluator.write_classes(self.results_path, gen_count)
 
+                # Set up evaluator before start of evaluation
+                self.evaluator.setup_generation(gen_count=gen_count)
+
                 # Evaluate solution
                 for i, solution in tqdm(enumerate(solutions), desc="Populations", total=self.solver.popsize, position=1, leave=False):
+                    self.evaluator.setup_individual(inv_count=i)
                     fitness_list[i] = self.evaluator.evaluate(solution, num_trials=self.num_trials, gen_count=gen_count, indiv_count=i)
 
                 # Inform solver about fitnesses

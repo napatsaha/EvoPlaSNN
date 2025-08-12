@@ -207,6 +207,13 @@ class NeuronLayer(NeuronLayerProtocol):
             else:
                 return trace_x3(self.tssp[idx], self.dt, self.tau_trace, self.last_peak[idx])
 
+    @property
+    def trace(self) -> np.ndarray:
+        """
+        Returns the trace of the neuron layer.
+        """
+        return self.get_trace()
+
     def __repr__(self):
         return f"NeuronLayer(size={self.size}, tau_mem={self.tau_mem}, tau_trace={self.tau_trace}, threshold={self.threshold}, wta={self.wta})"
     def __str__(self):
