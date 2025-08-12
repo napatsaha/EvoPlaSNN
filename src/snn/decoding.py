@@ -283,7 +283,7 @@ class BaseDecoder(Decoder):
     """
     Deals with converting a spike train from each output neuron into a scalar value.
     """
-    def __init__(self, buffer_size: int, neuron_size: int, #fitness_type: Literal["reward", "mse", "cross_entropy"] = "reward",
+    def __init__(self, buffer_size: int, neuron_size: int, *, #fitness_type: Literal["reward", "mse", "cross_entropy"] = "reward",
                  reward_null: float = 0.0, reward_correct: float = 1.0, reward_incorrect: float = -1.0, **kwargs):
         super().__init__()
         # if fitness_type not in ["reward", "mse", "cross_entropy"]:
@@ -397,6 +397,24 @@ class BaseDecoder(Decoder):
     #     if len(self.fitness_buffer) == 0:
     #         raise ValueError("No fitness recorded. Cannot calculate fitness.")
     #     return np.mean(self.fitness_buffer)
+
+
+class SingleOutputDecoder(BaseDecoder):
+    """
+    A Spike / No-spike that only takes information from a single output neuron.
+    The Decoder will predict one of two classes, based on whether or not that neuron has spiked within the duration.
+    """
+    def __init__(self, buffer_size, neuron_size, **kwargs):
+        neuron_size = 1 # Replace with single output neuron
+        super().__init__(buffer_size, neuron_size, **kwargs)
+
+    @override
+    def _decode(self) -> np.ndarray:
+        return (self.buffer.sum() > 0).astype(int)
+    
+    @override
+    def predict(self, output):
+        return output
 
 
 class FinalStepDecoder(BaseDecoder):

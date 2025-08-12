@@ -62,7 +62,7 @@ class PatternSpikeGenerator(SpikeGenerator):
         self.current_neuron = self.starting_neuron
         # else:
         #     self.current_neuron = - self.spacing if self.ascending else self.input_size + self.spacing - 1
-        self.finished = False
+        self._finished = False
         self.spike_count = 0
 
     def generate(self) -> np.ndarray:
@@ -97,7 +97,7 @@ class PatternSpikeGenerator(SpikeGenerator):
                 self.spike_count += 1
                 # Check if the pattern is finished
                 if self.spike_count >= self.max_spike_count:
-                    self.finished = True
+                    self._finished = True
                     self.spike_count = 0
 
             # else:
@@ -286,7 +286,7 @@ class ArrayPatternGenerator(SpikeGenerator):
 
 class BinaryArrayGenerator(SpikeGenerator):
     class_order = ["ascending", "descending"]
-    current_class: int = None
+    _current_class: int = None
     def __init__(self, input_size, interval: int = 1, spacing: int = None, p: float = 1.0,
                  starting_class: Literal["ascending", "descending"] = None, 
                  *, seed=None):
@@ -315,10 +315,10 @@ class BinaryArrayGenerator(SpikeGenerator):
 
     def reset(self):
         if self._starting_class is None:
-            self.current_class = int(self.rng.random() > self.p)
+            self._current_class = int(self.rng.random() > self.p)
         else:
             try:
-                self.current_class = self.class_order.index(self._starting_class.lower())
+                self._current_class = self.class_order.index(self._starting_class.lower())
             except:
                 raise ValueError(f"Starting class must be one of {self.class_order}")
         self.count = 0
@@ -327,7 +327,7 @@ class BinaryArrayGenerator(SpikeGenerator):
     def switch(self):
         r = self.rng.random()
         if r < self.p:
-            self.current_class = 1 - self.current_class
+            self._current_class = 1 - self._current_class
 
     def generate(self) -> np.ndarray:
         # Find index before changing count
@@ -347,7 +347,7 @@ class BinaryArrayGenerator(SpikeGenerator):
         self.count += 1
 
         # Slice stored array using recently resetted class
-        spikes = self.array[self.current_class, :, idx]
+        spikes = self.array[self._current_class, :, idx]
         return spikes
 
     def return_signal(self):
@@ -507,7 +507,7 @@ class CustomTimingGenerator(SpikeGenerator):
         self._full_length = self._pattern_length + self.spacing
         if timings is not None:
             patterns = timings # Backward compatibility
-            
+
         # Init classes separately if specified, otherwise use length of timing
         if labels is not None:
             self._validate_labels(patterns, labels)
