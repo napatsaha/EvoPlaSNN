@@ -2,6 +2,7 @@ import time
 import argparse
 from typing import Tuple
 from lrule.ann import read_ANN_Rule
+from lrule.base import LearningRule
 import yaml
 from pathlib import Path
 import numpy as np
@@ -133,23 +134,41 @@ def main(config_file: str | Path | dict, *, config_overrides: dict = None, paren
     return results_path 
 
 
-def eval(results_path: Path | str, num_steps: int = None, rule_id: int = 1, num_evals: int = 10, save_results: bool = False,
-         save_plots: bool = False, verbose: bool = True, return_evaluator: bool = False) -> Tuple[float, float] | SNN_Evaluator:
+def eval(results_path: Path | str = None, *, config_path: str | Path = None, num_steps: int = None, num_evals: int = 10, 
+         rule_id: int = 1, learning_rule: LearningRule = None,
+         save_plots: bool = False, show_plots: bool = False, save_results: bool = False,
+         verbose: bool = True, return_evaluator: bool = False) -> Tuple[float, float] | SNN_Evaluator:
 
-    if not isinstance(results_path, Path):
-        results_path = Path(results_path)
+    if results_path is not None:
+        if not isinstance(results_path, Path):
+            results_path = Path(results_path)
+    else:
+        results_path = None
 
-    with open(results_path / "config.yaml", "r") as f:
+    if config_path is None:
+        if results_path is not None:
+            config_path = results_path / "config.yaml"
+        else:
+            raise ValueError("results_path must be specified if config_path is not specified.")
+    else:
+        config_path = config_path
+
+    # Read config path
+    with open(config_path, "r") as f:
         config = yaml.safe_load(f)
 
     T = config["num_sim_steps"] if num_steps is None else num_steps
-    rule_id_name = f"best_rule_{rule_id:02d}.txt"
-    if not (results_path / rule_id_name).exists():
-        raise FileNotFoundError(f"Rule file {rule_id_name} not found in {results_path}. Please run the evolution first.")
-    
-    # Load the best ANN learning rule
-    arule = read_ANN_Rule(results_path / rule_id_name, config_path=results_path / "config.yaml")
-    prefix = f"eval_rule_{rule_id:02d}"
+    if learning_rule is None:
+        rule_id_name = f"best_rule_{rule_id:02d}.txt"
+        if not (results_path / rule_id_name).exists():
+            raise FileNotFoundError(f"Rule file {rule_id_name} not found in {results_path}. Please run the evolution first.")
+        
+        # Load the best ANN learning rule
+        lrule = read_ANN_Rule(results_path / rule_id_name, config_path=results_path / "config.yaml")
+        prefix = f"eval_rule_{rule_id:02d}"
+    else:
+        assert isinstance(learning_rule, LearningRule), f"{type(learning_rule)} is not a LearningRule object."
+        lrule = learning_rule
 
     # spikegen_cls = getattr(spkgen, config["spikegen_params"].pop("class", "BinaryClassGenerator"))
     # spikegen = spikegen_cls(input_size=config["snn_params"].get("input_size"), **config["spikegen_params"])
@@ -172,7 +191,7 @@ def eval(results_path: Path | str, num_steps: int = None, rule_id: int = 1, num_
     evaluator = SNN_Evaluator(
         params=config,
         record_info=True,
-        learning_rule=arule,
+        learning_rule=lrule,
         log_info=False
     )
 
@@ -199,20 +218,21 @@ def eval(results_path: Path | str, num_steps: int = None, rule_id: int = 1, num_
         print(f"Mean fitness (Type: {fitness_type}): {mean_fts:.2f} +/- {std_fts:.2f} SD ({num_evals} evaluations)")
 
     # Plotting
-    if save_plots:
+    if save_plots or show_plots:
         evaluator.setup_trial(trial_count=0)
         simulator = evaluator.simulator
         simulator.reset()
         simulator.run(T)
         fitness = simulator.get_fitness()
-        snn_plot.plot_spikes(simulator, x_min=T-100, x_max=T, x_eps=2, savepath=Path(results_path, f"{prefix}_spikes.png"), show=False)
-        snn_plot.plot_membranes(simulator, x_min=T-100, x_max=T, plot_inputs=False, col_width=20, row_height=7, savepath=Path(results_path, f"{prefix}_membranes.png"), show=False)
+        snn_plot.plot_spikes(simulator, x_min=T-100, x_max=T, x_eps=2, savepath=Path(results_path, f"{prefix}_spikes.png") if save_plots else None, show=show_plots)
+        snn_plot.plot_membranes(simulator, x_min=T-100, x_max=T, plot_inputs=False, col_width=20, row_height=7, 
+                                savepath=Path(results_path, f"{prefix}_membranes.png") if save_plots else None, show=show_plots)
         # snn_plot.plot_weights(simulator, div=10, savepath=Path(results_path, f"{prefix}_weights.png"), show=False)
-        snn_plot.plot_weight_over_time(simulator, savepath=Path(results_path, f"{prefix}_weight_over_time.png"), show=False)
-        snn_plot.plot_weight_heatmap(simulator, savepath=Path(results_path, f"{prefix}_weight_heatmap.png"), show=False, log_scale=False, t_range=500)
+        snn_plot.plot_weight_over_time(simulator, savepath=Path(results_path, f"{prefix}_weight_over_time.png") if save_plots else None, show=show_plots)
+        snn_plot.plot_weight_heatmap(simulator, savepath=Path(results_path, f"{prefix}_weight_heatmap.png") if save_plots else None, show=show_plots, log_scale=False, t_range=500)
         if simulator.record_eligibility:
-            snn_plot.plot_eligibility_traces(simulator, savepath=Path(results_path, f"{prefix}_eligibility_traces.png"), show=False)
-        snn_plot.plot_intermediate_fitness(simulator, savepath=Path(results_path, f"{prefix}_intermediate_fitness.png"), show=False)
+            snn_plot.plot_eligibility_traces(simulator, savepath=Path(results_path, f"{prefix}_eligibility_traces.png") if save_plots else None, show=show_plots)
+        snn_plot.plot_intermediate_fitness(simulator, savepath=Path(results_path, f"{prefix}_intermediate_fitness.png") if save_plots else None, show=show_plots)
 
     if not return_evaluator:
         return mean_fts, std_fts
