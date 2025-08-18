@@ -225,7 +225,7 @@ def eval(results_path: Path | str = None, *, config_path: str | Path = None, num
         simulator.run(T)
         fitness = simulator.get_fitness()
         snn_plot.plot_spikes(simulator, x_min=T-100, x_max=T, x_eps=2, savepath=Path(results_path, f"{prefix}_spikes.png") if save_plots else None, show=show_plots)
-        snn_plot.plot_membranes(simulator, x_min=T-100, x_max=T, plot_inputs=False, col_width=20, row_height=7, 
+        snn_plot.plot_membranes(simulator, x_min=T-100, x_max=T, plot_inputs=False, x_scale=20, y_scale=7, 
                                 savepath=Path(results_path, f"{prefix}_membranes.png") if save_plots else None, show=show_plots)
         # snn_plot.plot_weights(simulator, div=10, savepath=Path(results_path, f"{prefix}_weights.png"), show=False)
         snn_plot.plot_weight_over_time(simulator, savepath=Path(results_path, f"{prefix}_weight_over_time.png") if save_plots else None, show=show_plots)

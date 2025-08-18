@@ -4,7 +4,7 @@ from typing import List
 import numpy as np
 import matplotlib.pyplot as plt
 
-from .plot import _plot_membrane_old
+# from .plot import _plot_membrane_old
 
 
 def movmean(x: np.ndarray, n: int, mode: str = "valid") -> np.ndarray:   
@@ -15,6 +15,16 @@ def movmean(x: np.ndarray, n: int, mode: str = "valid") -> np.ndarray:
     else:
         raise ValueError(f"movmean only supports 1D and 2D arrays, got {x.ndim}D array instead.")
     
+
+def get_spike_times(spike_array: List[np.ndarray], start=0, end=None) -> List[List[np.ndarray]] | None:
+    tf_spikes = []
+    for layer_spikes in spike_array[start:end]:
+        tf_layer = []
+        for neuron in range(layer_spikes.shape[0]):
+            tf_neuron = np.where(layer_spikes[neuron, :])[0]
+            tf_layer.append(tf_neuron)
+        tf_spikes.append(tf_layer)
+    return tf_spikes
 
 
 class MatrixRecorder:
@@ -81,37 +91,37 @@ class LayerRecorder:
             f"Timestep {timestep} out of bounds for total timesteps {self.total_timesteps}"
         self.values[layer_index][:, timestep] = value
 
-    def plot(self, thresholds: int | List[int] = None, figtitle: str = None, col_width: float = 5.0, row_height: float = 2.5,
-             savepath: str | Path = None, show: bool = True):
-        # Setting up the figure
-        ncols = len(self.layer_sizes)
-        nrows = max(self.layer_sizes)
-        fig, axs = plt.subplots(nrows, ncols, figsize=(col_width*ncols, row_height*nrows), sharex=True, sharey=True)
+    # def plot(self, thresholds: int | List[int] = None, figtitle: str = None, col_width: float = 5.0, row_height: float = 2.5,
+    #          savepath: str | Path = None, show: bool = True):
+    #     # Setting up the figure
+    #     ncols = len(self.layer_sizes)
+    #     nrows = max(self.layer_sizes)
+    #     fig, axs = plt.subplots(nrows, ncols, figsize=(col_width*ncols, row_height*nrows), sharex=True, sharey=True)
 
-        # Handling thresholds
-        if thresholds is not None:
-            if isinstance(thresholds, list):
-                assert len(thresholds) == len(self.layer_sizes), \
-                    f"Length of thresholds {len(thresholds)} does not match number of layers {len(self.layer_sizes)}"
-            else:
-                thresholds = [thresholds for _ in range(ncols)]
-        else:
-            thresholds = [None for _ in range(ncols)]
+    #     # Handling thresholds
+    #     if thresholds is not None:
+    #         if isinstance(thresholds, list):
+    #             assert len(thresholds) == len(self.layer_sizes), \
+    #                 f"Length of thresholds {len(thresholds)} does not match number of layers {len(self.layer_sizes)}"
+    #         else:
+    #             thresholds = [thresholds for _ in range(ncols)]
+    #     else:
+    #         thresholds = [None for _ in range(ncols)]
 
-        # Plotting
-        for i, layer in enumerate(self.values):
-            for j in range(layer.shape[0]):
-                _plot_membrane_old(layer[j, :], axs[j, i], threshold=thresholds[i], title=f"Layer {i}, Neuron {j}")
+    #     # Plotting
+    #     for i, layer in enumerate(self.values):
+    #         for j in range(layer.shape[0]):
+    #             _plot_membrane_old(layer[j, :], axs[j, i], threshold=thresholds[i], title=f"Layer {i}, Neuron {j}")
 
-        # Formatting
-        if figtitle is not None:
-            fig.suptitle(figtitle, fontsize=16)
-        fig.tight_layout()
+    #     # Formatting
+    #     if figtitle is not None:
+    #         fig.suptitle(figtitle, fontsize=16)
+    #     fig.tight_layout()
 
-        # Display and saving
-        if savepath is not None:
-            plt.savefig(savepath)
-        if show:
-            plt.show()
-        else:
-            plt.close(fig)
+    #     # Display and saving
+    #     if savepath is not None:
+    #         plt.savefig(savepath)
+    #     if show:
+    #         plt.show()
+    #     else:
+    #         plt.close(fig)
