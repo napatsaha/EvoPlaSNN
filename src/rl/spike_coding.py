@@ -17,6 +17,11 @@ class SpikeCoder:
         self.num_actions = num_actions
         self.input_delay = input_delay
         self._delay_count = 0
+        self._ready = False # Determines whether environment should be incremented
+
+    def reset(self):
+        self._delay_count = 0
+        self._ready = False
 
     def encode(self, state: int) -> np.ndarray:
         """
@@ -29,7 +34,8 @@ class SpikeCoder:
             np.ndarray: A binary array representing the encoded spikes.
         """
         spikes = np.zeros(self.num_states, dtype=np.int8)
-        if self._delay_count >= (self.input_delay):
+        self._ready = self._delay_count >= (self.input_delay - 1)
+        if self._ready:
             spikes[state] = 1
             self._delay_count = 0
         else:
@@ -46,6 +52,8 @@ class SpikeCoder:
         Returns:
             int: The decoded action.
         """
+        if not self._ready:
+            return None
         spk_idx = spikes.nonzero()[0]
         if len(spk_idx) == 0:
             action = None
@@ -54,3 +62,10 @@ class SpikeCoder:
         else:
             action = spk_idx.item()
         return action
+    
+    @property
+    def ready(self) -> bool:
+        """
+        Determines whether environment should be incremented
+        """
+        return self._ready

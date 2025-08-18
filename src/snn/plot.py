@@ -135,7 +135,8 @@ def plot_membranes(simulator: 'SNNSimulator' = None, values: List[np.ndarray] = 
         layer_sizes = layer_sizes[1:]
     nrows = max(layer_sizes)
     ncols = len(layer_sizes)
-    fig = plt.figure(figsize=(x_scale*ncols*(x_max - x_min), y_scale*nrows))
+    fig, axs = plt.subplots(figsize=(x_scale*ncols*(x_max - x_min), y_scale*nrows), layout="constrained")
+    axs.remove()
     gs = fig.add_gridspec(nrows, ncols)
 
     for i in range(ncols):
@@ -154,9 +155,9 @@ def plot_membranes(simulator: 'SNNSimulator' = None, values: List[np.ndarray] = 
                         x_min=x_min, x_max=x_max)
             
     # Labelling
-    fig.text(s=f"Time ({dt})", fontsize=16, x=0.5, y=0.1)
-    fig.text(s="Membrane Potential", fontsize=16, ha='center', x=0.0, y=0.5, rotation=90)
-    fig.text(s=title if title is not None else "Membrane Potentials", fontsize=20, x=0.5, y=0.9)
+    fig.text(s=f"Time ({dt})", fontsize=12, x=0.5, y=-0.0)
+    fig.text(s="Membrane Potential", fontsize=12, ha='center', x=-0.0, y=0.5, rotation=90)
+    fig.text(s=title if title is not None else "Membrane Potentials", fontsize=20, x=0.5, y=1.05)
     
     if savepath is not None:
         plt.savefig(savepath)

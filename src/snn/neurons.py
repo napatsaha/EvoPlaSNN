@@ -54,7 +54,7 @@ class NeuronLayer(NeuronLayerProtocol):
                  wta: bool = False, sim_method: Literal["event-driven", "step-wise"] = "step-wise",
                  spike_method: Literal["deterministic", "stochastic"] = "deterministic", softmax_temp: float = 1.0,
                  reset_mechanism: Literal["rest", "zero", "subtract"] = "rest", mem_rest: float = 0.0, 
-                 reset_condition: Literal["only-winner", "all-above-threshold", "all"] = "all-above-threshold", delayed_wta: bool = False, 
+                 reset_condition: Literal["only-winner", "all-above", "all"] = "all-above", delayed_wta: bool = False, 
                  trace_amp: float = 1.0, #trace_type: Literal["dx1", "dx2", "dx3", "dx4"] = None,
                  trace_type: Literal["cumulative", "recent", "dx1", "dx2", "dx3", "dx4"] = "recent"):
         # Simulation parameters
@@ -86,19 +86,18 @@ class NeuronLayer(NeuronLayerProtocol):
         self.spike_method = spike_method
         self._stochastic_spike = spike_method == "stochastic"
         self.softmax_temp = softmax_temp
-        self.wta = wta
-        # self.delayed_wta = delayed_wta
+        self.wta = wta if not self._stochastic_spike else True # Assume winner take all when spiking is stochastic
         # Reset parameters
         if delayed_wta == True:
             reset_condition = "only-winner" # Backwards compatibility
         self.reset_condition = reset_condition
         self._reset_cond_one = reset_condition == "only-winner"
-        self._reset_cond_abv = reset_condition == "all-above-threshold"
+        self._reset_cond_abv = reset_condition == "all-above"
         self._reset_cond_all = reset_condition == "all"
         self.threshold = threshold
         self.reset_mechanism = reset_mechanism
         if self.reset_mechanism == "zero":
-            self.reset_condition = "rest"
+            self.reset_mechanism = "rest"
             self.mem_rest = 0.0
         self._reset_mech_rest = self.reset_mechanism == "rest"
         self._reset_mech_subt = self.reset_mechanism == "subtract"
@@ -148,18 +147,18 @@ class NeuronLayer(NeuronLayerProtocol):
         # If reset_condition == "only-winner", 
         #   only the neuron that spiked (winner) gets their membrane reset.
         #   Other non-spiking neurons with membranes above threshold, will automatically spike in the next step (hence, delayed)
-        # If reset_condition == "all-above-threshold", 
+        # If reset_condition == "all-above", 
         #   all neurons with membranes above thresholds get reset, regardless of whether or not they spiked.
         # If reset_condition == "all",
         #   all neurons get reset, regardless of their previous membrane potentials.
-        cond = self.spike if self._reset_cond_one else \
+        cond = self.spike.astype(bool) if self._reset_cond_one else \
                 (self.membrane >= self.threshold) if self._reset_cond_abv else \
-                True if self._reset_cond_all else \
+                sum(self.spike) > 0 if self._reset_cond_all else \
                 False
         if self._reset_mech_rest:
             self.membrane[cond] = self.mem_rest
         elif self._reset_mech_subt:
-            self.membrane[cond] = self.membrane - self.threshold
+            self.membrane[cond] -= self.threshold
 
     def _update_membrane(self, input_current):
         self.membrane = self.beta_mem * self.membrane + input_current
