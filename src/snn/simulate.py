@@ -14,6 +14,7 @@ from .spikegen import BinaryClassGenerator
 from .decoding import get_decoder_class, get_fitnessor_class, BaseDecoder, BaseFitnessor
 from .rewarder import create_rewarder, create_collector, RewarderProtocol, CollectorProtocol
 from rl.spike_coding import SpikeCoder
+from rl.collector import RewardCollector
 import gymnasium as gym
 
 
@@ -37,6 +38,7 @@ class SNNSimulator:
         self.learning_rule = network.learning_rule
         self.env = env
         self.spike_coder = spike_coder
+        self.reward_collector = RewardCollector()
 
         # Initialize recorders
         self.record_membrane = record_membrane
@@ -128,6 +130,7 @@ class SNNSimulator:
         # self.spike_generator.reset()
         self.env.reset()
         self.spike_coder.reset()
+        self.reward_collector.reset()
 
         # Reset network
         self.network.reset()
@@ -157,6 +160,7 @@ class SNNSimulator:
                 state, reward, terminated, truncated, info = self.env.step(action)
                 episode_done = terminated or truncated
                 if episode_done:
+                    self.reward_collector.collect(reward=reward, episode_length=info.get('step_count', 0))
                     self.env.reset()
                     state, info = self.env.reset()
             else:
@@ -248,7 +252,8 @@ class SNNSimulator:
         #         return None
         #     return self.collector.calculate_fitness()
         # else:
-            return None
+            # return None
+        return self.reward_collector.get_fitness()
 
     def get_intermediate_fitness(self, use_portion: bool = False) -> List[float] | None:
         # if self._post_process_type == 0:
@@ -262,7 +267,8 @@ class SNNSimulator:
         #         return None
         #     return self.collector.get_intermediate_fitness(use_portion=use_portion)
         # else:
-            return None
+            # return None
+        return self.reward_collector.get_rewards()
 
     def get_target_fitness(self) -> float | None:
         # if self._post_process_type == 0:

@@ -95,7 +95,7 @@ class TMaze(gym.Env):
         state = self.get_agent_position()
         info = {
             'step_count': self._step_count,
-            'reward_position': self.get_reward_position()
+            # 'reward_position': self.get_reward_position()
         }
         return state, info
 
@@ -106,8 +106,10 @@ class TMaze(gym.Env):
         state = self.get_agent_position()
         info = {
             'step_count': self._step_count,
-            'reward_position': self.get_reward_position()
+            # 'reward_position': self.get_reward_position()
         }
+        if truncated:
+            reward = 0.0
         return state, reward, terminated, truncated, info
 
     def get_maze(self):
