@@ -11,6 +11,9 @@ from typing import Tuple
 
 
 class TMaze(gym.Env):
+    action_space: gym.spaces.Discrete
+    observation_space: gym.spaces.Discrete
+
     WALL = 0
     EMPTY = 1
     AGENT = 2

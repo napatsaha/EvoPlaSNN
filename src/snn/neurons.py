@@ -31,6 +31,9 @@ def trace_x3(t, dt, tau, A):
     x = A * np.exp(-t / tau)
     return x
 
+def softmax(x, temperature=1.0):
+    ex = np.exp(x / temperature)
+    return ex / np.sum(ex)
 
 class NeuronLayer(NeuronLayerProtocol):
     """
@@ -48,18 +51,20 @@ class NeuronLayer(NeuronLayerProtocol):
     Assumming each new spike resets the trace to its maximum value.
     """
     def __init__(self, size: int, *, tau_mem: float = None, tau_trace: float = None, dt: float = 1e-3, threshold: float = 1.0, 
-                 wta: bool = False, delayed_wta: bool = False, sim_method: Literal["event-driven", "step-wise"] = "step-wise",
-                 membrane_start: float = 0.0, reset_mechanism: Literal["zero", "subtract"] = "zero",
-                 trace_amp: float = 1.0, trace_type: Literal["dx1", "dx2", "dx3", "dx4"] = None,
-                 trace_last: Literal["cumulative", "recent"] = "recent"):
+                 wta: bool = False, sim_method: Literal["event-driven", "step-wise"] = "step-wise",
+                 spike_method: Literal["deterministic", "stochastic"] = "deterministic", softmax_temp: float = 1.0,
+                 reset_mechanism: Literal["rest", "zero", "subtract"] = "rest", mem_rest: float = 0.0, 
+                 reset_condition: Literal["only-winner", "all-above-threshold", "all"] = "all-above-threshold", delayed_wta: bool = False, 
+                 trace_amp: float = 1.0, #trace_type: Literal["dx1", "dx2", "dx3", "dx4"] = None,
+                 trace_type: Literal["cumulative", "recent", "dx1", "dx2", "dx3", "dx4"] = "recent"):
         # Simulation parameters
         self.size = size
         self.dt = dt
         self.sim_method = sim_method
         self._event_driven = sim_method == "event-driven"
         self._step_wise = sim_method == "step-wise"
-        self._last_only = trace_last == "recent" 
-        if self._step_wise and trace_type is not None: # Backwards compatibility
+        self._last_only = trace_type == "recent" 
+        if trace_type.startswith("dx"): # Backwards compatibility
             self._last_only = True if trace_type in ["dx3", "dx4"] else False # dx2 and dx1 are cumulative traces
 
         # Deals with positive integer tau's as a unit of dt
@@ -69,23 +74,37 @@ class NeuronLayer(NeuronLayerProtocol):
             tau_trace = tau_trace * dt
 
         # Membrane potential parameters
-        self.membrane_start = membrane_start
+        self.mem_rest = mem_rest
         self.tau_mem = tau_mem if tau_mem is not None else tau_trace if tau_trace is not None else dt
         self.beta_mem = np.exp(-self.dt / self.tau_mem) # Decay rate
         # Trace parameters
         self.tau_trace = tau_trace if tau_trace is not None else tau_mem if tau_mem is not None else dt
         self.trace_amp = trace_amp
-        # self.trace_type = trace_type
         self.beta_trace = np.exp(-self.dt / self.tau_trace)  # Decay rate for trace
-        # Threshold parameters
-        self.threshold = threshold
-        self.reset_mechanism = reset_mechanism if reset_mechanism in ["zero", "subtract"] else "zero"
-        # Spike parameters
+
+        # Spiking parameters
+        self.spike_method = spike_method
+        self._stochastic_spike = spike_method == "stochastic"
+        self.softmax_temp = softmax_temp
         self.wta = wta
-        self.delayed_wta = delayed_wta
+        # self.delayed_wta = delayed_wta
+        # Reset parameters
+        if delayed_wta == True:
+            reset_condition = "only-winner" # Backwards compatibility
+        self.reset_condition = reset_condition
+        self._reset_cond_one = reset_condition == "only-winner"
+        self._reset_cond_abv = reset_condition == "all-above-threshold"
+        self._reset_cond_all = reset_condition == "all"
+        self.threshold = threshold
+        self.reset_mechanism = reset_mechanism
+        if self.reset_mechanism == "zero":
+            self.reset_condition = "rest"
+            self.mem_rest = 0.0
+        self._reset_mech_rest = self.reset_mechanism == "rest"
+        self._reset_mech_subt = self.reset_mechanism == "subtract"
 
         # Membrane potential
-        self.membrane = np.full((size,), membrane_start)
+        self.membrane = np.full((size,), mem_rest)
         # Spike status
         self.spike = np.zeros(size, dtype=np.int8)
         if self._event_driven:
@@ -100,7 +119,7 @@ class NeuronLayer(NeuronLayerProtocol):
         """
         Reset the neuron layer state.
         """
-        self.membrane.fill(self.membrane_start)
+        self.membrane.fill(self.mem_rest)
         self.spike.fill(0)
         if self._event_driven:
             self.tssp.fill(np.inf)
@@ -126,28 +145,54 @@ class NeuronLayer(NeuronLayerProtocol):
         return self.spike.astype(np.int8)
 
     def _reset_membrane(self):
-        cond = self.membrane >= self.threshold if not self.delayed_wta else self.spike
-        if self.reset_mechanism == "zero":
-            self.membrane = np.where(cond, self.membrane_start, self.membrane)
-        elif self.reset_mechanism == "subtract":
-            self.membrane = np.where(cond, self.membrane - self.threshold, self.membrane)
+        # If reset_condition == "only-winner", 
+        #   only the neuron that spiked (winner) gets their membrane reset.
+        #   Other non-spiking neurons with membranes above threshold, will automatically spike in the next step (hence, delayed)
+        # If reset_condition == "all-above-threshold", 
+        #   all neurons with membranes above thresholds get reset, regardless of whether or not they spiked.
+        # If reset_condition == "all",
+        #   all neurons get reset, regardless of their previous membrane potentials.
+        cond = self.spike if self._reset_cond_one else \
+                (self.membrane >= self.threshold) if self._reset_cond_abv else \
+                True if self._reset_cond_all else \
+                False
+        if self._reset_mech_rest:
+            self.membrane[cond] = self.mem_rest
+        elif self._reset_mech_subt:
+            self.membrane[cond] = self.membrane - self.threshold
 
     def _update_membrane(self, input_current):
         self.membrane = self.beta_mem * self.membrane + input_current
 
     def _set_spike(self):
-        # Winner Takes All (WTA)
-        if self.wta:
+        # Deterministic spiking
+        if not self._stochastic_spike:
+            if self.wta:
+                above_thr = self.membrane >= self.threshold
+                self.spike.fill(0)
+                if sum(above_thr) == 0:
+                    return
+                else:
+                    idx = np.argmax(self.membrane)
+                    self.spike[idx] = 1
+                    return
+            else:
+                self.spike = (self.membrane >= self.threshold)
+        # Stochastic spiking
+        else:
+            # Assumes WTA by default -> only one choice of neuron can spike stochastically
             above_thr = self.membrane >= self.threshold
             self.spike.fill(0)
             if sum(above_thr) == 0:
+                # Will only spike if at least one neuron has membrane above threshold
                 return
             else:
-                idx = np.argmax(self.membrane)
+                # Probability of spiking is based on membrane potentials of neurons themselves (softmax with temperature),
+                #   regardless of which one is above threshold
+                probs = softmax(self.membrane, temperature=self.softmax_temp)
+                idx = np.random.choice(self.size, p=probs)
                 self.spike[idx] = 1
-                return
-        else:
-            self.spike = (self.membrane >= self.threshold)
+
 
     def _update_tssp(self):
         # if self._event_driven:
