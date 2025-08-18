@@ -132,7 +132,7 @@ class TMaze(gym.Env):
         return np.asarray(pos).reshape(2)
 
     def _take_action(self, action: int) -> Tuple[float | None, bool]:
-        if action < 0 or action >= self.action_space.n:
+        if action is None or action < 0 or action >= self.action_space.n:
             raise ValueError(f"Invalid action: {action}. Must be between [0, {self.action_space.n - 1}].")
         
         reward = None
