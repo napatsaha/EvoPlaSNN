@@ -15,8 +15,10 @@ class SNN:
     neuron_layers: List[NeuronLayer]
     synapse_layers: List[SynapseLayer]
 
-    def __init__(self, input_size: int, hidden_size: list[int] | int | None, output_size: int, dt, *, 
-                 learning_rule: LearningRule = None, synapse_params: dict = None, neuron_params: dict = None,
+    def __init__(self, input_size: int, hidden_size: list[int] | int | None, output_size: int, *, dt: float = 1e-3, 
+                 learning_rule: LearningRule = None, 
+                 neuron_params: dict = None,
+                 synapse_params: dict = None, 
                  winner_take_all: bool = False, soft_reset: bool = False,
                  sim_method: Literal["event-driven", "step-wise"] = "step-wise",
                 #  tau_mem: float | List[float] = 5e-3, tau_trace: float | List[float] = 1e-1, threshold: float | List[float] = 1.0, 

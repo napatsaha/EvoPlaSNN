@@ -24,7 +24,7 @@ class SNNSimulator:
     rewarder: RewarderProtocol | None
     collector: CollectorProtocol | None
     def __init__(self, network: SNN, #spike_generator: SpikeGenerator = None, 
-                 env: gym.Env = None, spike_coder: SpikeCoder = None,
+                 env: gym.Env = None, spike_coder: SpikeCoder = None, reward_collector: RewardCollector = None,
                  *, 
                 #  params: dict = {},
                 #  decoder_type: Literal["final", "rate", "latency"] = "final", decoder_params: dict = {},
@@ -38,7 +38,7 @@ class SNNSimulator:
         self.learning_rule = network.learning_rule
         self.env = env
         self.spike_coder = spike_coder
-        self.reward_collector = RewardCollector()
+        self.reward_collector = reward_collector
 
         # Initialize recorders
         self.record_membrane = record_membrane
@@ -130,7 +130,8 @@ class SNNSimulator:
         # self.spike_generator.reset()
         self.env.reset()
         self.spike_coder.reset()
-        self.reward_collector.reset()
+        if self.reward_collector is not None:
+            self.reward_collector.reset()
 
         # Reset network
         self.network.reset()
@@ -160,7 +161,8 @@ class SNNSimulator:
                 state, reward, terminated, truncated, info = self.env.step(action)
                 episode_done = terminated or truncated
                 if episode_done:
-                    self.reward_collector.collect(reward=reward, episode_length=info.get('step_count', 0))
+                    if self.reward_collector is not None:
+                        self.reward_collector.collect(reward=reward, episode_length=info.get('step_count', None))
                     self.env.reset()
                     state, info = self.env.reset()
             else:
@@ -253,7 +255,7 @@ class SNNSimulator:
         #     return self.collector.calculate_fitness()
         # else:
             # return None
-        return self.reward_collector.get_fitness()
+        return self.reward_collector.get_fitness() if self.reward_collector is not None else None
 
     def get_intermediate_fitness(self, use_portion: bool = False) -> List[float] | None:
         # if self._post_process_type == 0:
@@ -268,7 +270,7 @@ class SNNSimulator:
         #     return self.collector.get_intermediate_fitness(use_portion=use_portion)
         # else:
             # return None
-        return self.reward_collector.get_rewards()
+        return self.reward_collector.get_rewards() if self.reward_collector is not None else None
 
     def get_target_fitness(self) -> float | None:
         # if self._post_process_type == 0:
@@ -284,7 +286,7 @@ class SNNSimulator:
         #     elif self.collector.fitness_type == "mapped":
         #         return 1.0
         # else:
-            return None
+        return None
 
     def is_minimise(self) -> bool | None:
         # if self._post_process_type == 0:
@@ -292,7 +294,7 @@ class SNNSimulator:
         # elif self._post_process_type == 1:
         #     return self.collector.minimise if self.collector is not None else None
         # else:
-            return None
+        return self.reward_collector.minimise if self.reward_collector is not None else None
 
     def get_spike_times(self, start=0, end=None) -> List[List[np.ndarray]] | None:
         if self.spike_recorder is None:
@@ -345,7 +347,7 @@ class SNNSimulator:
         return None
 
     def __repr__(self):
-        return f"SNNSimulator(network={self.network}, spike_generator={self.spike_generator})"
+        return f"SNNSimulator(network={self.network})"
 
 
 

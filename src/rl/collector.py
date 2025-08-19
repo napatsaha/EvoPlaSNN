@@ -5,6 +5,7 @@ class RewardCollector:
     def __init__(self):
         self.reward_history = []
         self.episode_lengths = []
+        self.minimise = False
         
     def reset(self):
         """
