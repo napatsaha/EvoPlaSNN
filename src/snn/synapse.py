@@ -28,7 +28,7 @@ class SynapseLayer(SynapseLayerProtocol):
                  eligibility_trace: bool = False, tau_syn: float = None, dt: float = 1e-3,
                  sim_method: Literal["event-driven", "step-wise"] = "step-wise",
                  weight_init: Literal["uniform", "normal", "constant"] = "uniform",
-                 weight_min: float = 0.0, weight_max: float = 1.0,
+                 weight_clip_min: float = 0.0, weight_clip_max: float = 1.0,
                  clip_weights: bool = True, normalise_weights: bool = False, 
                  normalise_method: Literal["sum", "L2", "P"] = "sum", #normalise_params: dict = None,
                  **kwargs):
@@ -63,8 +63,8 @@ class SynapseLayer(SynapseLayerProtocol):
             Warning(f"Invalid weight initialisation method: {weight_init}. Using 'uniform' instead.")
         self.weight_init = weight_init
         self.weight_init_params = kwargs
-        self.weight_min = weight_min
-        self.weight_max = weight_max
+        self.weight_clip_min = weight_clip_min
+        self.weight_clip_max = weight_clip_max
         self.clip_weights = clip_weights
         self.normalise_weights = normalise_weights
         self.normalise_method = normalise_method
@@ -74,33 +74,18 @@ class SynapseLayer(SynapseLayerProtocol):
 
     def _init_weights(self):
         if self.weight_init == 'uniform':
-            wmin = self.weight_init_params.get('weight_min', 0.0)
-            wmax = self.weight_init_params.get('weight_max', 1.0)
+            wmin = self.weight_init_params.get('weight_init_min', 0.0)
+            wmax = self.weight_init_params.get('weight_init_max', 1.0)
             self.weights = np.random.uniform(wmin, wmax, size=(self.pre_layer.size, self.post_layer.size))
         elif self.weight_init == 'normal':
-            mean = self.weight_init_params.get('mean', 0.0)
-            std = self.weight_init_params.get('std', 1.0)
+            mean = self.weight_init_params.get('weight_init_mean', 0.0)
+            std = self.weight_init_params.get('weight_init_std', 1.0)
             self.weights = np.random.normal(mean, std, size=(self.pre_layer.size, self.post_layer.size))
         elif self.weight_init == 'constant':
-            value = self.weight_init_params.get('value', 0.0)
+            value = self.weight_init_params.get('weight_init_value', 0.0)
             self.weights = np.full((self.pre_layer.size, self.post_layer.size), value, dtype=np.float32)
-        # if self.weight_init_params is None:
-        #     self.weight_init_params = {}
-        # if self.weight_init == 'uniform':
-        #     low = self.weight_init_params.get('low', 0.0)
-        #     high = self.weight_init_params.get('high', 1.0)
-        #     self.weights = np.random.uniform(low, high, size=(self.pre_layer.size, self.post_layer.size))
         else:
             raise NotImplementedError("Other weight initialisation methods not implemented yet")
-
-
-    # def _get_lrule_type(self):
-    #     if isinstance(self.learning_rule, STDP_Rule):
-    #         return "STDP"
-    #     elif isinstance(self.learning_rule, ANN_Rule):
-    #         return "ANN"
-    #     elif isinstance(self.learning_rule, Empty_Rule):
-    #         return None
 
     def _tile(self, vec_in: np.ndarray, vec_out: np.ndarray) -> np.ndarray:
         """
@@ -117,7 +102,6 @@ class SynapseLayer(SynapseLayerProtocol):
         Reset the synaptic weights to their initial state.
         """
         self._init_weights()
-        # self.weights[:] = np.random.uniform(self.weight_min, self.weight_max, size=(self.pre_layer.size, self.post_layer.size))
         self._normalise_weights()
         self.soft_reset()
 
@@ -177,11 +161,14 @@ class SynapseLayer(SynapseLayerProtocol):
         self.weights += dw
         
         # Clip the weights
-        if self.clip_weights:
-            self.weights = np.clip(self.weights, self.weight_min, self.weight_max)
+        self._clip_weights()
         
         # Normalise the weights
         self._normalise_weights()
+
+    def _clip_weights(self):
+        if self.clip_weights:
+            self.weights = np.clip(self.weights, self.weight_clip_min, self.weight_clip_max)
 
     def _normalise_weights(self):
         if self.normalise_weights:
@@ -202,8 +189,6 @@ class SynapseLayer(SynapseLayerProtocol):
                 return self._elast * np.exp(-self._etssp * self.dt / self.tau_syn)
         else:
             return None
-    
-
 
 
 def safe_norm(array, method, params={}, eps=1e-10):
