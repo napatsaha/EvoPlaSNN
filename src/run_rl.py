@@ -209,14 +209,17 @@ def eval(results_path: Path | str = None, *, config_path: str | Path = None, num
         simulator.run(T)
         fitness = simulator.get_fitness()
         snn_plot.plot_spikes(simulator, x_min=T-100, x_max=T, x_eps=2, savepath=Path(results_path, f"{prefix}_spikes.png") if save_plots else None, show=show_plots)
-        snn_plot.plot_membranes(simulator, x_min=T-100, x_max=T, plot_inputs=False, x_scale=20, y_scale=7, 
+        snn_plot.plot_membranes(simulator, x_min=T-100, x_max=T, plot_inputs=False, x_scale=0.3, y_scale=3, layout=None, 
                                 savepath=Path(results_path, f"{prefix}_membranes.png") if save_plots else None, show=show_plots)
         # snn_plot.plot_weights(simulator, div=10, savepath=Path(results_path, f"{prefix}_weights.png"), show=False)
-        snn_plot.plot_weight_over_time(simulator, savepath=Path(results_path, f"{prefix}_weight_over_time.png") if save_plots else None, show=show_plots)
-        snn_plot.plot_weight_heatmap(simulator, savepath=Path(results_path, f"{prefix}_weight_heatmap.png") if save_plots else None, show=show_plots, log_scale=False, t_range=500)
+        snn_plot.plot_weight_over_time(simulator, synapse_layer=0,
+                                       savepath=Path(results_path, f"{prefix}_weight_over_time.png") if save_plots else None, show=show_plots)
+        snn_plot.plot_weight_heatmap(simulator, log_scale=False, t_range=500, synapse_layer=0,
+                                     savepath=Path(results_path, f"{prefix}_weight_heatmap.png") if save_plots else None, show=show_plots)
         if simulator.record_eligibility:
             snn_plot.plot_eligibility_traces(simulator, savepath=Path(results_path, f"{prefix}_eligibility_traces.png") if save_plots else None, show=show_plots)
-        # snn_plot.plot_intermediate_fitness(simulator, savepath=Path(results_path, f"{prefix}_intermediate_fitness.png") if save_plots else None, show=show_plots)
+        snn_plot.plot_intermediate_fitness(simulator, window_size=20,
+                                           savepath=Path(results_path, f"{prefix}_intermediate_fitness.png") if save_plots else None, show=show_plots)
 
     if not return_evaluator:
         return mean_fts, std_fts

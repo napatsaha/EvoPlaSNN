@@ -91,7 +91,8 @@ def plot_spikes(simulator: 'SNNSimulator' = None, values: List[np.ndarray] = Non
 def plot_membranes(simulator: 'SNNSimulator' = None, values: List[np.ndarray] = None, spike_values: List[np.ndarray] = None, 
                    thresholds: List[float] = None, *, 
                    x_scale: float = 0.2, y_scale: float = 3.0, title: str = None, plot_inputs: bool = False, 
-                   color: str = "blue", cmap: str = None, cmap_range: tuple = (0, 1), x_min = None, x_max = None, x_range: int = 100,
+                   color: str = "blue", cmap: str = None, cmap_range: tuple = (0, 1), layout: str = "constrained",
+                   x_min = None, x_max = None, x_range: int = 100,
                    savepath: str | Path = None, show: bool = True):
     """
     Plot membrane potentials of all neurons in the network.
@@ -135,7 +136,7 @@ def plot_membranes(simulator: 'SNNSimulator' = None, values: List[np.ndarray] = 
         layer_sizes = layer_sizes[1:]
     nrows = max(layer_sizes)
     ncols = len(layer_sizes)
-    fig, axs = plt.subplots(figsize=(x_scale*ncols*(x_max - x_min), y_scale*nrows), layout="constrained")
+    fig, axs = plt.subplots(figsize=(x_scale*ncols*(x_max - x_min), y_scale*nrows), layout=layout)
     axs.remove()
     gs = fig.add_gridspec(nrows, ncols)
 
@@ -155,8 +156,8 @@ def plot_membranes(simulator: 'SNNSimulator' = None, values: List[np.ndarray] = 
                         x_min=x_min, x_max=x_max)
             
     # Labelling
-    fig.text(s=f"Time ({dt})", fontsize=12, x=0.5, y=-0.0)
-    fig.text(s="Membrane Potential", fontsize=12, ha='center', x=-0.0, y=0.5, rotation=90)
+    fig.text(s=f"Time ({dt})", fontsize=12, x=0.5, y=-0.01)
+    fig.text(s="Membrane Potential", fontsize=12, ha='center', x=-0.01, y=0.5, rotation=90)
     fig.text(s=title if title is not None else "Membrane Potentials", fontsize=20, x=0.5, y=1.05)
     
     if savepath is not None:
@@ -262,26 +263,33 @@ def plot_weights(simulator: 'SNNSimulator', div: int = 5, col_width: float = 6.0
     # plt.close(fig)
 
 
-def plot_weight_over_time(simulator: 'SNNSimulator', title="", x_min=None, x_max=None,
+def plot_weight_over_time(simulator: 'SNNSimulator' = None, values: List[np.ndarray] = None, *, title="", x_min=None, x_max=None,
+                          synapse_layer: int = 0, 
                           savepath=None, show=True, ):
-    assert simulator.record_weights, "Weight recording is not enabled."
-    x_max = simulator.num_steps if x_max is None else x_max
+    if simulator is not None:
+        assert simulator.record_weights, "Weight recording is not enabled."
+    values = simulator.weight_recorder.values if simulator is not None else values
+    T = simulator.num_steps if simulator is not None else max([val.shape[2] for val in values])
+    x_max = T if x_max is None else x_max
     x_min = 0 if x_min is None else x_min
-    for L in range(len(simulator.weight_recorder.layer_shapes)):
-        nrow, ncol = simulator.weight_recorder.layer_shapes[L]
-        w_mat = simulator.weight_recorder.values[L]
+    L = synapse_layer if synapse_layer < len(values) else 0
 
-        fig, axs = plt.subplots(nrow, ncol, figsize=(5*ncol, 3*nrow), sharex=True, sharey=True, gridspec_kw={"hspace": 0, "wspace": 0},
-                                squeeze=False)
-        for i in range(nrow):
-            for j in range(ncol):
-                ax = axs[i, j]
-                ax.plot(w_mat[i, j, :])
+    nrow, ncol = values[L].shape[:2]
+    w_mat = values[L]
+    wmax = max(np.max(w_mat), 1)
+    wmin = min(np.min(w_mat), 0)
 
-        ax.set_ylim(0, 1)
-        ax.set_xlim(x_min, x_max)
-        # plt.tight_layout()
-        plt.suptitle(title, y=0.9)
+    fig, axs = plt.subplots(nrow, ncol, figsize=(5*ncol, 3*nrow), sharex=True, sharey=True, gridspec_kw={"hspace": 0, "wspace": 0},
+                            squeeze=False)
+    for i in range(nrow):
+        for j in range(ncol):
+            ax = axs[i, j]
+            ax.plot(w_mat[i, j, :])
+            ax.set_ylim(wmin, wmax)
+            ax.set_xlim(x_min, x_max)
+    # plt.tight_layout()
+    plt.suptitle(title, y=0.9)
+
     if savepath is not None:
         plt.savefig(savepath)
     if show:
@@ -358,35 +366,54 @@ def plot_eligibility_traces(simulator: 'SNNSimulator', *, x_scale: float = 0.2, 
     # plt.close(fig)
 
 
-
-
-def plot_intermediate_fitness(simulator: 'SNN_Simulator', *, x_scale: float = 0.01, y_scale: float = 1.0, x_eps: int = 1,
+def plot_intermediate_fitness(simulator: 'SNN_Simulator' = None, values: np.ndarray = None, *, num_steps: int = None, timestamps: np.ndarray = None,
+                              x_scale: float = 0.01, y_scale: float = 1.0, x_eps: int = 1,
                               t_min: int = None, t_max: int = None, t_range: int = None, window_size: int = 10,
                               savepath: str | Path = None, show: bool = True):
-    fts = simulator.get_intermediate_fitness(use_portion=False)
-    ft = simulator.get_fitness()
-    T = simulator.num_steps
-    # ts = np.linspace(0, T, len(fts))
-    ts = np.arange(simulator.spike_generator.pattern_length - 1, T, simulator.spike_generator.length)
+    if simulator is not None:
+        fts = simulator.get_intermediate_fitness(use_portion=False)
+        ft = simulator.get_fitness()
+        T = simulator.num_steps
+        eps_len = simulator.reward_collector.get_episode_lengths()
+        eps_timestamp = np.cumsum(eps_len) * simulator.spike_coder.input_delay
+    elif values is not None:
+        fts = values
+        ft = np.mean(fts)
+        T = num_steps if num_steps is not None else len(fts)
+        eps_timestamp = None
+        if num_steps is None:
+            x_scale *= 100    
+
+    if timestamps is None and eps_timestamp is None:
+        ts = np.linspace(0, T, len(fts)) if num_steps is not None else np.arange(0, len(fts))
+    elif eps_timestamp is not None:
+        ts = eps_timestamp
+    else:
+        assert len(timestamps) == len(fts), "Timestamps must match the length of fitness values."
+        ts = timestamps
+    # ts = np.arange(simulator.spike_generator.pattern_length - 1, T, simulator.spike_generator.length)
     runavg = np.convolve(fts, np.ones(window_size) / window_size, mode='same')
 
     if t_range is None:
-        t_range = simulator.num_steps
+        t_range = T
     if t_max is None:
         t_max = T
     if t_min is None:
         t_min = max(0, t_max - t_range)
 
+
     fig, ax = plt.subplots(1, 1, figsize=((t_max - t_min) * x_scale, 10 * y_scale), layout="constrained")
     ax.plot(
         ts, fts,
         color="gray", alpha=0.8,
-        drawstyle="steps-post",
-        linewidth=1, label="Intermediate Fitness"
+        drawstyle="steps-pre",
+        linewidth=1, label="Intermediate Fitness",
+        marker="o", markersize=20
     )
-    ax.plot(ts, runavg, color="blue", linewidth=2, label=f"Running Average ({window_size})")
+    ax.plot(ts, runavg, color="blue", linewidth=2, label=f"Running Average ({window_size})", markersize=10, marker="o")
     ax.legend(loc="lower right", fontsize=12)
-    ax.xaxis.set_major_locator(plt.MultipleLocator(100))
+    if num_steps is not None:
+        ax.xaxis.set_major_locator(plt.MultipleLocator(100))
     ax.set_xlim(t_min - x_eps, t_max + x_eps)
     ax.set_xlabel("Time (steps)")
     ax.set_ylabel("Fitness")
