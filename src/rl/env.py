@@ -7,7 +7,8 @@ import gymnasium as gym
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import colors
-from typing import Tuple
+from typing import Literal, Tuple
+from functools import partial
 
 
 class TMaze(gym.Env):
@@ -33,19 +34,38 @@ class TMaze(gym.Env):
         3: "Right"
     }
 
-    def __init__(self, size=None, width=None, height=None, pad=1, max_steps=50):
+    def __init__(self, size=None, width=None, height=None, pad=1, *, 
+                 max_steps=50, reward_function: Literal["A", "B"] = "A",
+                 reward_min: float = 0.0, reward_max: float = 1.0):
+        """
+        Note on reward function:
+        - 'A' is giving 1 when reaching target, 0 if truncated (max steps reached)
+        - 'B' is giving a linearly-decreasing value (scaled between 0 and 1) 
+            inversely proportional to the number of steps taken, ranging from min_steps (determined by size) to max_steps (user-determined).
+        """
         super().__init__()
         self.width = size if width is None else width
         self.height = size if height is None else height
         self.pad = pad
         self.action_space = gym.spaces.Discrete(4)
+        self.reward_min = reward_min
+        self.reward_max = reward_max
+        self.reward_function = reward_function
+        self.max_steps = int(max_steps)
+        self._calculate_min_step()
         self._create_maze()
+        self._create_reward_function()
         self.observation_space = gym.spaces.Discrete(self._num_state)
-        self.max_steps = max_steps
         self._step_count = 0
 
         # Set up plotting variables
         self.cmap = colors.ListedColormap([ "white", "black","blue", "green"])
+
+    def _calculate_min_step(self):
+        # Do this before padding
+        up = self.height - 1
+        right = (self.width + 1) // 2 - 1
+        self.min_steps = int(up + right)
 
     def _create_maze(self):
         # Create empty array (filled with walls, as 1's)
@@ -70,12 +90,26 @@ class TMaze(gym.Env):
         self._starting_state = self._convert_pos_to_state(self._agent_pos)
         self._state_pos_dict = {state: self._convert_state_to_pos(state) for state in range(self._num_state)}
 
+    def _create_reward_function(self):
+        if self.reward_function == "A":
+            def f(terminated, truncated, r, R, **kwargs):
+                return R if terminated and not truncated else r
+            self._reward_func = partial(f, r=self.reward_min, R=self.reward_max)
+        elif self.reward_function == "B":
+            self._reward_func = partial(self.f, m=self.min_steps, M=self.max_steps, r=self.reward_min, R=self.reward_max)
+        else:
+            raise ValueError(f"Invalid reward function: {self.reward_function}. Must be 'A' or 'B'.")
+
     def _reset_position(self):
         self.maze[np.unravel_index(self._empty_idx, self.maze.shape)] = self.EMPTY
         self.maze[*self._reward_pos] = self.REWARD
         self._agent_pos = self._convert_state_to_pos(self._starting_state)
         self.maze[*self._agent_pos] = self.AGENT
         self._step_count = 0
+
+    @staticmethod
+    def f(step, m, M, r, R, **kwargs):
+        return (step - M) * (R - r) / (m - M) + r
 
     def render(self, fig_scale=1.0):
         fig, ax = plt.subplots(figsize=(self.width * fig_scale, self.height * fig_scale))
@@ -102,14 +136,15 @@ class TMaze(gym.Env):
     def step(self, action: int) -> Tuple[int, float | None, bool, bool, dict]:
         self._step_count += 1
         truncated = self._step_count >= self.max_steps
-        reward, terminated = self._take_action(action)
+        _, terminated = self._take_action(action)
         state = self.get_agent_position()
         info = {
             'step_count': self._step_count,
             # 'reward_position': self.get_reward_position()
         }
-        if truncated:
-            reward = 0.0
+        # if truncated:
+        #     reward = 0.0
+        reward = self._reward_func(terminated=terminated, truncated=truncated, step=self._step_count)
         return state, reward, terminated, truncated, info
 
     def get_maze(self):
