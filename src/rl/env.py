@@ -18,7 +18,10 @@ class TMaze(gym.Env):
     WALL = 0
     EMPTY = 1
     AGENT = 2
-    REWARD = 3
+    GOOD = 3
+    BAD = 4
+
+    COLOR_LIST = ["white", "black", "blue", "green", "red"]
 
     action_map = {
         0: np.array([-1, 0], dtype=np.int8),  # Up
@@ -35,8 +38,9 @@ class TMaze(gym.Env):
     }
 
     def __init__(self, size=None, width=None, height=None, pad=1, *, 
-                 max_steps=50, reward_function: Literal["A", "B"] = "A",
-                 reward_min: float = 0.0, reward_max: float = 1.0):
+                 max_steps=50, reward_function: Literal["A", "B", "C"] = "A",
+                 penalty: float = 0.0,
+                 reward_bad: float = -1.0, reward_good: float = 1.0, reward_trunc: float = 0.0):
         """
         Note on reward function:
         - 'A' is giving 1 when reaching target, 0 if truncated (max steps reached)
@@ -47,19 +51,27 @@ class TMaze(gym.Env):
         self.width = size if width is None else width
         self.height = size if height is None else height
         self.pad = pad
-        self.action_space = gym.spaces.Discrete(4)
-        self.reward_min = reward_min
-        self.reward_max = reward_max
+
+        # Reward parameters
+        self.reward_bad = reward_bad
+        self.reward_good = reward_good
+        self.reward_trunc = reward_trunc
         self.reward_function = reward_function
+        self.penalty = penalty
         self.max_steps = int(max_steps)
+
+        # Create important attributes
         self._calculate_min_step()
         self._create_maze()
         self._create_reward_function()
+
+        # Gym spaces
         self.observation_space = gym.spaces.Discrete(self._num_state)
+        self.action_space = gym.spaces.Discrete(4)
         self._step_count = 0
 
         # Set up plotting variables
-        self.cmap = colors.ListedColormap([ "white", "black","blue", "green"])
+        self.cmap = colors.ListedColormap(self.COLOR_LIST)
 
     def _calculate_min_step(self):
         # Do this before padding
@@ -76,8 +88,10 @@ class TMaze(gym.Env):
         self.maze[0, :] = self.EMPTY
         # Set agent starting position
         self.maze[-1, mid_width] = self.AGENT
-        # Set reward position at right wing of T
-        self.maze[0, -1] = self.REWARD
+        # Set good position at right wing of T
+        self.maze[0, -1] = self.GOOD
+        # Set bad position at left wing of T
+        self.maze[0, 0] = self.BAD
         # Add walls
         self.maze = np.pad(self.maze, self.pad, mode='constant', constant_values= self.WALL)
         self.width += 2 * self.pad
@@ -86,26 +100,38 @@ class TMaze(gym.Env):
         self._num_state = np.count_nonzero(self.maze)
         self._empty_idx = np.flatnonzero(self.maze)
         self._agent_pos = np.argwhere(self.maze == self.AGENT)[0]
-        self._reward_pos = np.argwhere(self.maze == self.REWARD)[0]
+        self._good_pos = np.argwhere(self.maze == self.GOOD)[0]
+        self._bad_pos = np.argwhere(self.maze == self.BAD)[0]
         self._starting_state = self._convert_pos_to_state(self._agent_pos)
         self._state_pos_dict = {state: self._convert_state_to_pos(state) for state in range(self._num_state)}
 
-    def _create_reward_function(self):
-        if self.reward_function == "A":
-            def f(terminated, truncated, r, R, **kwargs):
-                return R if terminated and not truncated else r
-            self._reward_func = partial(f, r=self.reward_min, R=self.reward_max)
-        elif self.reward_function == "B":
-            self._reward_func = partial(self.f, m=self.min_steps, M=self.max_steps, r=self.reward_min, R=self.reward_max)
-        else:
-            raise ValueError(f"Invalid reward function: {self.reward_function}. Must be 'A' or 'B'.")
-
     def _reset_position(self):
         self.maze[np.unravel_index(self._empty_idx, self.maze.shape)] = self.EMPTY
-        self.maze[*self._reward_pos] = self.REWARD
+        self.maze[*self._good_pos] = self.GOOD
+        self.maze[*self._bad_pos] = self.BAD
         self._agent_pos = self._convert_state_to_pos(self._starting_state)
         self.maze[*self._agent_pos] = self.AGENT
         self._step_count = 0
+
+    def _create_reward_function(self):
+        if self.reward_function == "A":
+            def f(terminated, truncated, reward, **kwargs):
+                if terminated:
+                    return reward
+                elif truncated:
+                    return self.reward_trunc
+                else:
+                    return reward
+            self._reward_func = partial(f)
+        elif self.reward_function == "B":
+            self._reward_func = partial(self.f, m=self.min_steps, M=self.max_steps, r=0.0, R=1.0)
+        elif self.reward_function == "C":
+            def f(reward, **kwargs):
+                return reward
+            self._reward_func = partial(f)
+        else:
+            raise ValueError(f"Invalid reward function: {self.reward_function}. Must be 'A' or 'B'.")
+
 
     @staticmethod
     def f(step, m, M, r, R, **kwargs):
@@ -136,7 +162,7 @@ class TMaze(gym.Env):
     def step(self, action: int) -> Tuple[int, float | None, bool, bool, dict]:
         self._step_count += 1
         truncated = self._step_count >= self.max_steps
-        _, terminated = self._take_action(action)
+        reward, terminated = self._take_action(action)
         state = self.get_agent_position()
         info = {
             'step_count': self._step_count,
@@ -144,7 +170,7 @@ class TMaze(gym.Env):
         }
         # if truncated:
         #     reward = 0.0
-        reward = self._reward_func(terminated=terminated, truncated=truncated, step=self._step_count)
+        reward = self._reward_func(terminated=terminated, truncated=truncated, step=self._step_count, reward=reward)
         return state, reward, terminated, truncated, info
 
     def get_maze(self):
@@ -154,7 +180,7 @@ class TMaze(gym.Env):
         return self._convert_pos_to_state(self._agent_pos)
     
     def get_reward_position(self):
-        return self._convert_pos_to_state(self._reward_pos)
+        return self._convert_pos_to_state(self._good_pos)
     
     def _convert_pos_to_state(self, pos: np.ndarray):
         flat_idx = np.ravel_multi_index(pos, self.maze.shape)
@@ -171,7 +197,6 @@ class TMaze(gym.Env):
     def _take_action(self, action: int) -> Tuple[float | None, bool]:
         if action is None or action < 0 or action >= self.action_space.n:
             raise ValueError(f"Invalid action: {action}. Must be between [0, {self.action_space.n - 1}].")
-        
         reward = None
         terminated = False
 
@@ -181,16 +206,22 @@ class TMaze(gym.Env):
 
         # Check where the agent would end up
         if new_item == self.WALL:
-            pass
+            reward = self.penalty
         elif new_item == self.EMPTY:
             self.maze[tuple(self._agent_pos)] = self.EMPTY
             self._agent_pos = new_pos
             self.maze[tuple(self._agent_pos)] = self.AGENT
-        elif new_item == self.REWARD:
+        elif new_item == self.GOOD:
             self.maze[tuple(self._agent_pos)] = self.EMPTY
             self._agent_pos = new_pos
             self.maze[tuple(self._agent_pos)] = self.AGENT
-            reward = 1.0
+            reward = self.reward_good
+            terminated = True
+        elif new_item == self.BAD:
+            self.maze[tuple(self._agent_pos)] = self.EMPTY
+            self._agent_pos = new_pos
+            self.maze[tuple(self._agent_pos)] = self.AGENT
+            reward = self.reward_bad
             terminated = True
         
         return reward, terminated
