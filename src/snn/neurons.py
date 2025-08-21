@@ -53,8 +53,9 @@ class NeuronLayer(NeuronLayerProtocol):
     def __init__(self, size: int, *, tau_mem: float = None, tau_trace: float = None, dt: float = 1e-3, threshold: float = 1.0, 
                  wta: bool = False, sim_method: Literal["event-driven", "step-wise"] = "step-wise",
                  spike_method: Literal["deterministic", "stochastic"] = "deterministic", softmax_temp: float = 1.0,
+                 spike_condition: Literal["every", "input"] = "every",
                  reset_mechanism: Literal["rest", "zero", "subtract"] = "rest", mem_rest: float = 0.0, 
-                 reset_condition: Literal["only-winner", "all-above", "all"] = "all-above", delayed_wta: bool = False, 
+                 reset_condition: Literal["only-winner", "all-above", "all", "none"] = "all-above", delayed_wta: bool = False, 
                  trace_amp: float = 1.0, #trace_type: Literal["dx1", "dx2", "dx3", "dx4"] = None,
                  trace_type: Literal["cumulative", "recent", "dx1", "dx2", "dx3", "dx4"] = "recent"):
         # Simulation parameters
@@ -87,14 +88,22 @@ class NeuronLayer(NeuronLayerProtocol):
         self._stochastic_spike = spike_method == "stochastic"
         self.softmax_temp = softmax_temp
         self.wta = wta if not self._stochastic_spike else True # Assume winner take all when spiking is stochastic
+        # Spike condition
+        self.spike_condition = spike_condition
+        self._spike_cond_every = spike_condition == "every"
+        self._spike_cond_input = spike_condition == "input"
+        
         # Reset parameters
+        self.threshold = threshold
+        # Reset condition
         if delayed_wta == True:
             reset_condition = "only-winner" # Backwards compatibility
         self.reset_condition = reset_condition
         self._reset_cond_one = reset_condition == "only-winner"
         self._reset_cond_abv = reset_condition == "all-above"
         self._reset_cond_all = reset_condition == "all"
-        self.threshold = threshold
+        self._reset_cond_nan = reset_condition == "none"
+        # Reset mechanism
         self.reset_mechanism = reset_mechanism
         if self.reset_mechanism == "zero":
             self.reset_mechanism = "rest"
@@ -131,11 +140,11 @@ class NeuronLayer(NeuronLayerProtocol):
         Update the neuron layer state based on the input current and time step.
         """
         # Reset the membrane potential for spiking neurons
-        self._reset_membrane()
+        self._reset_membrane(input_current)
         # Calculate the new membrane potential
         self._update_membrane(input_current)
         # Check for spikes
-        self._set_spike()
+        self._set_spike(input_current)
         # Update the time since last spike
         # self._update_tssp()
         # Update trace
@@ -143,7 +152,7 @@ class NeuronLayer(NeuronLayerProtocol):
 
         return self.spike.astype(np.int8)
 
-    def _reset_membrane(self):
+    def _reset_membrane(self, input_current: np.ndarray = None):
         # If reset_condition == "only-winner", 
         #   only the neuron that spiked (winner) gets their membrane reset.
         #   Other non-spiking neurons with membranes above threshold, will automatically spike in the next step (hence, delayed)
@@ -154,6 +163,7 @@ class NeuronLayer(NeuronLayerProtocol):
         cond = self.spike.astype(bool) if self._reset_cond_one else \
                 (self.membrane >= self.threshold) if self._reset_cond_abv else \
                 sum(self.spike) > 0 if self._reset_cond_all else \
+                False if self._reset_cond_nan else \
                 False
         if self._reset_mech_rest:
             self.membrane[cond] = self.mem_rest
@@ -161,9 +171,13 @@ class NeuronLayer(NeuronLayerProtocol):
             self.membrane[cond] -= self.threshold
 
     def _update_membrane(self, input_current):
-        self.membrane = self.beta_mem * self.membrane + input_current
+        self.membrane = self.beta_mem * (self.membrane - self.mem_rest) + input_current + self.mem_rest
 
-    def _set_spike(self):
+    def _set_spike(self, input_current: np.ndarray = None):
+        if self._spike_cond_input:
+            if input_current is not None and sum(input_current) == 0:
+                self.spike.fill(0)
+                return
         # Deterministic spiking
         if not self._stochastic_spike:
             if self.wta:
@@ -176,7 +190,7 @@ class NeuronLayer(NeuronLayerProtocol):
                     self.spike[idx] = 1
                     return
             else:
-                self.spike = (self.membrane >= self.threshold)
+                self.spike = (self.membrane >= self.threshold).astype(np.int8)
         # Stochastic spiking
         else:
             # Assumes WTA by default -> only one choice of neuron can spike stochastically
