@@ -25,6 +25,7 @@ class SNNSimulator:
     collector: CollectorProtocol | None
     def __init__(self, network: SNN, #spike_generator: SpikeGenerator = None, 
                  env: gym.Env = None, spike_coder: SpikeCoder = None, reward_collector: RewardCollector = None,
+                 update_condition: Literal["on-step", "on-end"] = "on-end",
                  *, 
                 #  params: dict = {},
                 #  decoder_type: Literal["final", "rate", "latency"] = "final", decoder_params: dict = {},
@@ -58,6 +59,7 @@ class SNNSimulator:
         # if hasattr(self.learning_rule, "condition") and self.learning_rule.condition == "on-spike":
         #     self._supervised = False
         self._soft_reset = self.network.use_soft_reset()
+        self.update_condition = update_condition
 
         # # Initialize post-processing components
         # params = copy.deepcopy(params)
@@ -160,6 +162,8 @@ class SNNSimulator:
             if self.spike_coder.ready and action is not None:
                 state, reward, terminated, truncated, info = self.env.step(action)
                 episode_done = terminated or truncated
+                if self.update_condition == "on-step":
+                    self.network.update_synapses(reward=reward)
                 if episode_done:
                     if self.reward_collector is not None:
                         self.reward_collector.collect(reward=reward, episode_length=info.get('step_count', None))
@@ -170,7 +174,7 @@ class SNNSimulator:
                 reward = None
 
             # Update network at the end of each episode
-            if episode_done:
+            if episode_done and self.update_condition == "on-end":
                 self.network.update_synapses(reward=reward)
 
             # # Post-processing

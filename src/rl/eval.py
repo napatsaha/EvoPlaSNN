@@ -50,11 +50,12 @@ class RL_Evaluator(Evaluator):
         self.reward_collector = RewardCollector(**params["collector_params"])
         
         self.simulator = SNNSimulator(self.snn, self.env, self.spike_coder, self.reward_collector,
-                                      record_weights=False if not record_info else True, 
-                                      record_traces=False if not record_info else True,
-                                      record_membrane=False if not record_info else True,
-                                      record_spikes=False if not record_info else True,
-                                      record_eligibility=False if not record_info else True,
+                                      record_weights=record_info, 
+                                      record_traces=record_info,
+                                      record_membrane=record_info,
+                                      record_spikes=record_info,
+                                      record_eligibility=record_info,
+                                      **params.get("simulator_params", {})
                                       )
         self.logger = None
 
