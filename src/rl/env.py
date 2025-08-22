@@ -39,8 +39,8 @@ class TMaze(gym.Env):
 
     def __init__(self, size=None, width=None, height=None, pad=1, *, 
                  max_steps=50, reward_function: Literal["A", "B", "C"] = "A",
-                 penalty: float = 0.0,
-                 reward_bad: float = -1.0, reward_good: float = 1.0, reward_trunc: float = 0.0):
+                 penalty: float = -0.1, reward_inter: float = 0.1,
+                 reward_bad: float = -1.0, reward_good: float = 1.0, reward_trunc: float = -1.0):
         """
         Note on reward function:
         - 'A' is giving 1 when reaching target, 0 if truncated (max steps reached)
@@ -56,14 +56,15 @@ class TMaze(gym.Env):
         self.reward_bad = reward_bad
         self.reward_good = reward_good
         self.reward_trunc = reward_trunc
-        self.reward_function = reward_function
+        # self.reward_function = reward_function
         self.penalty = penalty
+        self.reward_inter = reward_inter
         self.max_steps = int(max_steps)
 
         # Create important attributes
         self._calculate_min_step()
         self._create_maze()
-        self._create_reward_function()
+        # self._create_reward_function()
 
         # Gym spaces
         self.observation_space = gym.spaces.Discrete(self._num_state)
@@ -72,6 +73,55 @@ class TMaze(gym.Env):
 
         # Set up plotting variables
         self.cmap = colors.ListedColormap(self.COLOR_LIST)
+
+    @staticmethod
+    def f(step, m, M, r, R, **kwargs):
+        return (step - M) * (R - r) / (m - M) + r
+
+    def render(self, fig_scale=1.0):
+        fig, ax = plt.subplots(figsize=(self.width * fig_scale, self.height * fig_scale))
+        ax.imshow(self.maze, cmap=self.cmap, extent=(0, self.width, 0, self.height), vmin=0, vmax=4, interpolation="nearest")
+        for state, pos in self._state_pos_dict.items():
+            ax.text(pos[1] + 0.5, self.height - pos[0] - 0.5, r"$s_{"+str(state)+r"}$", ha='center', va='center', fontsize=12, color=self.cmap(0))
+        ax.set_xticks(np.arange(0, self.width, 1), labels=[])
+        ax.set_yticks(np.arange(0, self.height, 1), labels=[])
+        ax.grid(visible=True, color='gray', linewidth=1)
+        plt.show()
+        # return fig
+    
+    def reset(self, *, seed = None, options = None):
+        super().reset(seed=seed, options=options)
+        self._step_count = 0
+        self._reset_position()
+        state = self.get_agent_position()
+        info = {
+            'step_count': self._step_count,
+            # 'reward_position': self.get_reward_position()
+        }
+        return state, info
+
+    def step(self, action: int) -> Tuple[int, float | None, bool, bool, dict]:
+        self._step_count += 1
+        truncated = self._step_count >= self.max_steps
+        displaced_item = self._take_action(action)
+        reward, terminated = self._reward_func(displaced_item)
+        if truncated and not terminated:
+            reward = self.reward_trunc
+        state = self.get_agent_position()
+        info = {
+            'step_count': self._step_count,
+        }
+        # reward = self._reward_func(terminated=terminated, truncated=truncated, step=self._step_count, reward=reward)
+        return state, reward, terminated, truncated, info
+
+    def get_maze(self):
+        return self.maze.copy()
+    
+    def get_agent_position(self):
+        return self._convert_pos_to_state(self._agent_pos)
+    
+    def get_reward_position(self):
+        return self._convert_pos_to_state(self._good_pos)
 
     def _calculate_min_step(self):
         # Do this before padding
@@ -113,74 +163,43 @@ class TMaze(gym.Env):
         self.maze[*self._agent_pos] = self.AGENT
         self._step_count = 0
 
-    def _create_reward_function(self):
-        if self.reward_function == "A":
-            def f(terminated, truncated, reward, **kwargs):
-                if terminated:
-                    return reward
-                elif truncated:
-                    return self.reward_trunc
-                else:
-                    return reward
-            self._reward_func = partial(f)
-        elif self.reward_function == "B":
-            self._reward_func = partial(self.f, m=self.min_steps, M=self.max_steps, r=0.0, R=1.0)
-        elif self.reward_function == "C":
-            def f(reward, **kwargs):
-                return reward
-            self._reward_func = partial(f)
-        else:
-            raise ValueError(f"Invalid reward function: {self.reward_function}. Must be 'A' or 'B'.")
+    # def _create_reward_function(self):
+    #     if self.reward_function == "A":
+    #         def f(terminated, truncated, reward, **kwargs):
+    #             if terminated:
+    #                 return reward
+    #             elif truncated:
+    #                 return self.reward_trunc
+    #             else:
+    #                 return reward
+    #         self._reward_func = partial(f)
+    #     elif self.reward_function == "B":
+    #         self._reward_func = partial(self.f, m=self.min_steps, M=self.max_steps, r=0.0, R=1.0)
+    #     elif self.reward_function == "C":
+    #         def f(reward, **kwargs):
+    #             return reward
+    #         self._reward_func = partial(f)
+    #     else:
+    #         raise ValueError(f"Invalid reward function: {self.reward_function}. Must be 'A' or 'B'.")
 
+    def _reward_func(self, displaced_item: int) -> Tuple[float, bool]:
+        """
+        Return a tuple of (reward, terminated) as a function of the displaced item from the chosen action.
+        """
+        terminated = False
+        if displaced_item == self.WALL:
+            reward = self.penalty
+        elif displaced_item == self.EMPTY:
+            reward = self.reward_inter
+        elif displaced_item == self.GOOD:
+            reward = self.reward_good
+            terminated = True
+        elif displaced_item == self.BAD:
+            reward = self.reward_bad
+            terminated = True
 
-    @staticmethod
-    def f(step, m, M, r, R, **kwargs):
-        return (step - M) * (R - r) / (m - M) + r
+        return reward, terminated
 
-    def render(self, fig_scale=1.0):
-        fig, ax = plt.subplots(figsize=(self.width * fig_scale, self.height * fig_scale))
-        ax.imshow(self.maze, cmap=self.cmap, extent=(0, self.width, 0, self.height), vmin=0, vmax=4, interpolation="nearest")
-        for state, pos in self._state_pos_dict.items():
-            ax.text(pos[1] + 0.5, self.height - pos[0] - 0.5, r"$s_{"+str(state)+r"}$", ha='center', va='center', fontsize=12, color=self.cmap(0))
-        ax.set_xticks(np.arange(0, self.width, 1), labels=[])
-        ax.set_yticks(np.arange(0, self.height, 1), labels=[])
-        ax.grid(visible=True, color='gray', linewidth=1)
-        plt.show()
-        # return fig
-    
-    def reset(self, *, seed = None, options = None):
-        super().reset(seed=seed, options=options)
-        self._step_count = 0
-        self._reset_position()
-        state = self.get_agent_position()
-        info = {
-            'step_count': self._step_count,
-            # 'reward_position': self.get_reward_position()
-        }
-        return state, info
-
-    def step(self, action: int) -> Tuple[int, float | None, bool, bool, dict]:
-        self._step_count += 1
-        truncated = self._step_count >= self.max_steps
-        reward, terminated = self._take_action(action)
-        state = self.get_agent_position()
-        info = {
-            'step_count': self._step_count,
-            # 'reward_position': self.get_reward_position()
-        }
-        # if truncated:
-        #     reward = 0.0
-        reward = self._reward_func(terminated=terminated, truncated=truncated, step=self._step_count, reward=reward)
-        return state, reward, terminated, truncated, info
-
-    def get_maze(self):
-        return self.maze.copy()
-    
-    def get_agent_position(self):
-        return self._convert_pos_to_state(self._agent_pos)
-    
-    def get_reward_position(self):
-        return self._convert_pos_to_state(self._good_pos)
     
     def _convert_pos_to_state(self, pos: np.ndarray):
         flat_idx = np.ravel_multi_index(pos, self.maze.shape)
@@ -194,11 +213,15 @@ class TMaze(gym.Env):
         pos = np.unravel_index(flat_idx, self.maze.shape)
         return np.asarray(pos).reshape(2)
 
-    def _take_action(self, action: int) -> Tuple[float | None, bool]:
-        if action is None or action < 0 or action >= self.action_space.n:
-            raise ValueError(f"Invalid action: {action}. Must be between [0, {self.action_space.n - 1}].")
-        reward = None
-        terminated = False
+    def _take_action(self, action: int) -> int:
+        """
+        Take the corresponding action if it is allowed (i.e. not a WALL), and return the item in the new cell that agent
+        has replaced (or would have replaced, if action wasn't possible). 
+        """
+        # if action is None or action < 0 or action >= self.action_space.n:
+        #     raise ValueError(f"Invalid action: {action}. Must be between [0, {self.action_space.n - 1}].")
+        # reward = None
+        # terminated = False
 
         # Perform movement
         new_pos = self._agent_pos + self.action_map[action]
@@ -206,22 +229,28 @@ class TMaze(gym.Env):
 
         # Check where the agent would end up
         if new_item == self.WALL:
-            reward = self.penalty
-        elif new_item == self.EMPTY:
+            # reward = self.penalty
+            pass
+        else:
             self.maze[tuple(self._agent_pos)] = self.EMPTY
             self._agent_pos = new_pos
             self.maze[tuple(self._agent_pos)] = self.AGENT
-        elif new_item == self.GOOD:
-            self.maze[tuple(self._agent_pos)] = self.EMPTY
-            self._agent_pos = new_pos
-            self.maze[tuple(self._agent_pos)] = self.AGENT
-            reward = self.reward_good
-            terminated = True
-        elif new_item == self.BAD:
-            self.maze[tuple(self._agent_pos)] = self.EMPTY
-            self._agent_pos = new_pos
-            self.maze[tuple(self._agent_pos)] = self.AGENT
-            reward = self.reward_bad
-            terminated = True
+        # elif new_item == self.EMPTY:
+        #     self.maze[tuple(self._agent_pos)] = self.EMPTY
+        #     self._agent_pos = new_pos
+        #     self.maze[tuple(self._agent_pos)] = self.AGENT
+        # elif new_item == self.GOOD:
+        #     self.maze[tuple(self._agent_pos)] = self.EMPTY
+        #     self._agent_pos = new_pos
+        #     self.maze[tuple(self._agent_pos)] = self.AGENT
+        #     reward = self.reward_good
+        #     terminated = True
+        # elif new_item == self.BAD:
+        #     self.maze[tuple(self._agent_pos)] = self.EMPTY
+        #     self._agent_pos = new_pos
+        #     self.maze[tuple(self._agent_pos)] = self.AGENT
+        #     reward = self.reward_bad
+        #     terminated = True
         
-        return reward, terminated
+        return new_item
+    
