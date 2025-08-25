@@ -37,7 +37,7 @@ class SNNSimulator:
         self.num_steps = 0
         self.network = network
         # self.spike_generator = spike_generator
-        self.learning_rule = network.learning_rule
+        self._learning_rule = network.learning_rule
         self.env = env
         self.spike_coder = spike_coder
         self.reward_collector = reward_collector
@@ -67,6 +67,8 @@ class SNNSimulator:
         self.decay_rate = decay_rate
         self.decay_cutoff = decay_cutoff
         self.decay_init_value = self.network.get_exploration_rate(simplify=True)
+        if self._decay:
+            self.reward_collector.cutoff_timestep = decay_cutoff
 
         # # Initialize post-processing components
         # params = copy.deepcopy(params)
@@ -376,6 +378,14 @@ class SNNSimulator:
         Warning("SNNSimulator.plot_traces is deprecated. Use plot.plot_traces(SNN.Simulator) instead.")
         # plot.plot_traces(self, *args, **kwargs)
         return None
+
+    @property
+    def learning_rule(self):
+        return self._learning_rule
+    @learning_rule.setter
+    def learning_rule(self, rule):
+        self._learning_rule = rule
+        self.network.learning_rule = rule
 
     def __repr__(self):
         return f"SNNSimulator(network={self.network})"

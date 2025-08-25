@@ -33,7 +33,7 @@ class SNN:
         self.num_layers = len(self.layer_sizes_active)
 
         # Learning rule
-        self.learning_rule = learning_rule if learning_rule is not None else Empty_Rule()
+        self._learning_rule = learning_rule if learning_rule is not None else Empty_Rule()
 
         # Simulation related parameters
         self.dt = dt
@@ -69,7 +69,7 @@ class SNN:
         for i in range(self.num_layers - 1):
             pre_layer = self.neuron_layers[i]
             post_layer = self.neuron_layers[i + 1]
-            synapse = SynapseLayer(pre_layer, post_layer, learning_rule=self.learning_rule, 
+            synapse = SynapseLayer(pre_layer, post_layer, learning_rule=self._learning_rule, 
                                    dt=self.dt, sim_method=self.sim_method,
                                    **self.synapse_params)
             self.synapse_layers.append(synapse)
@@ -162,6 +162,16 @@ class SNN:
     @property
     def eligibility_traces(self):
         return [synapse.eligibility_trace for synapse in self.synapse_layers]
+
+    @property
+    def learning_rule(self):
+        return self._learning_rule
+    
+    @learning_rule.setter
+    def learning_rule(self, rule: LearningRule):
+        self._learning_rule = rule
+        for synapse in self.synapse_layers:
+            synapse.learning_rule = rule
 
     def __repr__(self):
         return f"SpikingNetwork(input_size={self.input_size}, hidden_size={self.hidden_size}, output_size={self.output_size})"

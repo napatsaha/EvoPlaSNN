@@ -263,7 +263,7 @@ def plot_weights(simulator: 'SNNSimulator', div: int = 5, col_width: float = 6.0
     # plt.close(fig)
 
 
-def plot_weight_over_time(simulator: 'SNNSimulator' = None, values: List[np.ndarray] = None, *, title="", x_min=None, x_max=None,
+def plot_weight_over_time(simulator: 'SNNSimulator' = None, values: List[np.ndarray] = None, *, title: str = None, x_min=None, x_max=None,
                           synapse_layer: int = 0, 
                           savepath=None, show=True, ):
     if simulator is not None:
@@ -273,6 +273,7 @@ def plot_weight_over_time(simulator: 'SNNSimulator' = None, values: List[np.ndar
     x_max = T if x_max is None else x_max
     x_min = 0 if x_min is None else x_min
     L = synapse_layer if synapse_layer < len(values) else 0
+    dt = f"{simulator.dt} s" if simulator is not None else "1 unit"
 
     nrow, ncol = values[L].shape[:2]
     w_mat = values[L]
@@ -287,8 +288,16 @@ def plot_weight_over_time(simulator: 'SNNSimulator' = None, values: List[np.ndar
             ax.plot(w_mat[i, j, :])
             ax.set_ylim(wmin, wmax)
             ax.set_xlim(x_min, x_max)
-    # plt.tight_layout()
-    plt.suptitle(title, y=0.9)
+            if i == 0:
+                ax.text(0.5, 1.05, f"Post Neuron {j}", transform=ax.transAxes, fontsize=16, ha="center")
+            if j == ncol - 1:
+                ax.text(1.05, 0.5, f"Pre Neuron {i}", transform=ax.transAxes, fontsize=16, rotation=-90, va="center")
+    plt.tight_layout()
+    # plt.suptitle(title, y=0.9)
+    # Labelling
+    fig.text(s=f"Time ({dt})", fontsize=12, x=0.5, y=-0.005, ha='center')
+    fig.text(s="Weight Value", fontsize=12, ha='center', x=-0.005, y=0.5, rotation=90, va='center')
+    fig.text(s=title if title is not None else "SNN Weight over Time", fontsize=20, x=0.5, y=1.00, ha='center')
 
     if savepath is not None:
         plt.savefig(savepath)
@@ -366,7 +375,8 @@ def plot_eligibility_traces(simulator: 'SNNSimulator', *, x_scale: float = 0.2, 
     # plt.close(fig)
 
 
-def plot_intermediate_fitness(simulator: 'SNN_Simulator' = None, values: np.ndarray = None, *, num_steps: int = None, timestamps: np.ndarray = None,
+def plot_intermediate_fitness(simulator: 'SNN_Simulator' = None, values: np.ndarray = None, *, plot_exploration: bool = False,
+                              num_steps: int = None, timestamps: np.ndarray = None,
                               x_scale: float = 0.01, y_scale: float = 1.0, x_eps: int = 1,
                               t_min: int = None, t_max: int = None, t_range: int = None, window_size: int = 10,
                               savepath: str | Path = None, show: bool = True):
@@ -402,7 +412,9 @@ def plot_intermediate_fitness(simulator: 'SNN_Simulator' = None, values: np.ndar
         t_min = max(0, t_max - t_range)
 
 
-    fig, ax = plt.subplots(1, 1, figsize=((t_max - t_min) * x_scale, 10 * y_scale), layout="constrained")
+    fig, axs = plt.subplots(1 + int(plot_exploration), 1, figsize=((t_max - t_min) * x_scale, 10 * y_scale * (int(plot_exploration) + 1)), layout="constrained",
+                            squeeze=False)
+    ax = axs[0, 0]
     ax.plot(
         ts, fts,
         color="gray", alpha=0.8,
@@ -417,6 +429,21 @@ def plot_intermediate_fitness(simulator: 'SNN_Simulator' = None, values: np.ndar
     ax.set_xlim(t_min - x_eps, t_max + x_eps)
     ax.set_xlabel("Time (steps)")
     ax.set_ylabel("Fitness")
+    if plot_exploration:
+        ax = axs[1, 0]
+        expl = simulator.reward_collector.get_explorations()
+        ts = [r.t for r in simulator.reward_collector.records]
+        ax.plot(
+            ts, expl,
+            color="red", alpha=0.8,
+            drawstyle="steps-pre",
+            linewidth=2.5, 
+        )
+        ax.set_xlim(t_min - x_eps, t_max + x_eps)
+        if num_steps is not None:
+            ax.xaxis.set_major_locator(plt.MultipleLocator(100))
+        ax.set_xlabel("Time (steps)")
+        ax.set_ylabel("Exploration Rate")
     fig.text(0.5, 1.07, "Intermediate Fitness Over Time", ha='center', fontsize=20)
     fig.text(0.5, 1.02, f"Average Fitness: {ft:.2f}", ha='center', fontsize=14)
     if savepath is not None:
