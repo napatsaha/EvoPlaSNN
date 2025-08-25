@@ -30,7 +30,8 @@ class SNNSimulator:
                 #  params: dict = {},
                 #  decoder_type: Literal["final", "rate", "latency"] = "final", decoder_params: dict = {},
                 #  fitnessor_type: Literal["accuracy", "reward", "cross-entropy", "mse"] = "accuracy", fitnessor_params: dict = {},
-                 supervised: bool = True,
+                 supervised: bool = True, decay: bool = True,
+                 decay_rate: float = None, decay_cutoff: int = None, 
                  record_membrane: bool = True, record_spikes: bool = True, record_traces: bool = True, record_weights: bool = False,
                  record_eligibility: bool = False):
         self.num_steps = 0
@@ -60,6 +61,12 @@ class SNNSimulator:
         #     self._supervised = False
         self._soft_reset = self.network.use_soft_reset()
         self.update_condition = update_condition
+
+        # Deal with decaying exploration over course of simulation
+        self._decay = decay
+        self.decay_rate = decay_rate
+        self.decay_cutoff = decay_cutoff
+        self.decay_init_value = self.network.get_exploration_rate(simplify=True)
 
         # # Initialize post-processing components
         # params = copy.deepcopy(params)
@@ -106,6 +113,7 @@ class SNNSimulator:
         """
         # Reset step count
         self.num_steps = 0
+        self._decay = True
 
         # Reset recorders
         if self.record_membrane:
@@ -144,6 +152,7 @@ class SNNSimulator:
         # _new_sample = True
         state, info = self.env.reset()
         episode_done = False
+        episode_count = 0
         for t in range(t_start, self.num_steps):
 
             # Random input spikes
@@ -166,9 +175,15 @@ class SNNSimulator:
                     self.network.update_synapses(reward=reward)
                 if episode_done:
                     if self.reward_collector is not None:
-                        self.reward_collector.collect(reward=reward, episode_length=info.get('step_count', None))
+                        self.reward_collector.collect(
+                            t=t,
+                            episode=episode_count,
+                            reward=reward, 
+                            episode_length=info.get('step_count', None),
+                            exploration=self.network.get_exploration_rate(simplify=True))
                     self.env.reset()
                     state, info = self.env.reset()
+                    episode_count += 1
             else:
                 episode_done = False
                 reward = None
@@ -176,6 +191,18 @@ class SNNSimulator:
             # Update network at the end of each episode
             if episode_done and self.update_condition == "on-end":
                 self.network.update_synapses(reward=reward)
+
+            # Update softmax temperature / exploration rate
+            if episode_done and self._decay:
+                if t < self.decay_cutoff:
+                    # Update softmax temp at end of episode
+                    new_rate = self.decay_init_value * np.exp(-t * self.decay_rate / self.decay_cutoff)
+                    self.network.set_exploration_rate(new_rate)
+                else:
+                    # Set simulator to deterministic
+                    self.network.set_deterministic()
+                    self._decay = False
+
 
             # # Post-processing
             # # If using Decoder-Fitnessor scheme

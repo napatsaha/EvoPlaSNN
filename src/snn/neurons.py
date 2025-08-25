@@ -52,7 +52,8 @@ class NeuronLayer(NeuronLayerProtocol):
     """
     def __init__(self, size: int, *, tau_mem: float = None, tau_trace: float = None, dt: float = 1e-3, threshold: float = 1.0, 
                  wta: bool = False, sim_method: Literal["event-driven", "step-wise"] = "step-wise",
-                 spike_method: Literal["deterministic", "stochastic"] = "deterministic", softmax_temp: float = 1.0,
+                 spike_method: Literal["deterministic", "stochastic"] = "deterministic", 
+                 softmax_temp: float = 1.0, 
                  spike_condition: Literal["every", "input"] = "every",
                  reset_mechanism: Literal["rest", "zero", "subtract"] = "rest", mem_rest: float = 0.0, 
                  reset_condition: Literal["only-winner", "all-above", "all", "none"] = "all-above", delayed_wta: bool = False, 
@@ -84,9 +85,10 @@ class NeuronLayer(NeuronLayerProtocol):
         self.beta_trace = np.exp(-self.dt / self.tau_trace)  # Decay rate for trace
 
         # Spiking parameters
-        self.spike_method = spike_method
+        self._spike_method = spike_method
         self._stochastic_spike = spike_method == "stochastic"
-        self.softmax_temp = softmax_temp
+        self._initial_softmax_temp = softmax_temp
+        self._softmax_temp = softmax_temp
         self.wta = wta if not self._stochastic_spike else True # Assume winner take all when spiking is stochastic
         # Spike condition
         self.spike_condition = spike_condition
@@ -202,7 +204,7 @@ class NeuronLayer(NeuronLayerProtocol):
             else:
                 # Probability of spiking is based on membrane potentials of neurons themselves (softmax with temperature),
                 #   regardless of which one is above threshold
-                probs = softmax(self.membrane, temperature=self.softmax_temp)
+                probs = softmax(self.membrane, temperature=self._softmax_temp)
                 idx = np.random.choice(self.size, p=probs)
                 self.spike[idx] = 1
 
@@ -271,6 +273,27 @@ class NeuronLayer(NeuronLayerProtocol):
         Returns the trace of the neuron layer.
         """
         return self.get_trace()
+
+    @property
+    def spike_method(self) -> str:
+        return self._spike_method
+    
+    @spike_method.setter
+    def spike_method(self, value: Literal["stochastic", "deterministic"]):
+        assert value in ["stochastic", "deterministic"], "New spike method model not supported."
+        self._spike_method = value
+        self._stochastic_spike = self._spike_method == "stochastic"
+
+    @property
+    def softmax_temp(self) -> float:
+        if self._stochastic_spike:
+            return self._softmax_temp
+        else:
+            return 0.0
+    
+    @softmax_temp.setter
+    def softmax_temp(self, value: float):
+        self._softmax_temp = value
 
     def __repr__(self):
         return f"NeuronLayer(size={self.size}, tau_mem={self.tau_mem}, tau_trace={self.tau_trace}, threshold={self.threshold}, wta={self.wta})"
