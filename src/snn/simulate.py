@@ -307,7 +307,7 @@ class SNNSimulator:
         #     return self.collector.get_intermediate_fitness(use_portion=use_portion)
         # else:
             # return None
-        return self.reward_collector.get_rewards() if self.reward_collector is not None else None
+        return self.reward_collector.get_rewards(use_cutoff=use_portion) if self.reward_collector is not None else None
 
     def get_target_fitness(self) -> float | None:
         # if self._post_process_type == 0:

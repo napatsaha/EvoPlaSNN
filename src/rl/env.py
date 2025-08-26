@@ -123,6 +123,12 @@ class TMaze(gym.Env):
     def get_reward_position(self):
         return self._convert_pos_to_state(self._good_pos)
 
+    def get_min_reward(self):
+        return min(self.reward_bad, self.reward_good, self.penalty, self.reward_trunc, self.reward_inter)
+    
+    def get_max_reward(self):
+        return max(self.reward_bad, self.reward_good, self.penalty, self.reward_trunc, self.reward_inter)
+
     def _calculate_min_step(self):
         # Do this before padding
         up = self.height - 1

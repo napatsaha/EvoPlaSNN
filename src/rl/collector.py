@@ -8,12 +8,14 @@ EpsInfo = namedtuple("EpsInfo", ["t", "episode", "reward", "length", "exploratio
 
 class RewardCollector:
     records: List[EpsInfo]
-    def __init__(self, *, cutoff_timestep: int = 0):
+    def __init__(self, *, cutoff_timestep: int = 0, max_fitness: float = 1.0, min_fitness: float = -1.0):
         # self.reward_history = []
         # self.episode_lengths = []
         self.records = []
         self.cutoff_timestep = cutoff_timestep
         self.minimise = False
+        self.max_fitness = max_fitness
+        self.min_fitness = min_fitness
         
     def reset(self):
         """
@@ -60,4 +62,7 @@ class RewardCollector:
         Sum of all rewards collected.  
         (Assuming fixed simulation length, larger sum means shorter episode.)
         """
-        return np.mean(self.get_rewards(use_cutoff=True))
+        rewards = self.get_rewards(use_cutoff=True)
+        if len(rewards) == 0:
+            return self.min_fitness
+        return np.mean(rewards)

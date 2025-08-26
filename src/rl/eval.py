@@ -48,6 +48,9 @@ class RL_Evaluator(Evaluator):
         self.arule = ANN_Rule(**params["arule_params"]) if learning_rule is None else learning_rule
         self.snn = SNN(input_size=num_states, output_size=num_actions, learning_rule=self.arule, **params["snn_params"])
         self.reward_collector = RewardCollector(**params["collector_params"])
+        # Update min and max fitness from environment
+        self.reward_collector.min_fitness = self.env.get_min_reward()
+        self.reward_collector.max_fitness = self.env.get_max_reward()
         
         self.simulator = SNNSimulator(self.snn, self.env, self.spike_coder, self.reward_collector,
                                       record_weights=record_info, 
@@ -77,7 +80,7 @@ class RL_Evaluator(Evaluator):
         Returns the target fitness for the evaluation.
         This is used to determine when the optimisation should stop.
         """
-        return self.simulator.get_target_fitness()
+        return self.reward_collector.max_fitness
 
     def setup_logger(self, results_path: Path = None):
         self.results_path = results_path
@@ -141,14 +144,14 @@ class RL_Evaluator(Evaluator):
             if self._log_info >= 1:
                 self.logger.info(f"Trial {i+1}/{num_trials}: Finished Evaluation. Time taken: {t1 - t0:.4f} seconds.")
                 # Get intermediate fitness across samples
-                intermediate_fitness = self.reward_collector.get_rewards()
+                intermediate_fitness = self.simulator.get_intermediate_fitness(use_portion=True)
                 self.write_trial(self.gen_count, self.inv_count, i, fitness, intermediate_fitness)
         
         if return_fitness_list:
             return fitnesses        
         
-        avg_fitness = np.mean(fitnesses)
-        std_fitness = np.std(fitnesses)
+        avg_fitness = np.mean(fitnesses, where=~np.isnan(fitnesses))
+        std_fitness = np.std(fitnesses, where=~np.isnan(fitnesses))
         
         if self._log_info >= 1:
             t10 = time.time()

@@ -14,8 +14,8 @@ class EvoManager:
     Main class for managing loop of evolutionary optimisation.
     """
     def __init__(self, solver: BaseSolver, evaluator: Evaluator, *, num_trials: int = 1, results_path: str = None,
-                 max_generations: int = None, target_fitness: float = None, tolerance: float = 1e-6, 
-                 max_stagnation: int = None,
+                 max_generations: int = None, max_stagnation: int = None,
+                 use_target_fitness: bool = None, target_fitness: float = None, tolerance: float = 1e-6, 
                  record_classes: bool = False, save_best: int = 1,
                 #  update_inputs: bool = True,  # Whether to update input classes for each generation
                  **kwargs):
@@ -33,7 +33,7 @@ class EvoManager:
         # Termination control
         self.max_generations = max(max_generations, 1) # Ensure non-zero and non-negative
         self.target_fitness = target_fitness
-        self._check_target_fitness = target_fitness is not None
+        self._check_target_fitness = use_target_fitness if use_target_fitness is not None else (target_fitness is not None)
         self.tolerance = tolerance
         self._check_stagnation = True if max_stagnation is not None else False
         self.max_stagnation = max_stagnation
