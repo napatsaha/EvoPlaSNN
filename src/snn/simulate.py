@@ -63,6 +63,7 @@ class SNNSimulator:
         self.update_condition = update_condition
 
         # Deal with decaying exploration over course of simulation
+        self._use_decay = decay
         self._decay = decay
         self.decay_rate = decay_rate
         self.decay_cutoff = decay_cutoff
@@ -115,7 +116,10 @@ class SNNSimulator:
         """
         # Reset step count
         self.num_steps = 0
-        self._decay = True
+        if self._use_decay:
+            self._decay = True
+            self.network.set_stochastic()
+            self.network.set_exploration_rate(self.decay_init_value)
 
         # Reset recorders
         if self.record_membrane:

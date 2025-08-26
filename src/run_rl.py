@@ -218,7 +218,7 @@ def eval(results_path: Path | str = None, *, config_path: str | Path = None, num
                                      savepath=Path(results_path, f"{prefix}_weight_heatmap.png") if save_plots else None, show=show_plots)
         if simulator.record_eligibility:
             snn_plot.plot_eligibility_traces(simulator, savepath=Path(results_path, f"{prefix}_eligibility_traces.png") if save_plots else None, show=show_plots)
-        snn_plot.plot_intermediate_fitness(simulator, window_size=20, plot_exploration=True,
+        snn_plot.plot_intermediate_fitness(simulator, window_size=20, plot_exploration=True,x_scale=0.025, y_scale=0.75,
                                            savepath=Path(results_path, f"{prefix}_intermediate_fitness.png") if save_plots else None, show=show_plots)
 
     if not return_evaluator:

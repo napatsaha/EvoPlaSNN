@@ -55,6 +55,7 @@ class NeuronLayer(NeuronLayerProtocol):
                  spike_method: Literal["deterministic", "stochastic"] = "deterministic", 
                  softmax_temp: float = 1.0, 
                  spike_condition: Literal["every", "input"] = "every",
+                 ignore_threshold: bool = False,
                  reset_mechanism: Literal["rest", "zero", "subtract"] = "rest", mem_rest: float = 0.0, 
                  reset_condition: Literal["only-winner", "all-above", "all", "none"] = "all-above", delayed_wta: bool = False, 
                  trace_amp: float = 1.0, #trace_type: Literal["dx1", "dx2", "dx3", "dx4"] = None,
@@ -94,6 +95,7 @@ class NeuronLayer(NeuronLayerProtocol):
         self.spike_condition = spike_condition
         self._spike_cond_every = spike_condition == "every"
         self._spike_cond_input = spike_condition == "input"
+        self._ignore_threshold = ignore_threshold
         
         # Reset parameters
         self.threshold = threshold
@@ -176,17 +178,23 @@ class NeuronLayer(NeuronLayerProtocol):
         self.membrane = self.beta_mem * (self.membrane - self.mem_rest) + input_current + self.mem_rest
 
     def _set_spike(self, input_current: np.ndarray = None):
+        # Always reset previous timestep's spikes regardless of what happens next
+        self.spike.fill(0)
+        # If there is no input, do not spike (only if spike_condition = "input")
         if self._spike_cond_input:
             if input_current is not None and sum(input_current) == 0:
-                self.spike.fill(0)
                 return
         # Deterministic spiking
         if not self._stochastic_spike:
+            # If Winner-Take-All, only one neuron can spike
             if self.wta:
-                above_thr = self.membrane >= self.threshold
-                self.spike.fill(0)
-                if sum(above_thr) == 0:
-                    return
+                # If not ignoring threshold, only spike if at least one neuron is above threshold
+                if not self._ignore_threshold:
+                    above_thr = self.membrane >= self.threshold
+                    # self.spike.fill(0)
+                    if sum(above_thr) == 0:
+                        return
+                # Otherwise, spike based on highest membrane regardless of being below threshold or not
                 else:
                     idx = np.argmax(self.membrane)
                     self.spike[idx] = 1
@@ -196,11 +204,13 @@ class NeuronLayer(NeuronLayerProtocol):
         # Stochastic spiking
         else:
             # Assumes WTA by default -> only one choice of neuron can spike stochastically
-            above_thr = self.membrane >= self.threshold
-            self.spike.fill(0)
-            if sum(above_thr) == 0:
-                # Will only spike if at least one neuron has membrane above threshold
-                return
+            if not self._ignore_threshold:
+                above_thr = self.membrane >= self.threshold
+                # self.spike.fill(0)
+                if sum(above_thr) == 0:
+                    # Will only spike if at least one neuron has membrane above threshold
+                    return
+            # If ignoring threshold, all neurons have a chance of spiking
             else:
                 # Probability of spiking is based on membrane potentials of neurons themselves (softmax with temperature),
                 #   regardless of which one is above threshold
