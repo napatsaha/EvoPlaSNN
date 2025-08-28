@@ -174,7 +174,7 @@ class SNNSimulator:
             action = self.spike_coder.decode(spk_out)
 
             # Increment environment step if the spike coder says so
-            if self.spike_coder.ready and action is not None:
+            if self.spike_coder.ready:
                 state, reward, terminated, truncated, info = self.env.step(action)
                 episode_done = terminated or truncated
                 if self.update_condition == "on-step":

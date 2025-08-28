@@ -51,14 +51,16 @@ class SpikeCoder:
 
         Returns:
             int: The decoded action.
+
+            Returns None only when Spike Coder is not ready (i.e. it is within waiting interval of input encoding).
         """
         if not self._ready:
             return None
         spk_idx = spikes.nonzero()[0]
         if len(spk_idx) == 0:
-            action = None
+            action = -1
         elif len(spk_idx) > 1:
-            action = None
+            action = np.random.choice(spk_idx).item()
         else:
             action = spk_idx.item()
         return action

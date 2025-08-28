@@ -24,6 +24,7 @@ class TMaze(gym.Env):
     COLOR_LIST = ["white", "black", "blue", "green", "red"]
 
     action_map = {
+        -1: np.array([0, 0], dtype=np.int8), # Stationary
         0: np.array([-1, 0], dtype=np.int8),  # Up
         1: np.array([1, 0], dtype=np.int8),   # Down
         2: np.array([0, -1], dtype=np.int8),  # Left
@@ -31,6 +32,7 @@ class TMaze(gym.Env):
     }
 
     action_names = {
+        -1: "Stay",
         0: "Up",
         1: "Down",
         2: "Left",
@@ -203,6 +205,11 @@ class TMaze(gym.Env):
         elif displaced_item == self.BAD:
             reward = self.reward_bad
             terminated = True
+        elif displaced_item == self.AGENT:
+            # Stationary case
+            reward = 0.0
+        else:
+            raise ValueError(f"Invalid displaced item: {displaced_item}.")
 
         return reward, terminated
 
