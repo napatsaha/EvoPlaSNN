@@ -109,7 +109,7 @@ class TMaze(gym.Env):
         self.reward_good = reward_good
         self.reward_trunc = reward_trunc
         # Intermediate reward
-        self._reward_step_closer = reward_step_closer
+        self._check_closest_distance = reward_step_closer
         self.penalty = penalty
         self.reward_inter = reward_inter
 
@@ -123,69 +123,12 @@ class TMaze(gym.Env):
         self.action_space = gym.spaces.Discrete(4)
         self._step_count = 0
         self._closest_dist = self.min_steps
+        self._prev_dist = None
 
         # Plotting attributes
         self.cmap = colors.ListedColormap(self.COLOR_LIST)
 
-    @staticmethod
-    def f(step, m, M, r, R, **kwargs):
-        return (step - M) * (R - r) / (m - M) + r
-
-    def render(self, fig_scale=1.0):
-        fig, ax = plt.subplots(figsize=(self.width * fig_scale, self.height * fig_scale))
-        ax.imshow(self.maze, cmap=self.cmap, extent=(0, self.width, 0, self.height), vmin=0, vmax=4, interpolation="nearest")
-        for state, pos in self._state_pos_dict.items():
-            ax.text(pos[1] + 0.5, self.height - pos[0] - 0.5, r"$s_{"+str(state)+r"}$", ha='center', va='center', fontsize=12, color=self.cmap(0))
-        ax.set_xticks(np.arange(0, self.width, 1), labels=[])
-        ax.set_yticks(np.arange(0, self.height, 1), labels=[])
-        ax.grid(visible=True, color='gray', linewidth=1)
-        plt.show()
-        # return fig
-    
-    def reset(self, *, seed = None, options = None):
-        super().reset(seed=seed, options=options)
-        self._step_count = 0
-        self._reset_position()
-        state = self.get_agent_position()
-        info = {
-            'step_count': self._step_count,
-            # 'reward_position': self.get_reward_position()
-        }
-        if self._reward_step_closer:
-            self._closest_dist = self.min_steps
-        return state, info
-
-    def step(self, action: int) -> Tuple[int, float | None, bool, bool, dict]:
-        self._step_count += 1
-        truncated = self._step_count >= self.max_steps
-        displaced_item, new_dist = self._take_action(action)
-        reward, terminated = self._reward_func(displaced_item, new_dist)
-        if truncated and not terminated:
-            reward = self.reward_trunc
-        state = self.get_agent_position()
-        info = {
-            'step_count': self._step_count,
-            'manhattan_dist': new_dist,
-            'closest_dist': self._closest_dist
-        }
-        # reward = self._reward_func(terminated=terminated, truncated=truncated, step=self._step_count, reward=reward)
-        return state, reward, terminated, truncated, info
-
-    def get_maze(self):
-        return self.maze.copy()
-    
-    def get_agent_position(self):
-        return self._convert_pos_to_state(self._agent_pos)
-    
-    def get_reward_position(self):
-        return self._convert_pos_to_state(self._good_pos)
-
-    def get_min_reward(self):
-        return min(self.reward_bad, self.reward_good, self.penalty, self.reward_trunc, self.reward_inter)
-    
-    def get_max_reward(self):
-        return max(self.reward_bad, self.reward_good, self.penalty, self.reward_trunc, self.reward_inter)
-
+    ## Creation functions
     def _calculate_min_step(self):
         # Do this before padding
         up = self.height - 1
@@ -218,6 +161,7 @@ class TMaze(gym.Env):
         self._starting_state = self._convert_pos_to_state(self._agent_pos)
         self._state_pos_dict = {state: self._convert_state_to_pos(state) for state in range(self._num_state)}
 
+    ## Internal functions
     def _reset_position(self):
         self.maze[np.unravel_index(self._empty_idx, self.maze.shape)] = self.EMPTY
         self.maze[*self._good_pos] = self.GOOD
@@ -225,6 +169,137 @@ class TMaze(gym.Env):
         self._agent_pos = self._convert_state_to_pos(self._starting_state)
         self.maze[*self._agent_pos] = self.AGENT
         self._step_count = 0
+
+    def _take_action(self, action: int, info: dict) -> Tuple[float, dict]:
+        """
+        Internals of a step function:
+        - Apply chosen action to current agent position to see what item would be displaced
+        - If it's a wall, cancel the motion. 
+        - Otherwise, calculate and apply the new position to agent
+        - Calculate the Manhattan distance and update closest distant if required
+        - Finally calculate reward and whether the episode is now terminated
+
+        The info dictionary are there to store intermediate information
+        """
+        terminated = False
+        reward = 0.0
+        new_dist = self._prev_dist
+
+        # Perform supposed movement
+        new_pos = self._agent_pos + self.action_map[action]
+        displaced_item = self.maze[*new_pos]
+
+        # Check where the agent would end up
+        if displaced_item == self.WALL:
+            # Bumping into wall
+            reward = self.penalty
+        elif displaced_item == self.AGENT:
+            # Stationary case
+            reward = 0.0
+        else:
+            # Valid movement possible
+            self.maze[tuple(self._agent_pos)] = self.EMPTY
+            self._agent_pos = new_pos
+            self.maze[tuple(self._agent_pos)] = self.AGENT
+
+            # Calculate new closest distance
+            if self._check_closest_distance:
+                new_dist = man_dist(self._agent_pos, self._good_pos).item()
+                self._prev_dist = new_dist
+                if new_dist < self._closest_dist:
+                    self._closest_dist = new_dist
+                    reward = self.reward_inter
+                else:
+                    reward = 0.0            
+            else:
+                reward = self.reward_inter
+
+            # Calculate reward and terminate for non-empty cells
+            if displaced_item == self.GOOD:
+                reward = self.reward_good
+                terminated = True
+            elif displaced_item == self.BAD:
+                reward = self.reward_bad
+                terminated = True
+            else:
+                pass
+
+        info['manhattan_dist'] = new_dist
+        info["closest_dist"] = self._closest_dist
+        info["terminated"] = terminated
+
+        return reward, info
+    
+    ## Helper functions
+    def _convert_pos_to_state(self, pos: np.ndarray):
+        flat_idx = np.ravel_multi_index(pos, self.maze.shape)
+        state_idx = np.isin(self._empty_idx, flat_idx).nonzero()[0]
+        return state_idx.item()
+    
+    def _convert_state_to_pos(self, state: int):
+        if state < 0 or state >= self._num_state:
+            raise ValueError(f"State index out of bounds. Must be between [0, {self._num_state - 1}]. Got state: {state}")
+        flat_idx = self._empty_idx[state]
+        pos = np.unravel_index(flat_idx, self.maze.shape)
+        return np.asarray(pos).reshape(2)
+
+    ## Gym functions
+    def render(self, fig_scale=1.0):
+        fig, ax = plt.subplots(figsize=(self.width * fig_scale, self.height * fig_scale))
+        ax.imshow(self.maze, cmap=self.cmap, extent=(0, self.width, 0, self.height), vmin=0, vmax=4, interpolation="nearest")
+        for state, pos in self._state_pos_dict.items():
+            ax.text(pos[1] + 0.5, self.height - pos[0] - 0.5, r"$s_{"+str(state)+r"}$", ha='center', va='center', fontsize=12, color=self.cmap(0))
+        ax.set_xticks(np.arange(0, self.width, 1), labels=[])
+        ax.set_yticks(np.arange(0, self.height, 1), labels=[])
+        ax.grid(visible=True, color='gray', linewidth=1)
+        plt.show()
+        # return fig
+    
+    def reset(self, *, seed = None, options = None):
+        super().reset(seed=seed, options=options)
+        self._step_count = 0
+        self._reset_position()
+        state = self.get_agent_position()
+        info = {
+            'step_count': self._step_count,
+            # 'reward_position': self.get_reward_position()
+        }
+        if self._check_closest_distance:
+            self._closest_dist = self.min_steps
+            self._prev_dist = self._closest_dist
+            info['closest_dist'] = self._closest_dist
+        return state, info
+
+    def step(self, action: int) -> Tuple[int, float | None, bool, bool, dict]:
+        self._step_count += 1
+        info = {'step_count': self._step_count}
+        truncated = self._step_count >= self.max_steps
+        reward, info = self._take_action(action, info)
+        terminated = info.get('terminated', None)
+        if truncated and not terminated:
+            reward = self.reward_trunc
+        state = self.get_agent_position()
+        return state, reward, terminated, truncated, info
+
+    ## Other functions
+    @staticmethod
+    def f(step, m, M, r, R, **kwargs):
+        return (step - M) * (R - r) / (m - M) + r
+
+    def get_maze(self):
+        return self.maze.copy()
+    
+    def get_agent_position(self):
+        return self._convert_pos_to_state(self._agent_pos)
+    
+    def get_reward_position(self):
+        return self._convert_pos_to_state(self._good_pos)
+
+    def get_min_reward(self):
+        return min(self.reward_bad, self.reward_good, self.penalty, self.reward_trunc, self.reward_inter)
+    
+    def get_max_reward(self):
+        return max(self.reward_bad, self.reward_good, self.penalty, self.reward_trunc, self.reward_inter)
 
     # def _create_reward_function(self):
     #     if self.reward_function == "A":
@@ -245,78 +320,36 @@ class TMaze(gym.Env):
     #     else:
     #         raise ValueError(f"Invalid reward function: {self.reward_function}. Must be 'A' or 'B'.")
 
-    def _reward_func(self, displaced_item: int, new_dist: int | None) -> Tuple[float, bool]:
-        """
-        Return a tuple of (reward, terminated) as a function of the displaced item from the chosen action.
-        """
-        terminated = False
+    # def _reward_func(self, displaced_item: int, new_dist: int | None) -> Tuple[float, bool]:
+    #     """
+    #     Return a tuple of (reward, terminated) as a function of the displaced item from the chosen action.
+    #     """
+    #     terminated = False
 
-        if displaced_item == self.WALL:
-            reward = self.penalty
-        elif displaced_item == self.EMPTY:
-            if self._reward_step_closer:
-                if new_dist < self._closest_dist:
-                    self._closest_dist = new_dist
-                    reward = self.reward_inter
-                else:
-                    reward = 0.0
-            else:
-                reward = self.reward_inter
-        elif displaced_item == self.GOOD:
-            reward = self.reward_good
-            terminated = True
-        elif displaced_item == self.BAD:
-            reward = self.reward_bad
-            terminated = True
-        elif displaced_item == self.AGENT:
-            # Stationary case
-            reward = 0.0
-        else:
-            raise ValueError(f"Invalid displaced item: {displaced_item}.")
+    #     if displaced_item == self.WALL:
+    #         reward = self.penalty
+    #     elif displaced_item == self.EMPTY:
+    #         if self._reward_step_closer:
+    #             if new_dist < self._closest_dist:
+    #                 self._closest_dist = new_dist
+    #                 reward = self.reward_inter
+    #             else:
+    #                 reward = 0.0
+    #         else:
+    #             reward = self.reward_inter
+    #     elif displaced_item == self.GOOD:
+    #         reward = self.reward_good
+    #         terminated = True
+    #     elif displaced_item == self.BAD:
+    #         reward = self.reward_bad
+    #         terminated = True
+    #     elif displaced_item == self.AGENT:
+    #         # Stationary case
+    #         reward = 0.0
+    #     else:
+    #         raise ValueError(f"Invalid displaced item: {displaced_item}.")
 
-        return reward, terminated
+    #     return reward, terminated
 
     
-    def _convert_pos_to_state(self, pos: np.ndarray):
-        flat_idx = np.ravel_multi_index(pos, self.maze.shape)
-        state_idx = np.isin(self._empty_idx, flat_idx).nonzero()[0]
-        return state_idx.item()
-    
-    def _convert_state_to_pos(self, state: int):
-        if state < 0 or state >= self._num_state:
-            raise ValueError(f"State index out of bounds. Must be between [0, {self._num_state - 1}]. Got state: {state}")
-        flat_idx = self._empty_idx[state]
-        pos = np.unravel_index(flat_idx, self.maze.shape)
-        return np.asarray(pos).reshape(2)
 
-    def _take_action(self, action: int) -> Tuple[int, int | None]:
-        """
-        Take the corresponding action if it is allowed (i.e. not a WALL), and return the item in the new cell that agent
-        has replaced (or would have replaced, if action wasn't possible). 
-        """
-        # if action is None or action < 0 or action >= self.action_space.n:
-        #     raise ValueError(f"Invalid action: {action}. Must be between [0, {self.action_space.n - 1}].")
-        # reward = None
-        # terminated = False
-
-        # Perform movement
-        new_pos = self._agent_pos + self.action_map[action]
-        new_item = self.maze[*new_pos]
-
-        # Check where the agent would end up
-        if new_item == self.WALL:
-            # reward = self.penalty
-            pass
-        else:
-            self.maze[tuple(self._agent_pos)] = self.EMPTY
-            self._agent_pos = new_pos
-            self.maze[tuple(self._agent_pos)] = self.AGENT
-
-        # Calculate new closest distance
-        if self._reward_step_closer:
-            new_dist = man_dist(self._agent_pos, self._good_pos).item()
-        else:
-            new_dist = None
-        
-        return new_item, new_dist
-    
