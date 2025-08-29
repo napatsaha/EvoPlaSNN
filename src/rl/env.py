@@ -11,7 +11,30 @@ from typing import Literal, Tuple
 from functools import partial
 
 
+def man_dist(x, y):
+    """A simplified Manhattan distance calculator"""
+    return np.abs(x - y).sum()
+
+
 class TMaze(gym.Env):
+    """
+    T-Maze environment for reinforcement learning.
+
+    Attributes:
+        width (int): The width of the environment.
+        height (int): The height of the environment.
+        pad (int): The padding around the environment.
+        reward_bad (float): The reward for bad actions.
+        reward_good (float): The reward for good actions.
+        reward_trunc (float): The reward for truncation or termination.
+        penalty (float): The penalty for invalid actions or other undesirable behavior.
+        reward_inter (float): The intermediate reward for certain actions.
+        max_steps (int): The maximum number of steps allowed in the environment.
+        observation_space (gym.spaces.Discrete): The observation space of the environment.
+        action_space (gym.spaces.Discrete): The action space of the environment.
+        _step_count (int): The current step count in the environment.
+        cmap (colors.ListedColormap): The colormap used for plotting the environment.
+    """
     action_space: gym.spaces.Discrete
     observation_space: gym.spaces.Discrete
 
@@ -40,40 +63,68 @@ class TMaze(gym.Env):
     }
 
     def __init__(self, size=None, width=None, height=None, pad=1, *, 
-                 max_steps=50, reward_function: Literal["A", "B", "C"] = "A",
+                 max_steps=50, 
+                 reward_step_closer: bool = False,
                  penalty: float = -0.1, reward_inter: float = 0.1,
                  reward_bad: float = -1.0, reward_good: float = 1.0, reward_trunc: float = -1.0):
         """
-        Note on reward function:
-        - 'A' is giving 1 when reaching target, 0 if truncated (max steps reached)
-        - 'B' is giving a linearly-decreasing value (scaled between 0 and 1) 
-            inversely proportional to the number of steps taken, ranging from min_steps (determined by size) to max_steps (user-determined).
+        Initializes the environment with the given parameters.
+
+        Args:
+            size (int, optional): The size of the environment. If `width` and `height` 
+                are not provided, this value is used for both dimensions. Defaults to None.
+
+            width (int, optional): The width of the environment. Defaults to None.
+
+            height (int, optional): The height of the environment. Defaults to None.
+
+            pad (int, optional): The padding around the environment. Defaults to 1.
+
+            max_steps (int, optional): The maximum number of steps allowed in the environment. Defaults to 50.
+
+            reward_step_closer (bool, optional): Whether to reward the agent for stepping closer to the goal 
+                (by comparing whether the Manhattan distance between agent and goal is closer than has ever been in this episode). Defaults to False.
+
+            penalty (float, optional): The intermediate penalty for agent bumping into walls. Defaults to -0.1.
+
+            reward_inter (float, optional): The intermediate reward for either stepping into empty cell (if `reward_step_closer=False`)
+                or getting closer to goal (if `reward_step_closer=True`). Defaults to 0.1.
+
+            reward_bad (float, optional): The terminal reward for ending up in the bad final state. Defaults to -1.0.
+
+            reward_good (float, optional): The terminal reward for ending up in the good final state. Defaults to 1.0.
+
+            reward_trunc (float, optional): The terminal reward for reaching maximum steps before reaching good or bad states. Defaults to -1.0.
+    
         """
         super().__init__()
         self.width = size if width is None else width
         self.height = size if height is None else height
         self.pad = pad
+        self.max_steps = int(max_steps)
 
         # Reward parameters
+        # Final episode reward
         self.reward_bad = reward_bad
         self.reward_good = reward_good
         self.reward_trunc = reward_trunc
-        # self.reward_function = reward_function
+        # Intermediate reward
+        self._reward_step_closer = reward_step_closer
         self.penalty = penalty
         self.reward_inter = reward_inter
-        self.max_steps = int(max_steps)
 
         # Create important attributes
         self._calculate_min_step()
         self._create_maze()
         # self._create_reward_function()
 
-        # Gym spaces
+        # Gym spaces attributes
         self.observation_space = gym.spaces.Discrete(self._num_state)
         self.action_space = gym.spaces.Discrete(4)
         self._step_count = 0
+        self._closest_dist = self.min_steps
 
-        # Set up plotting variables
+        # Plotting attributes
         self.cmap = colors.ListedColormap(self.COLOR_LIST)
 
     @staticmethod
@@ -100,18 +151,22 @@ class TMaze(gym.Env):
             'step_count': self._step_count,
             # 'reward_position': self.get_reward_position()
         }
+        if self._reward_step_closer:
+            self._closest_dist = self.min_steps
         return state, info
 
     def step(self, action: int) -> Tuple[int, float | None, bool, bool, dict]:
         self._step_count += 1
         truncated = self._step_count >= self.max_steps
-        displaced_item = self._take_action(action)
-        reward, terminated = self._reward_func(displaced_item)
+        displaced_item, new_dist = self._take_action(action)
+        reward, terminated = self._reward_func(displaced_item, new_dist)
         if truncated and not terminated:
             reward = self.reward_trunc
         state = self.get_agent_position()
         info = {
             'step_count': self._step_count,
+            'manhattan_dist': new_dist,
+            'closest_dist': self._closest_dist
         }
         # reward = self._reward_func(terminated=terminated, truncated=truncated, step=self._step_count, reward=reward)
         return state, reward, terminated, truncated, info
@@ -190,15 +245,23 @@ class TMaze(gym.Env):
     #     else:
     #         raise ValueError(f"Invalid reward function: {self.reward_function}. Must be 'A' or 'B'.")
 
-    def _reward_func(self, displaced_item: int) -> Tuple[float, bool]:
+    def _reward_func(self, displaced_item: int, new_dist: int | None) -> Tuple[float, bool]:
         """
         Return a tuple of (reward, terminated) as a function of the displaced item from the chosen action.
         """
         terminated = False
+
         if displaced_item == self.WALL:
             reward = self.penalty
         elif displaced_item == self.EMPTY:
-            reward = self.reward_inter
+            if self._reward_step_closer:
+                if new_dist < self._closest_dist:
+                    self._closest_dist = new_dist
+                    reward = self.reward_inter
+                else:
+                    reward = 0.0
+            else:
+                reward = self.reward_inter
         elif displaced_item == self.GOOD:
             reward = self.reward_good
             terminated = True
@@ -226,7 +289,7 @@ class TMaze(gym.Env):
         pos = np.unravel_index(flat_idx, self.maze.shape)
         return np.asarray(pos).reshape(2)
 
-    def _take_action(self, action: int) -> int:
+    def _take_action(self, action: int) -> Tuple[int, int | None]:
         """
         Take the corresponding action if it is allowed (i.e. not a WALL), and return the item in the new cell that agent
         has replaced (or would have replaced, if action wasn't possible). 
@@ -248,22 +311,12 @@ class TMaze(gym.Env):
             self.maze[tuple(self._agent_pos)] = self.EMPTY
             self._agent_pos = new_pos
             self.maze[tuple(self._agent_pos)] = self.AGENT
-        # elif new_item == self.EMPTY:
-        #     self.maze[tuple(self._agent_pos)] = self.EMPTY
-        #     self._agent_pos = new_pos
-        #     self.maze[tuple(self._agent_pos)] = self.AGENT
-        # elif new_item == self.GOOD:
-        #     self.maze[tuple(self._agent_pos)] = self.EMPTY
-        #     self._agent_pos = new_pos
-        #     self.maze[tuple(self._agent_pos)] = self.AGENT
-        #     reward = self.reward_good
-        #     terminated = True
-        # elif new_item == self.BAD:
-        #     self.maze[tuple(self._agent_pos)] = self.EMPTY
-        #     self._agent_pos = new_pos
-        #     self.maze[tuple(self._agent_pos)] = self.AGENT
-        #     reward = self.reward_bad
-        #     terminated = True
+
+        # Calculate new closest distance
+        if self._reward_step_closer:
+            new_dist = man_dist(self._agent_pos, self._good_pos).item()
+        else:
+            new_dist = None
         
-        return new_item
+        return new_item, new_dist
     
