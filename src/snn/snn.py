@@ -49,7 +49,9 @@ class SNN:
         ] if neuron_params is not None else [{}] * self.num_layers
 
         self.synapse_params = synapse_params if synapse_params is not None else {}
-        self.use_etrace = self.synapse_params.get("eligibility_trace", False)
+        self.use_etrace_pre = self.synapse_params.get("eligibility_trace", False) or self.synapse_params.get("eligibility_pre", False)
+        self.use_etrace_post = self.synapse_params.get("eligibility_post", False)
+        self.use_etrace = self.use_etrace_pre or self.use_etrace_post
 
         # Create each neuron layers
         self.neuron_layers = []
@@ -160,9 +162,13 @@ class SNN:
         return [layer.threshold for layer in self.neuron_layers]
 
     @property
-    def eligibility_traces(self):
-        return [synapse.eligibility_trace for synapse in self.synapse_layers]
-
+    def eligibility_traces_pre(self):
+        return [synapse.eligibility_pre for synapse in self.synapse_layers]
+    
+    @property
+    def eligibility_traces_post(self):
+        return [synapse.eligibility_post for synapse in self.synapse_layers]
+    
     @property
     def learning_rule(self):
         return self._learning_rule

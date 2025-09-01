@@ -1,6 +1,6 @@
 from pathlib import Path
 import pickle
-from typing import List
+from typing import List, Literal
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 from matplotlib.axes import Axes
@@ -340,28 +340,45 @@ def plot_weight_heatmap(simulator: 'SNNSimulator', *, x_scale: float = 0.2, y_sc
     # plt.close(fig)
 
 
-def plot_eligibility_traces(simulator: 'SNNSimulator', *, x_scale: float = 0.2, y_scale: float = 0.8,
-                            synapse_layer: int = 0, t_min: int = None, t_max: int = None, t_range: int = 100,
+def plot_eligibility_traces(simulator: 'SNNSimulator' = None, values: np.ndarray = None, *, 
+                            synapse_layer: int = 0, etype: Literal["pre", "post"] = "pre",
+                            x_scale: float = 0.2, y_scale: float = 0.8,
+                            t_min: int = None, t_max: int = None, t_range: int = 100,
                             cmap: str = "viridis", 
                             savepath: str | Path = None, show: bool = True):
-    num_outputs = simulator.network.output_size
-    if simulator.record_eligibility is False:
-        raise ValueError("Eligibility trace recording is not enabled. Please enable it in the simulator configuration.")
+    if simulator is not None:
+        if etype == "pre":
+            assert simulator.record_eligibility_pre, "Pre-synaptic eligibility trace recording is not enabled."
+            etrace = simulator.eligibility_pre_recorder.values[synapse_layer]
+        else:
+            assert simulator.record_eligibility_post, "Post-synaptic eligibility trace recording is not enabled."
+            etrace = simulator.eligibility_post_recorder.values[synapse_layer]
+        
+        num_inputs = simulator.network.input_size
+        num_outputs = simulator.network.output_size
+        num_steps = simulator.num_steps
+    elif values is not None:
+        etrace = values
+        num_inputs = etrace.shape[0]
+        num_outputs = etrace.shape[1]
+        num_steps = etrace.shape[2]
+    else:
+        raise ValueError("Either a simulator (with eligibility trace recording enabled) or a numpy array of shape [num_inputs, num_outputs, num_steps], must be provided.")
+    # if simulator.record_eligibility is False:
+    #     raise ValueError("Eligibility trace recording is not enabled. Please enable it in the simulator configuration.")
     if t_max is None:
-        t_max = simulator.num_steps
+        t_max = num_steps
     if t_min is None:
         t_min = max(0, t_max - t_range)
 
-    eg = simulator.eligibility_recorder.values[synapse_layer]
-    num_outputs = simulator.network.output_size
-    num_inputs = simulator.network.input_size
+
     fig_size = ((t_max - t_min) * x_scale, num_outputs * num_inputs * y_scale)
     fig, axs = plt.subplots(num_outputs, 1, figsize=fig_size, sharex=True, layout="constrained", gridspec_kw={"hspace": 0.0},
                             squeeze=False)
 
     for i, j in enumerate(reversed(range(num_outputs))):
         ax = axs[i, 0]
-        m = ax.imshow(eg[:, j, t_min:t_max], cmap=cmap, aspect='auto', origin="lower")
+        m = ax.imshow(etrace[:, j, t_min:t_max], cmap=cmap, aspect='auto', origin="lower")
         ax.xaxis.set_ticks(np.arange(0, t_max - t_min, 10), labels= np.arange(t_min, t_max, 10))
         ax.set_ylabel(f'Neuron {j}')
 

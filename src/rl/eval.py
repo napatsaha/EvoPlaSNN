@@ -57,7 +57,7 @@ class RL_Evaluator(Evaluator):
                                       record_traces=record_info,
                                       record_membrane=record_info,
                                       record_spikes=record_info,
-                                      record_eligibility=record_info,
+                                      record_eligibility_pre=record_info,
                                       **params.get("simulator_params", {})
                                       )
         self.logger = None

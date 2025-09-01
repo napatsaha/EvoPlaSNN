@@ -230,7 +230,7 @@ def eval(results_path: Path | str = None, *, config_path: str | Path = None, num
         # snn_plot.plot_weights(simulator, div=10, savepath=Path(results_path, f"{prefix}_weights.png"), show=False)
         snn_plot.plot_weight_over_time(simulator, savepath=Path(results_path, f"{prefix}_weight_over_time.png") if save_plots else None, show=show_plots)
         snn_plot.plot_weight_heatmap(simulator, savepath=Path(results_path, f"{prefix}_weight_heatmap.png") if save_plots else None, show=show_plots, log_scale=False, t_range=500)
-        if simulator.record_eligibility:
+        if simulator.record_eligibility_pre:
             snn_plot.plot_eligibility_traces(simulator, savepath=Path(results_path, f"{prefix}_eligibility_traces.png") if save_plots else None, show=show_plots)
         snn_plot.plot_intermediate_fitness(simulator, savepath=Path(results_path, f"{prefix}_intermediate_fitness.png") if save_plots else None, show=show_plots)
 
