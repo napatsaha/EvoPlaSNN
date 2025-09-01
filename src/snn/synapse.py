@@ -198,30 +198,30 @@ class SynapseLayer(SynapseLayerProtocol):
                         # Update tssp
                     self._etssp_post[idx_spike, :] = 0
 
-    def _update_etrace_step(self, spike_layer: NeuronLayerProtocol, trace_layer: NeuronLayerProtocol, etrace):
-        spike = spike_layer.spike
-        if sum(spike) == 0:
-            rise = 0.0
-        else:        
-            trace = trace_layer.get_trace()
-            trace, spike = self._tile(trace, spike)
-            rise = trace * spike
-        etrace = etrace * self.beta_syn + rise
+    # def _update_etrace_step(self, spike_layer: NeuronLayerProtocol, trace_layer: NeuronLayerProtocol, etrace):
+    #     spike = spike_layer.spike
+    #     if sum(spike) == 0:
+    #         rise = 0.0
+    #     else:        
+    #         trace = trace_layer.get_trace()
+    #         trace, spike = self._tile(trace, spike)
+    #         rise = trace * spike
+    #     etrace = etrace * self.beta_syn + rise
 
-    def _update_etrace_event(self, spike_layer: NeuronLayerProtocol, trace_layer: NeuronLayerProtocol, elast, etssp):
-        etssp += 1
-        spike = spike_layer.spike
-        idx_spike = spike.nonzero()[0]
-        if len(idx_spike) == 0:
-            return
-        else:
-            trace = trace_layer.get_trace() # Shape: [pre_size,]
-                # Value before rise
-            decay = elast[:, idx_spike] * np.exp(-etssp[:, idx_spike] * self.dt / self.tau_syn) # Shape: [pre_size, num_post_spikes]
-                # Update last peak
-            elast[:, idx_spike] = trace[:, np.newaxis] + decay
-                # Update tssp
-            etssp[:, idx_spike] = 0
+    # def _update_etrace_event(self, spike_layer: NeuronLayerProtocol, trace_layer: NeuronLayerProtocol, elast, etssp):
+    #     etssp += 1
+    #     spike = spike_layer.spike
+    #     idx_spike = spike.nonzero()[0]
+    #     if len(idx_spike) == 0:
+    #         return
+    #     else:
+    #         trace = trace_layer.get_trace() # Shape: [pre_size,]
+    #             # Value before rise
+    #         decay = elast[:, idx_spike] * np.exp(-etssp[:, idx_spike] * self.dt / self.tau_syn) # Shape: [pre_size, num_post_spikes]
+    #             # Update last peak
+    #         elast[:, idx_spike] = trace[:, np.newaxis] + decay
+    #             # Update tssp
+    #         etssp[:, idx_spike] = 0
 
     def update(self, reward=None) -> None:
         """

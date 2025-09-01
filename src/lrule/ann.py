@@ -39,7 +39,7 @@ _activation_functions = {
     "relu": relu,
     "sigmoid": sigmoid,
     "tanh": tanh,
-    "linear": lambda x: x
+    "linear": linear
 }
 
 
@@ -251,7 +251,8 @@ class ANN:
         return sum([layer.size for layer in self.layers])
 
     def __repr__(self):
-        return f"ANN(input_size={self.input_size}, hidden_sizes={self.hidden_sizes}, output_size={self.output_size}, bias={self.bias})"
+        return f"ANN(input_size={self.input_size}, hidden_sizes={self.hidden_sizes}, output_size={self.output_size}, bias={self.bias}, " + \
+                f"hidden_activation={self.hidden_activation.__name__}, output_activation={self.output_activation.__name__})"
     
     def __str__(self):
         s = "{\n"
@@ -265,9 +266,11 @@ class ANN_Rule(LearningRule):
     """
     A Learning Rule that represents a black box ANN function that converts synapse-related information to weight updates.
     """
+    INPUT_ORDER = ("trace_pre", "trace_post", "weights", "reward", "eligibility_pre", "eligibility_post")
+
     def __init__(self, parameters = None, *, learning_rate: float = 1.0,
-                 use_trace_pre: bool = True, use_trace_post: bool = True, use_weights: bool = True, use_reward: bool = True, 
-                 use_eligibility: bool = False,
+                 use_trace_pre: bool = False, use_trace_post: bool = False, use_weights: bool = True, use_reward: bool = False, 
+                 use_eligibility: bool = False, use_eligibility_pre: bool = False, use_eligibility_post: bool = False,
                  **kwargs):
         super().__init__()
         self.learning_rate = learning_rate
@@ -275,8 +278,14 @@ class ANN_Rule(LearningRule):
         self.use_trace_post = use_trace_post
         self.use_weights = use_weights
         self.use_reward = use_reward
-        self.use_eligibility = use_eligibility
-        self.input_size = int(use_trace_pre) + int(use_trace_post) + int(use_weights) + int(use_reward) + int(use_eligibility)
+        self.use_eligibility_pre = use_eligibility or use_eligibility_pre
+        self.use_eligibility_post = use_eligibility_post
+
+        # 
+        self.input_order = [item for item in self.INPUT_ORDER if getattr(self, f"use_{item}")]
+        self.input_size = len(self.input_order)
+        # self.input_size = int(self.use_trace_pre) + int(self.use_trace_post) + int(self.use_weights) + int(self.use_reward) + \
+        #     int(self.use_eligibility_pre) + int(self.use_eligibility_post)
         # self.parameters = parameters
         self.ann = ANN(input_size=self.input_size, output_size=1, parameters=parameters, **kwargs)
 
@@ -285,8 +294,21 @@ class ANN_Rule(LearningRule):
         """
         Apply the ANN Rule to an external set of weights.
         """
-        inp = []
         w_shape = synapse.weights.shape
+
+        inp = self.prepare_inputs(synapse, reward, w_shape)
+
+        dw = self.ann.forward(inp)
+        dw = dw.reshape(w_shape)
+        dw *= self.learning_rate
+
+        if return_inputs:
+            return dw, inp
+        else:
+            return dw
+
+    def prepare_inputs(self, synapse, reward, w_shape):
+        inp = []
         if self.use_trace_pre or self.use_trace_post:
             trace_pre, trace_post = tile_array(w_shape, synapse.pre_layer.trace, synapse.post_layer.trace)
             if self.use_trace_pre:
@@ -299,20 +321,13 @@ class ANN_Rule(LearningRule):
             if reward is None:
                 reward = 0
             inp.append(np.full((np.prod(w_shape), 1), fill_value=reward))
-        if self.use_eligibility:
-            inp.append(synapse.eligibility_trace.reshape(-1, 1))
+        if self.use_eligibility_pre:
+            inp.append(synapse.eligibility_pre.reshape(-1, 1))
+        if self.use_eligibility_post:
+            inp.append(synapse.eligibility_post.reshape(-1, 1))
 
         inp = np.concatenate(inp, axis=1)
-        # inp = np.concatenate([trace_pre.reshape(-1, 1), trace_post.reshape(-1, 1)], axis=1)
-
-        dw = self.ann.forward(inp)
-        dw = dw.reshape(w_shape)
-        dw *= self.learning_rate
-
-        if return_inputs:
-            return dw, inp
-        else:
-            return dw
+        return inp
         
     def save_parameters(self, file_path: str, precision: int = 6):
         """
@@ -328,6 +343,7 @@ class ANN_Rule(LearningRule):
         np.savez(file_path, parameters=self.ann.parameters, input_size=self.input_size,
                  use_trace_pre=self.use_trace_pre, use_trace_post=self.use_trace_post,
                  use_weights=self.use_weights, use_reward=self.use_reward, 
+                 use_eligilibity_pre=self.use_eligibility_pre, use_eligibility_post=self.use_eligibility_post,
                  hidden_size=self.ann.hidden_sizes, bias=self.ann.bias,
                  hidden_activation=self.ann.hidden_activation.__name__,
                  output_activation=self.ann.output_activation.__name__,)
@@ -345,11 +361,16 @@ class ANN_Rule(LearningRule):
         use_weights = data['use_weights'].item()
         use_reward = data['use_reward'].item()
         use_eligibility = data.get('use_eligibility', False).item()  # Optional, defaults to False if not present
+        use_eligibility_pre = data.get('use_eligibility_pre', False).item()
+        use_eligibility_post = data.get('use_eligibility_post', False).item()
         
         return cls(parameters=parameters,
-                   use_trace_pre=use_trace_pre, use_trace_post=use_trace_post,
-                   use_weights=use_weights, use_reward=use_reward,
-                    use_eligibility=use_eligibility,
+                   use_trace_pre=use_trace_pre, 
+                   use_trace_post=use_trace_post,
+                   use_weights=use_weights, 
+                   use_reward=use_reward,
+                   use_eligibility_pre=use_eligibility_pre or use_eligibility, 
+                   use_eligibility_post=use_eligibility_post,
                    hidden_size=data["hidden_size"].tolist(),
                    bias=data["bias"].item(),
                    hidden_activation=data["hidden_activation"].item(),
@@ -368,8 +389,9 @@ class ANN_Rule(LearningRule):
         self.ann.parameters = value
 
     def __repr__(self):
-        return f"ANN_Rule(parameters_size={self.size}, use_trace_pre={self.use_trace_pre}, use_trace_post={self.use_trace_post}, use_weights={self.use_weights}, use_reward={self.use_reward}, " + \
-        f"hidden_size={self.ann.hidden_sizes}, bias={self.ann.bias})"
+        # return f"ANN_Rule(parameters_size={self.size}, use_trace_pre={self.use_trace_pre}, use_trace_post={self.use_trace_post}, use_weights={self.use_weights}, use_reward={self.use_reward}, " + \
+        # f"hidden_size={self.ann.hidden_sizes}, bias={self.ann.bias})"
+        return f"ANN_Rule(size={self.size}, inputs={self.input_order}, learning_rate={self.learning_rate})"
     
     def __str__(self):
         s = "ANN_Rule("
