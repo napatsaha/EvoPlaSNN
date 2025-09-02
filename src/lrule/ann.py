@@ -267,6 +267,7 @@ class ANN_Rule(LearningRule):
     A Learning Rule that represents a black box ANN function that converts synapse-related information to weight updates.
     """
     INPUT_ORDER = ("trace_pre", "trace_post", "weights", "reward", "eligibility_pre", "eligibility_post")
+    OUTPUT_ORDER = ("weight", "threshold")
     AGG_DICT = {
                 "max": np.max,
                 "min": np.min,
@@ -306,6 +307,7 @@ class ANN_Rule(LearningRule):
         if not (self.delta_weight or self.delta_threshold):
             raise ValueError("At least one of delta_weight or delta_threshold must be True.")
         self.output_size = int(self.delta_weight) + int(self.delta_threshold)
+        self.output_order = [item for item in self.OUTPUT_ORDER if getattr(self, f"delta_{item}")]
 
         # Construct an ANN
         self.ann = ANN(input_size=self.input_size, output_size=self.output_size, parameters=parameters, **kwargs)
@@ -440,7 +442,8 @@ class ANN_Rule(LearningRule):
     def __repr__(self):
         # return f"ANN_Rule(parameters_size={self.size}, use_trace_pre={self.use_trace_pre}, use_trace_post={self.use_trace_post}, use_weights={self.use_weights}, use_reward={self.use_reward}, " + \
         # f"hidden_size={self.ann.hidden_sizes}, bias={self.ann.bias})"
-        return f"ANN_Rule(size={self.size}, inputs={self.input_order}, learning_rate={self.learning_rate})"
+        return f"ANN_Rule(size={self.size}, inputs={self.input_order}, outputs={self.output_order}, " + \
+            f"learning_rate={[self.learning_rate, self.learning_rate_thr]})"
     
     def __str__(self):
         s = "ANN_Rule("

@@ -88,86 +88,6 @@ def plot_spikes(simulator: 'SNNSimulator' = None, values: List[np.ndarray] = Non
     # plt.close(fig)
 
 
-def plot_membranes(simulator: 'SNNSimulator' = None, values: List[np.ndarray] = None, spike_values: List[np.ndarray] = None, 
-                   thresholds: List[float] = None, *, 
-                   x_scale: float = 0.2, y_scale: float = 3.0, title: str = None, plot_inputs: bool = False, 
-                   color: str = "blue", cmap: str = None, cmap_range: tuple = (0, 1), layout: str = "constrained",
-                   x_min = None, x_max = None, x_range: int = 100,
-                   savepath: str | Path = None, show: bool = True):
-    """
-    Plot membrane potentials of all neurons in the network.
-    """
-    if values is None and simulator is None:
-        raise ValueError("Either a simulator (with membrane recording enabled) or a list of recorded values of shape: [layer_size, num_steps] * num_layers, must be provided.")    # Flexible input handling
-    if simulator is not None:
-        # assert simulator.record_spikes, "Spike recording is not enabled."
-        assert simulator.record_membrane, "Membrane recording is not enabled."
-        num_steps = simulator.num_steps
-        values = simulator.mem_recorder.values
-        spike_values = simulator.spike_recorder.values if simulator.record_spikes else None
-        spike_times = get_spike_times(spike_values) if simulator.record_spikes else None
-        thresholds = simulator.network.thresholds
-        num_layers = simulator.network.num_layers 
-        layer_sizes = simulator.network.layer_sizes 
-        dt = f"{simulator.dt} s" 
-    else:
-        num_steps = min([val.shape[1] for val in values])
-        values = values
-        spike_values = spike_values
-        spike_times = get_spike_times(spike_values) if spike_values is not None else None
-        thresholds = thresholds
-        num_layers = len(values)
-        layer_sizes =  [val.shape[0] for val in values]
-        dt =  "1 unit"
-
-    if x_max is None:
-        x_max = num_steps
-    if x_min is None:
-        x_min = max(0, x_max - x_range)
-    if cmap is None:
-        cm = color
-    else:
-        cm = mpl.colormaps[cmap]
-
-    if not plot_inputs:
-        thresholds = thresholds[1:] if thresholds is not None else None
-        spike_times = spike_times[1:] if spike_times is not None else None
-        values = values[1:]
-        layer_sizes = layer_sizes[1:]
-    nrows = max(layer_sizes)
-    ncols = len(layer_sizes)
-    fig, axs = plt.subplots(figsize=(x_scale*ncols*(x_max - x_min), y_scale*nrows), layout=layout)
-    axs.remove()
-    gs = fig.add_gridspec(nrows, ncols)
-
-    for i in range(ncols):
-        layer_mem = values[i]
-        n_neurons = layer_mem.shape[0]
-        for j in range(n_neurons):
-            if cmap is None:
-                c = cm
-            else:
-                c = np.interp(j / (n_neurons - 1), (0, 1), cmap_range)
-                c = cm(c)
-            _plot_neuron(fig, gs[j, i], mem=layer_mem[j, :],
-                        threshold=thresholds[i] if thresholds is not None else None, 
-                        tf_post=spike_times[i][j] if spike_times is not None else None, 
-                        color=c, y_label=f"Neuron {j}",
-                        x_min=x_min, x_max=x_max)
-            
-    # Labelling
-    fig.text(s=f"Time ({dt})", fontsize=12, x=0.5, y=-0.01)
-    fig.text(s="Membrane Potential", fontsize=12, ha='center', x=-0.01, y=0.5, rotation=90)
-    fig.text(s=title if title is not None else "Membrane Potentials", fontsize=20, x=0.5, y=1.05)
-    
-    if savepath is not None:
-        plt.savefig(savepath)
-
-    if show:
-        plt.show()
-    # plt.close(fig)
-
-
 def plot_traces(simulator: 'SNNSimulator', x_scale: float = 0.2, y_scale: float = 0.8,
                 y_eps: float = 0.1, x_eps: int | float = 1, trace_scale: float = 0.8, x_min = None, x_max = None, x_range: int = 100,
                 drawstyle: str = 'steps-post',
@@ -226,6 +146,162 @@ def plot_traces(simulator: 'SNNSimulator', x_scale: float = 0.2, y_scale: float 
     if show:
         plt.show()
     # plt.close(fig)
+
+
+def plot_membranes(simulator: 'SNNSimulator' = None, values: List[np.ndarray] = None, spike_values: List[np.ndarray] = None, 
+                   thresholds: List[float | np.ndarray] = None, *, 
+                   x_scale: float = 0.2, y_scale: float = 3.0, title: str = None, plot_inputs: bool = False, 
+                   color: str = "blue", cmap: str = None, cmap_range: tuple = (0, 1), layout: str = "constrained",
+                   x_min = None, x_max = None, x_range: int = 100,
+                   savepath: str | Path = None, show: bool = True):
+    """
+    Plot membrane potentials of all neurons in the network.
+    """
+    if values is None and simulator is None:
+        raise ValueError("Either a simulator (with membrane recording enabled) or a list of recorded values of shape: [layer_size, num_steps] * num_layers, must be provided.")    # Flexible input handling
+    if simulator is not None:
+        # assert simulator.record_spikes, "Spike recording is not enabled."
+        assert simulator.record_membrane, "Membrane recording is not enabled."
+        num_steps = simulator.num_steps
+        values = simulator.mem_recorder.values
+        spike_values = simulator.spike_recorder.values if simulator.record_spikes else None
+        spike_times = get_spike_times(spike_values) if simulator.record_spikes else None
+        thresholds = simulator.network.thresholds if not simulator.record_thresholds else simulator.threshold_recorder.values
+        num_layers = simulator.network.num_layers 
+        layer_sizes = simulator.network.layer_sizes 
+        dt = f"{simulator.dt} s" 
+    else:
+        num_steps = min([val.shape[1] for val in values])
+        values = values
+        spike_values = spike_values
+        spike_times = get_spike_times(spike_values) if spike_values is not None else None
+        thresholds = thresholds
+        num_layers = len(values)
+        layer_sizes =  [val.shape[0] for val in values]
+        dt =  "1 unit"
+
+    if x_max is None:
+        x_max = num_steps
+    if x_min is None:
+        x_min = max(0, x_max - x_range)
+    if cmap is None:
+        cm = color
+    else:
+        cm = mpl.colormaps[cmap]
+
+    if not plot_inputs:
+        thresholds = thresholds[1:] if thresholds is not None else None
+        spike_times = spike_times[1:] if spike_times is not None else None
+        values = values[1:]
+        layer_sizes = layer_sizes[1:]
+    nrows = max(layer_sizes)
+    ncols = len(layer_sizes)
+    fig, axs = plt.subplots(figsize=(x_scale*ncols*(x_max - x_min), y_scale*nrows), layout=layout)
+    axs.remove()
+    gs = fig.add_gridspec(nrows, ncols)
+
+    for i in range(ncols):
+        layer_mem = values[i]
+        n_neurons = layer_mem.shape[0]
+        for j in range(n_neurons):
+            if cmap is None:
+                c = cm
+            else:
+                c = np.interp(j / (n_neurons - 1), (0, 1), cmap_range)
+                c = cm(c)
+            _plot_neuron(fig, gs[j, i], mem=layer_mem[j, :],
+                        threshold=thresholds[i][j, :] if thresholds is not None else None, 
+                        tf_post=spike_times[i][j] if spike_times is not None else None, 
+                        color=c, y_label=f"Neuron {j}",
+                        x_min=x_min, x_max=x_max)
+            
+    # Labelling
+    fig.text(s=f"Time ({dt})", fontsize=12, x=0.5, y=-0.01)
+    fig.text(s="Membrane Potential", fontsize=12, ha='center', x=-0.01, y=0.5, rotation=90)
+    fig.text(s=title if title is not None else "Membrane Potentials", fontsize=20, x=0.5, y=1.05)
+    
+    if savepath is not None:
+        plt.savefig(savepath)
+
+    if show:
+        plt.show()
+    # plt.close(fig)
+
+
+def _plot_neuron(fig: Figure, gs: gridspec.GridSpec, mem: np.ndarray, *, 
+                 tf_pre: int = None, tf_post: int = None, threshold: float = None, y_label: str = None,
+                 x_min: int = None, x_max: int = None, **kwargs):
+    T = len(mem)
+    x_min = 0 if x_min is None else x_min
+    x_max = T if x_max is None else x_max
+    
+    ncols = 1# + int(tf_pre is not None) + int(tf_post is not None)
+    nrows = 1
+    height_ratios = [1.0]
+    if tf_post is not None:
+        height_ratios = [0.1] + height_ratios
+        nrows += 1
+    if tf_pre is not None:
+        height_ratios = height_ratios + [0.1]
+        nrows += 1
+
+    gs0 = gridspec.GridSpecFromSubplotSpec(nrows, ncols, subplot_spec=gs, hspace=0.1, height_ratios=height_ratios)
+    plot_idx = 0
+
+    if tf_post is not None:
+        ax = fig.add_subplot(gs0[plot_idx])
+        plot_idx += 1
+        _plot_spikes_single(ax, tf_post, label="Post", x_min=x_min, x_max=x_max)
+
+    ax = fig.add_subplot(gs0[plot_idx])
+    plot_idx += 1
+    _plot_membrane_single(ax, mem, tf_pre=tf_pre, tf_post=tf_post, threshold=threshold, x_min=x_min, x_max=x_max, ylabel=y_label, **kwargs)
+
+    if tf_pre is not None:
+        ax = fig.add_subplot(gs0[plot_idx])
+        plot_idx += 1
+        _plot_spikes_single(ax, tf_pre, label="Pre", x_min=x_min, x_max=x_max)
+
+
+def _plot_membrane_single(ax: Axes, mem: np.ndarray, *, threshold: np.ndarray = None, tf_pre: int = None, tf_post: int = None,
+                                title=None, xlabel=None, ylabel=None, x_min: int = None, x_max: int = None, **kwargs):
+    T = len(mem)
+    x_min = 0 if x_min is None else x_min
+    x_max = T if x_max is None else x_max
+    ymax = max(max(mem), 1.0)
+    ymin = min(min(mem), 0.0)
+    ymid = (ymax + ymin) / 2
+    eps = (ymax - ymin) * 0.1
+
+    ax.plot(mem, **kwargs)
+    if threshold is not None:
+        ax.plot(threshold, drawstyle='steps-post', color='black', linestyle='--', alpha=0.5)
+        # ax.axhline(y=threshold, color='black', linestyle='--', alpha=0.5)
+        ymax = max(ymax, max(threshold))
+        ymin = min(ymin, min(threshold))
+    if tf_pre is not None:
+        ax.vlines(x=tf_pre, ymin=ymin-eps, ymax=ymid - 2*eps, color='gray', alpha=0.5, linestyles='dotted')
+    if tf_post is not None:
+        ax.vlines(x=tf_post, ymin=ymid + 2*eps, ymax=ymax+eps, color='gray', alpha=0.7, linestyles='dotted')
+    ax.set_xlim(x_min, x_max)
+    ax.xaxis.set_minor_locator(ticker.MultipleLocator(1))
+    ax.set_ylim(ymin - eps, ymax + eps)
+    if ylabel is not None:
+        ax.set_ylabel(ylabel)
+    if xlabel is not None:
+        ax.set_xlabel(xlabel)
+    if title is not None:
+        ax.set_title(title)
+
+
+def _plot_spikes_single(ax: Axes, tf_spikes: np.ndarray, x_max: int, label: str = "", x_min: int = 0):
+
+    ax.eventplot(tf_spikes, colors='gray', linelengths=0.5)
+    ax.set_ylim(1.0, 1.5)
+    ax.set_xlim(x_min, x_max)
+    ax.set_yticks([])
+    ax.set_xticks([])
+    ax.set_ylabel(label, rotation=0, ha='right', va='center')
 
 
 def plot_weights(simulator: 'SNNSimulator', div: int = 5, col_width: float = 6.0, row_height: float = 8.0,
@@ -608,86 +684,12 @@ def plot_compare_run(exp_dir: str | Path, x_var: str, hue_var: str = None, col_v
 
 ### Helper functions ###
 
-
-def _plot_spikes_single(ax: Axes, tf_spikes: np.ndarray, x_max: int, label: str = "", x_min: int = 0):
-
-    ax.eventplot(tf_spikes, colors='gray', linelengths=0.5)
-    ax.set_ylim(1.0, 1.5)
-    ax.set_xlim(x_min, x_max)
-    ax.set_yticks([])
-    ax.set_xticks([])
-    ax.set_ylabel(label, rotation=0, ha='right', va='center')
-
-
 def _plot_membrane_old(membrane_array, ax: Axes, threshold=None, title=None):
     ax.plot(membrane_array)
     if threshold is not None:
         ax.axhline(threshold, color='gray', linestyle='--')
     if title is not None:
         ax.set_title(title)
-
-
-def _plot_membrane_single(ax: Axes, mem: np.ndarray, *, threshold: float = None, tf_pre: int = None, tf_post: int = None,
-                                title=None, xlabel=None, ylabel=None, x_min: int = None, x_max: int = None, **kwargs):
-    T = len(mem)
-    x_min = 0 if x_min is None else x_min
-    x_max = T if x_max is None else x_max
-    ymax = max(max(mem), 1.0)
-    ymin = min(min(mem), 0.0)
-    ymid = (ymax + ymin) / 2
-    eps = (ymax - ymin) * 0.1
-
-    ax.plot(mem, **kwargs)
-    if tf_pre is not None:
-        ax.vlines(x=tf_pre, ymin=ymin-eps, ymax=ymid - 2*eps, color='gray', alpha=0.5, linestyles='dotted')
-    if tf_post is not None:
-        ax.vlines(x=tf_post, ymin=ymid + 2*eps, ymax=ymax+eps, color='gray', alpha=0.7, linestyles='dotted')
-    if threshold is not None:
-        ax.axhline(y=threshold, color='black', linestyle='--', alpha=0.5)
-    ax.set_xlim(x_min, x_max)
-    ax.xaxis.set_minor_locator(ticker.MultipleLocator(1))
-    ax.set_ylim(ymin - eps, ymax + eps)
-    if ylabel is not None:
-        ax.set_ylabel(ylabel)
-    if xlabel is not None:
-        ax.set_xlabel(xlabel)
-    if title is not None:
-        ax.set_title(title)
-
-
-def _plot_neuron(fig: Figure, gs: gridspec.GridSpec, mem: np.ndarray, *, 
-                 tf_pre: int = None, tf_post: int = None, threshold: float = None, y_label: str = None,
-                 x_min: int = None, x_max: int = None, **kwargs):
-    T = len(mem)
-    x_min = 0 if x_min is None else x_min
-    x_max = T if x_max is None else x_max
-    
-    ncols = 1# + int(tf_pre is not None) + int(tf_post is not None)
-    nrows = 1
-    height_ratios = [1.0]
-    if tf_post is not None:
-        height_ratios = [0.1] + height_ratios
-        nrows += 1
-    if tf_pre is not None:
-        height_ratios = height_ratios + [0.1]
-        nrows += 1
-
-    gs0 = gridspec.GridSpecFromSubplotSpec(nrows, ncols, subplot_spec=gs, hspace=0.1, height_ratios=height_ratios)
-    plot_idx = 0
-
-    if tf_post is not None:
-        ax = fig.add_subplot(gs0[plot_idx])
-        plot_idx += 1
-        _plot_spikes_single(ax, tf_post, label="Post", x_min=x_min, x_max=x_max)
-
-    ax = fig.add_subplot(gs0[plot_idx])
-    plot_idx += 1
-    _plot_membrane_single(ax, mem, tf_pre=tf_pre, tf_post=tf_post, threshold=threshold, x_min=x_min, x_max=x_max, ylabel=y_label, **kwargs)
-
-    if tf_pre is not None:
-        ax = fig.add_subplot(gs0[plot_idx])
-        plot_idx += 1
-        _plot_spikes_single(ax, tf_pre, label="Pre", x_min=x_min, x_max=x_max)
 
 
 def plot_runs(simulators: List['SNNSimulator'], plot_spikes=True, plot_traces=True, plot_membranes=True, plot_weights=True, plot_weights_time=True, 

@@ -109,7 +109,7 @@ class SNN:
         Reset only neuron membrane potentials, spikes and  synapse eligibility traces.
         """
         for neuron_layer in self.neuron_layers:
-            neuron_layer.reset()
+            neuron_layer.soft_reset()
         for synapse_layer in self.synapse_layers:
             synapse_layer.soft_reset()
 

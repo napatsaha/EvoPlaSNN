@@ -98,6 +98,7 @@ class NeuronLayer(NeuronLayerProtocol):
         self._ignore_threshold = ignore_threshold
         
         # Reset parameters
+        self._init_threshold = threshold
         self.threshold = np.full((size,), threshold, dtype=np.float32)
         # Reset condition
         if delayed_wta == True:
@@ -131,6 +132,10 @@ class NeuronLayer(NeuronLayerProtocol):
         """
         Reset the neuron layer state.
         """
+        self.threshold.fill(self._init_threshold)
+        self.soft_reset()
+
+    def soft_reset(self):
         self.membrane.fill(self.mem_rest)
         self.spike.fill(0)
         if self._event_driven:

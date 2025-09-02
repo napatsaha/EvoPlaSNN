@@ -32,8 +32,8 @@ class SNNSimulator:
                 #  fitnessor_type: Literal["accuracy", "reward", "cross-entropy", "mse"] = "accuracy", fitnessor_params: dict = {},
                  supervised: bool = True, decay: bool = False,
                  decay_rate: float = None, decay_cutoff: int = None, 
-                 record_membrane: bool = True, record_spikes: bool = True, record_traces: bool = True, record_weights: bool = False,
-                 record_eligibility_pre: bool = False, record_eligibility_post: bool = False):
+                 record_membrane: bool = True, record_spikes: bool = True, record_traces: bool = True, record_thresholds: bool = False,
+                 record_weights: bool = False, record_eligibility_pre: bool = False, record_eligibility_post: bool = False):
         self.num_steps = 0
         self.network = network
         # self.spike_generator = spike_generator
@@ -46,6 +46,7 @@ class SNNSimulator:
         self.record_membrane = record_membrane
         self.record_spikes = record_spikes
         self.record_traces = record_traces
+        self.record_thresholds = record_thresholds
         self.record_weights = record_weights
         self.record_eligibility_pre = record_eligibility_pre if self.network.use_etrace_pre else False
         self.record_eligibility_post = record_eligibility_post if self.network.use_etrace_post else False
@@ -54,6 +55,7 @@ class SNNSimulator:
         self.mem_recorder = LayerRecorder(network.layer_sizes_active) if self.record_membrane else None
         self.spike_recorder = LayerRecorder(network.layer_sizes, dtype=np.int8) if self.record_spikes else None
         self.trace_recorder = LayerRecorder(network.layer_sizes, dtype=np.float32) if self.record_traces else None
+        self.threshold_recorder = LayerRecorder(network.layer_sizes, dtype=np.float32) if self.record_thresholds else None
         self.weight_recorder = MatrixRecorder([synapse.weights.shape for synapse in network.synapse_layers]) if self.record_weights else None
         self.eligibility_pre_recorder = MatrixRecorder([synapse.weights.shape for synapse in network.synapse_layers]) if self.record_eligibility_pre else None
         self.eligibility_post_recorder = MatrixRecorder([synapse.weights.shape for synapse in network.synapse_layers]) if self.record_eligibility_post else None
@@ -132,6 +134,8 @@ class SNNSimulator:
             self.spike_recorder.reset()
         if self.record_traces:
             self.trace_recorder.reset()
+        if self.record_thresholds:
+            self.threshold_recorder.reset()
         if self.record_weights:
             self.weight_recorder.reset()
         if self.record_eligibility_pre:
@@ -268,6 +272,11 @@ class SNNSimulator:
                 for i, traces in enumerate(self.network.traces):
                     self.trace_recorder.record(i, t, traces)
 
+            # Record thresholds
+            if self.record_thresholds:
+                for i, thresholds in enumerate(self.network.thresholds):
+                    self.threshold_recorder.record(i, t, thresholds)
+
             # Record weights
             if self.record_weights:
                 for i, weights in enumerate(self.network.weights):
@@ -366,6 +375,8 @@ class SNNSimulator:
             self.spike_recorder.setup(num_steps)
         if self.record_traces:
             self.trace_recorder.setup(num_steps)
+        if self.record_thresholds:
+            self.threshold_recorder.setup(num_steps)
         if self.record_weights:
             self.weight_recorder.setup(num_steps)
         if self.record_eligibility_pre:
