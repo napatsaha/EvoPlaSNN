@@ -12,7 +12,7 @@ class LearningRule(ABC):
         pass
 
     @abstractmethod
-    def update(self) -> np.ndarray:
+    def update(self, always_return_tuple: bool) -> np.ndarray:
         """
         Update the synaptic weights based on the learning rule.
         """

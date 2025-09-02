@@ -21,7 +21,7 @@ class SynapseLayer(SynapseLayerProtocol):
     post_layer: NeuronLayerProtocol
     pre_layer: NeuronLayerProtocol
     weights: np.ndarray
-    learning_rule: LearningRule
+    _learning_rule: LearningRule
     
     def __init__(self, pre_layer: NeuronLayerProtocol, post_layer: NeuronLayerProtocol, *, 
                  learning_rule: LearningRule = None,
@@ -227,8 +227,11 @@ class SynapseLayer(SynapseLayerProtocol):
         """
         Update the synaptic weights based on the learning rule.
         """
-        dw = self.learning_rule.update(self, reward=reward)
-        self.weights += dw
+        dw, dth = self._learning_rule.update(self, reward=reward, always_return_tuple=True)
+        if self._out_weights:
+            self.weights += dw
+        if self._out_thresholds: 
+            self.post_layer.update_thresholds(dth)
         
         # Clip the weights
         self._clip_weights()
@@ -273,6 +276,16 @@ class SynapseLayer(SynapseLayerProtocol):
         else:
             return None
         
+    @property
+    def learning_rule(self):
+        return self._learning_rule
+    
+    @learning_rule.setter
+    def learning_rule(self, rule: LearningRule):
+        self._learning_rule = rule
+        self._out_weights = getattr(rule, "delta_weight", False)
+        self._out_thresholds = getattr(rule, "delta_threshold", False)
+
     def has_elig_pre(self):
         return self._use_elig_pre
     def has_elig_post(self):

@@ -149,6 +149,11 @@ class NeuronLayerProtocol(Protocol):
         """
         pass
 
+    def update_thresholds(self, delta_thr: np.ndarray):
+        """
+        Update the firing thresholds of the neurons by adding delta_thr.
+        """
+        pass
 
 
 

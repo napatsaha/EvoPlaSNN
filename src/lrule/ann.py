@@ -267,13 +267,29 @@ class ANN_Rule(LearningRule):
     A Learning Rule that represents a black box ANN function that converts synapse-related information to weight updates.
     """
     INPUT_ORDER = ("trace_pre", "trace_post", "weights", "reward", "eligibility_pre", "eligibility_post")
+    AGG_DICT = {
+                "max": np.max,
+                "min": np.min,
+                "mean": np.mean,
+                "sum": np.sum
+                }
 
-    def __init__(self, parameters = None, *, learning_rate: float = 1.0,
+    def __init__(self, parameters = None, *, 
+                 learning_rate: float = 1.0, learning_rate_thr: float = 0.1, threshold_agg_func: Literal["max", "min", "mean", "sum"] = "mean",
+                 delta_weight: bool = True, delta_threshold: bool = False,
                  use_trace_pre: bool = False, use_trace_post: bool = False, use_weights: bool = True, use_reward: bool = False, 
                  use_eligibility: bool = False, use_eligibility_pre: bool = False, use_eligibility_post: bool = False,
                  **kwargs):
         super().__init__()
         self.learning_rate = learning_rate
+        self.learning_rate_thr = learning_rate_thr
+        if threshold_agg_func not in ("max", "min", "mean", "sum"):
+            raise ValueError("threshold_agg_func must be one of 'max', 'min', 'mean', 'sum'")
+        else:
+            self.threshold_agg_func = threshold_agg_func
+            self._thr_agg = self.AGG_DICT.get(threshold_agg_func)
+
+        # Inputs to learning rule
         self.use_trace_pre = use_trace_pre
         self.use_trace_post = use_trace_post
         self.use_weights = use_weights
@@ -281,31 +297,64 @@ class ANN_Rule(LearningRule):
         self.use_eligibility_pre = use_eligibility or use_eligibility_pre
         self.use_eligibility_post = use_eligibility_post
 
-        # 
         self.input_order = [item for item in self.INPUT_ORDER if getattr(self, f"use_{item}")]
         self.input_size = len(self.input_order)
-        # self.input_size = int(self.use_trace_pre) + int(self.use_trace_post) + int(self.use_weights) + int(self.use_reward) + \
-        #     int(self.use_eligibility_pre) + int(self.use_eligibility_post)
-        # self.parameters = parameters
-        self.ann = ANN(input_size=self.input_size, output_size=1, parameters=parameters, **kwargs)
+
+        # Learning rule outputs
+        self.delta_weight = delta_weight
+        self.delta_threshold = delta_threshold
+        if not (self.delta_weight or self.delta_threshold):
+            raise ValueError("At least one of delta_weight or delta_threshold must be True.")
+        self.output_size = int(self.delta_weight) + int(self.delta_threshold)
+
+        # Construct an ANN
+        self.ann = ANN(input_size=self.input_size, output_size=self.output_size, parameters=parameters, **kwargs)
 
 
-    def update(self, synapse: "SynapseLayerProtocol", reward: float = None, return_inputs: bool = False) -> np.ndarray: 
+    def update(self, synapse: "SynapseLayerProtocol", reward: float = None, always_return_tuple: bool = False) -> np.ndarray: 
         """
         Apply the ANN Rule to an external set of weights.
         """
         w_shape = synapse.weights.shape
 
         inp = self.prepare_inputs(synapse, reward, w_shape)
+        out = self.ann.forward(inp)
+        out = out.reshape(*w_shape, -1)
 
-        dw = self.ann.forward(inp)
-        dw = dw.reshape(w_shape)
-        dw *= self.learning_rate
+        if self.delta_weight:
+            idx = 0
+            dw = out[..., idx]
+            dw *= self.learning_rate
+        if self.delta_threshold:
+            idx = 1 if self.delta_weight else 0
+            dth = out[..., idx]
+            dth = self._thr_agg(dth, axis=0) # Aggregate threshold deltas for each post-synaptic neuron
+            dth *= self.learning_rate_thr
 
-        if return_inputs:
-            return dw, inp
+        # Return values
+        if self.delta_weight and self.delta_threshold:
+            return dw, dth
+        elif self.delta_weight and not self.delta_threshold:
+            if always_return_tuple:
+                return dw, None
+            else:
+                return dw
+        elif self.delta_threshold and not self.delta_weight:
+            if always_return_tuple:
+                return None, dth
+            else:
+                return dth
         else:
-            return dw
+            raise RuntimeError("At least one of delta_weight or delta_threshold must be True.")
+
+        # dw = self.ann.forward(inp)
+        # dw = dw.reshape(w_shape)
+        # dw *= self.learning_rate
+
+        # if return_inputs:
+        #     return dw, inp
+        # else:
+        #     return dw
 
     def prepare_inputs(self, synapse, reward, w_shape):
         inp = []

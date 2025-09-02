@@ -98,7 +98,7 @@ class NeuronLayer(NeuronLayerProtocol):
         self._ignore_threshold = ignore_threshold
         
         # Reset parameters
-        self.threshold = threshold
+        self.threshold = np.full((size,), threshold, dtype=np.float32)
         # Reset condition
         if delayed_wta == True:
             reset_condition = "only-winner" # Backwards compatibility
@@ -268,6 +268,12 @@ class NeuronLayer(NeuronLayerProtocol):
                 return trace_x3(self.tssp, self.dt, self.tau_trace, self.last_peak)
             else:
                 return trace_x3(self.tssp[idx], self.dt, self.tau_trace, self.last_peak[idx])
+
+    def update_thresholds(self, delta_thr: np.ndarray):
+        """
+        Update the thresholds of the neuron layer by adding delta_thr.
+        """
+        self.threshold += delta_thr
 
     @property
     def trace(self) -> np.ndarray:
