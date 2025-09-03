@@ -204,13 +204,20 @@ def plot_membranes(simulator: 'SNNSimulator' = None, values: List[np.ndarray] = 
         layer_mem = values[i]
         n_neurons = layer_mem.shape[0]
         for j in range(n_neurons):
+            if thresholds is not None:
+                if thresholds[i].ndim == 1:
+                    thr = float(thresholds[i][j])
+                else:
+                    thr = thresholds[i][j, :]
+            else:
+                thr = None
             if cmap is None:
                 c = cm
             else:
                 c = np.interp(j / (n_neurons - 1), (0, 1), cmap_range)
                 c = cm(c)
             _plot_neuron(fig, gs[j, i], mem=layer_mem[j, :],
-                        threshold=thresholds[i][j, :] if thresholds is not None else None, 
+                        threshold=thr, 
                         tf_post=spike_times[i][j] if spike_times is not None else None, 
                         color=c, y_label=f"Neuron {j}",
                         x_min=x_min, x_max=x_max)
@@ -263,7 +270,7 @@ def _plot_neuron(fig: Figure, gs: gridspec.GridSpec, mem: np.ndarray, *,
         _plot_spikes_single(ax, tf_pre, label="Pre", x_min=x_min, x_max=x_max)
 
 
-def _plot_membrane_single(ax: Axes, mem: np.ndarray, *, threshold: np.ndarray = None, tf_pre: int = None, tf_post: int = None,
+def _plot_membrane_single(ax: Axes, mem: np.ndarray, *, threshold: np.ndarray | float = None, tf_pre: int = None, tf_post: int = None,
                                 title=None, xlabel=None, ylabel=None, x_min: int = None, x_max: int = None, **kwargs):
     T = len(mem)
     x_min = 0 if x_min is None else x_min
@@ -275,10 +282,14 @@ def _plot_membrane_single(ax: Axes, mem: np.ndarray, *, threshold: np.ndarray = 
 
     ax.plot(mem, **kwargs)
     if threshold is not None:
-        ax.plot(threshold, drawstyle='steps-post', color='black', linestyle='--', alpha=0.5)
-        # ax.axhline(y=threshold, color='black', linestyle='--', alpha=0.5)
-        ymax = max(ymax, max(threshold))
-        ymin = min(ymin, min(threshold))
+        if isinstance(threshold, float):
+            ax.axhline(y=threshold, color='black', linestyle='--', alpha=0.5)
+            thr_max, thr_min = threshold, threshold
+        else:
+            ax.plot(threshold, drawstyle='steps-post', color='black', linestyle='--', alpha=0.5)
+            thr_max, thr_min = max(threshold), min(threshold)
+        ymax = max(ymax, thr_max)
+        ymin = min(ymin, thr_min)
     if tf_pre is not None:
         ax.vlines(x=tf_pre, ymin=ymin-eps, ymax=ymid - 2*eps, color='gray', alpha=0.5, linestyles='dotted')
     if tf_post is not None:
@@ -304,39 +315,80 @@ def _plot_spikes_single(ax: Axes, tf_spikes: np.ndarray, x_max: int, label: str 
     ax.set_ylabel(label, rotation=0, ha='right', va='center')
 
 
-def plot_weights(simulator: 'SNNSimulator', div: int = 5, col_width: float = 6.0, row_height: float = 8.0,
-                title: str = None, cmap: str = "gray",
-                savepath: str | Path = None, show: bool = True):
-    assert simulator.record_weights, "Weight recording is not enabled."
-    num_layers = len(simulator.network.synapse_layers)
+# def plot_weights(simulator: 'SNNSimulator', div: int = 5, col_width: float = 6.0, row_height: float = 8.0,
+#                 title: str = None, cmap: str = "gray",
+#                 savepath: str | Path = None, show: bool = True):
+#     assert simulator.record_weights, "Weight recording is not enabled."
+#     num_layers = len(simulator.network.synapse_layers)
 
-    ts = np.linspace(0, simulator.num_steps-1, div+1).astype(int)
+#     ts = np.linspace(0, simulator.num_steps-1, div+1).astype(int)
 
-    fig, axs = plt.subplots(num_layers, div+1, figsize=(col_width*div, row_height), squeeze=False)
-    fs = np.prod(fig.get_size_inches())/16
-    # mpl.rcParams.update({"font.size": np.prod(fig.get_size_inches())/16})
+#     fig, axs = plt.subplots(num_layers, div+1, figsize=(col_width*div, row_height), squeeze=False)
+#     fs = np.prod(fig.get_size_inches())/16
+#     # mpl.rcParams.update({"font.size": np.prod(fig.get_size_inches())/16})
 
-    cmap = mpl.colormaps[cmap].reversed()
+#     cmap = mpl.colormaps[cmap].reversed()
 
-    for l in range(num_layers):
-        for i, t in enumerate(ts):
-            im = simulator.weight_recorder.values[l][:, :, t]
-            ax = axs[l, i]
-            ax.imshow(im, cmap=cmap, vmin=0, vmax=1)
-            ax.set_title(f"t={t}", fontsize=fs*0.8)
-            ax.set(xticks=[], yticks=[])
+#     for l in range(num_layers):
+#         for i, t in enumerate(ts):
+#             im = simulator.weight_recorder.values[l][:, :, t]
+#             ax = axs[l, i]
+#             ax.imshow(im, cmap=cmap, vmin=0, vmax=1)
+#             ax.set_title(f"t={t}", fontsize=fs*0.8)
+#             ax.set(xticks=[], yticks=[])
 
-    fig.supxlabel("Post-synaptic Neuron", y=0.2, fontsize=fs)
-    fig.supylabel("Pre-synaptic Neuron", x=0.1, fontsize=fs)
-    fig.suptitle(title if title is not None else "Synaptic Weights", fontsize=1.2*fs, y=0.995)
-    fig.colorbar(mpl.cm.ScalarMappable(norm=mpl.colors.Normalize(vmin=0, vmax=1), cmap=cmap), ax=axs,  
-                    orientation="horizontal", fraction=0.05, aspect=100, label="Weight")
-    fig.subplots_adjust(wspace=0.0, left=0.1, bottom=0.2)
+#     fig.supxlabel("Post-synaptic Neuron", y=0.2, fontsize=fs)
+#     fig.supylabel("Pre-synaptic Neuron", x=0.1, fontsize=fs)
+#     fig.suptitle(title if title is not None else "Synaptic Weights", fontsize=1.2*fs, y=0.995)
+#     fig.colorbar(mpl.cm.ScalarMappable(norm=mpl.colors.Normalize(vmin=0, vmax=1), cmap=cmap), ax=axs,  
+#                     orientation="horizontal", fraction=0.05, aspect=100, label="Weight")
+#     fig.subplots_adjust(wspace=0.0, left=0.1, bottom=0.2)
+#     if savepath is not None:
+#         plt.savefig(savepath)
+#     if show:
+#         plt.show()
+#     # plt.close(fig)
+
+def plot_weights(simulator: "SNNSimulator" = None, values: List[np.ndarray] = None, *, env = None,
+                 x_scale: float = 0.3, y_scale: float = 0.3, cmap: str = "viridis",
+                 savepath: str | Path = None, show: bool = True):
+    if simulator is not None:
+        assert simulator.record_weights, "Weight recording is not enabled."
+        values = simulator.network.weights
+        num_layers = len(simulator.network.synapse_layers)
+    elif values is not None:
+        values = values
+        num_layers = len(values)
+    else:
+        raise ValueError("Either simulator with weight recording enabled or list of weight values for each synapse layer must be provided.")
+    fig, axs = plt.subplots(1, num_layers, figsize=(20*y_scale*num_layers, 20*x_scale), squeeze=False, layout="constrained")
+    wmin = min(min([np.min(w) for w in values]), 0)
+    wmax = max(max([np.max(w) for w in values]), 1)
+    
+    for i in range(num_layers):
+        ax = axs[0, i]
+        img = ax.imshow(values[i], cmap=cmap, vmin=wmin, vmax=wmax, aspect=1.0)
+        annotate_heatmap(img, valfmt="{x:.2f}", fontsize=12)
+        ax.xaxis.set_major_locator(plt.MultipleLocator(1))
+        ax.yaxis.set_major_locator(plt.MultipleLocator(1))
+        ax.set_title(f"Synapse Layer {i}")
+        ax.set_xlabel("Post-synaptic Neuron")
+        ax.set_ylabel("Pre-synaptic Neuron")
+        # Label action with names in last layer
+        if env is not None and i == (num_layers - 1):
+            num_actions = values[i].shape[1]
+            axs.flat[-1].xaxis.set_ticks(ticks=range(num_actions), labels=[env.action_names[i] for i in range(num_actions)])
+            ax.set_xlabel("Action")
+        if env is not None and i == 0:
+            ax.set_ylabel("State")
+
+    fig.colorbar(img, ax=axs, orientation='vertical', label='Weight Value')
+    fig.text(x=0.5, y=1.01, s="SNN Synaptic Weights", fontsize=20, ha='center')
     if savepath is not None:
         plt.savefig(savepath)
     if show:
         plt.show()
-    # plt.close(fig)
+    plt.close(fig)
 
 
 def plot_weight_over_time(simulator: 'SNNSimulator' = None, values: List[np.ndarray] = None, *, title: str = None, x_min=None, x_max=None,
@@ -690,6 +742,67 @@ def _plot_membrane_old(membrane_array, ax: Axes, threshold=None, title=None):
         ax.axhline(threshold, color='gray', linestyle='--')
     if title is not None:
         ax.set_title(title)
+
+
+def annotate_heatmap(im, data=None, valfmt="{x:.2f}",
+                     textcolors=("black", "white"),
+                     threshold=None, **textkw):
+    """
+    A function to annotate a heatmap.
+
+    Taken from: https://matplotlib.org/stable/gallery/images_contours_and_fields/image_annotated_heatmap.html
+
+    Parameters
+    ----------
+    im
+        The AxesImage to be labeled.
+    data
+        Data used to annotate.  If None, the image's data is used.  Optional.
+    valfmt
+        The format of the annotations inside the heatmap.  This should either
+        use the string format method, e.g. "$ {x:.2f}", or be a
+        `matplotlib.ticker.Formatter`.  Optional.
+    textcolors
+        A pair of colors.  The first is used for values below a threshold,
+        the second for those above.  Optional.
+    threshold
+        Value in data units according to which the colors from textcolors are
+        applied.  If None (the default) uses the middle of the colormap as
+        separation.  Optional.
+    **kwargs
+        All other arguments are forwarded to each call to `text` used to create
+        the text labels.
+    """
+
+    if not isinstance(data, (list, np.ndarray)):
+        data = im.get_array()
+
+    # Normalize the threshold to the images color range.
+    if threshold is not None:
+        threshold = im.norm(threshold)
+    else:
+        threshold = im.norm(data.max())/2.
+
+    # Set default alignment to center, but allow it to be
+    # overwritten by textkw.
+    kw = dict(horizontalalignment="center",
+              verticalalignment="center")
+    kw.update(textkw)
+
+    # Get the formatter in case a string is supplied
+    if isinstance(valfmt, str):
+        valfmt = mpl.ticker.StrMethodFormatter(valfmt)
+
+    # Loop over the data and create a `Text` for each "pixel".
+    # Change the text's color depending on the data.
+    texts = []
+    for i in range(data.shape[0]):
+        for j in range(data.shape[1]):
+            kw.update(color=textcolors[int(im.norm(data[i, j]) > threshold)])
+            text = im.axes.text(j, i, valfmt(data[i, j], None), **kw)
+            texts.append(text)
+
+    return texts
 
 
 def plot_runs(simulators: List['SNNSimulator'], plot_spikes=True, plot_traces=True, plot_membranes=True, plot_weights=True, plot_weights_time=True, 

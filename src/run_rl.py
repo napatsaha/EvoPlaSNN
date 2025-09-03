@@ -122,7 +122,7 @@ def main(config_file: str | Path | dict, *, config_overrides: dict = None, paren
 
 def eval(results_path: Path | str = None, *, config_path: str | Path = None, num_steps: int = None, num_evals: int = 10, 
          rule_id: int = 1, learning_rule: LearningRule = None,
-         save_plots: bool = False, show_plots: bool = False, save_results: bool = False,
+         save_plots: bool = False, show_plots: bool = False, save_results: bool = False, eval_results: bool = True,
          verbose: bool = True, return_evaluator: bool = False) -> Tuple[float, float] | Evaluator:
 
     if results_path is not None:
@@ -181,27 +181,28 @@ def eval(results_path: Path | str = None, *, config_path: str | Path = None, num
         log_level=0
     )
 
-    evaluator.setup_generation(gen_count=0, num_sets=num_evals)
-    fitnesses = evaluator.evaluate(num_trials=num_evals, return_fitness_list=True)
-    if save_results:
-        with open(results_path / f"{prefix}_eval_result.csv", "w") as f:
-            f.write("trial,fitness\n")
-            for i, fitness in enumerate(fitnesses):
-                f.write(f"{i},{fitness}\n")
-    
-    # fits = []
-    # for _ in range(num_evals):
-    #     simulator.reset()
-    #     simulator.run(T)
-    #     fitness = simulator.get_fitness()
-    #     fits.append(fitness)
+    if eval_results:
+        evaluator.setup_generation(gen_count=0, num_sets=num_evals)
+        fitnesses = evaluator.evaluate(num_trials=num_evals, return_fitness_list=True)
+        if save_results:
+            with open(results_path / f"{prefix}_eval_result.csv", "w") as f:
+                f.write("trial,fitness\n")
+                for i, fitness in enumerate(fitnesses):
+                    f.write(f"{i},{fitness}\n")
+        
+        # fits = []
+        # for _ in range(num_evals):
+        #     simulator.reset()
+        #     simulator.run(T)
+        #     fitness = simulator.get_fitness()
+        #     fits.append(fitness)
 
-    mean_fts = np.mean(fitnesses)
-    std_fts = np.std(fitnesses)
+        mean_fts = np.mean(fitnesses)
+        std_fts = np.std(fitnesses)
 
-    if verbose:
-        fitness_type = config.get("fitnessor_params", {}).get("type", "unknown")
-        print(f"Mean fitness (Type: {fitness_type}): {mean_fts:.2f} +/- {std_fts:.2f} SD ({num_evals} evaluations)")
+        if verbose:
+            fitness_type = config.get("fitnessor_params", {}).get("type", "unknown")
+            print(f"Mean fitness (Type: {fitness_type}): {mean_fts:.2f} +/- {std_fts:.2f} SD ({num_evals} evaluations)")
 
     # Plotting
     if save_plots or show_plots:
@@ -214,16 +215,22 @@ def eval(results_path: Path | str = None, *, config_path: str | Path = None, num
                              savepath=Path(results_path, f"{prefix}_spikes.png") if save_plots else None, show=show_plots)
         snn_plot.plot_membranes(simulator, plot_inputs=False, x_scale=0.3, y_scale=3, layout=None, x_range=200,
                                 savepath=Path(results_path, f"{prefix}_membranes.png") if save_plots else None, show=show_plots)
+        snn_plot.plot_weights(simulator, env=evaluator.env,
+                              savepath=Path(results_path, f"{prefix}_weights.png") if save_plots else None, show=show_plots)
         snn_plot.plot_weight_over_time(simulator, synapse_layer=0,
                                        savepath=Path(results_path, f"{prefix}_weight_over_time.png") if save_plots else None, show=show_plots)
         snn_plot.plot_weight_heatmap(simulator, log_scale=False, t_range=500, synapse_layer=0,
                                      savepath=Path(results_path, f"{prefix}_weight_heatmap.png") if save_plots else None, show=show_plots)
         if simulator.record_eligibility_pre:
-            snn_plot.plot_eligibility_traces(simulator, savepath=Path(results_path, f"{prefix}_eligibility_traces.png") if save_plots else None, show=show_plots)
+            snn_plot.plot_eligibility_traces(simulator, etype="pre", synapse_layer=0, 
+                                             savepath=Path(results_path, f"{prefix}_eligibility_pre_traces.png") if save_plots else None, show=show_plots)
+        if simulator.record_eligibility_post:
+            snn_plot.plot_eligibility_traces(simulator, etype="post", synapse_layer=0, 
+                                             savepath=Path(results_path, f"{prefix}_eligibility_post_traces.png") if save_plots else None, show=show_plots)
         snn_plot.plot_intermediate_fitness(simulator, window_size=20, plot_exploration=True,x_scale=0.025, y_scale=0.75,
                                            savepath=Path(results_path, f"{prefix}_intermediate_fitness.png") if save_plots else None, show=show_plots)
 
-    if not return_evaluator:
+    if not return_evaluator and eval_results:
         return mean_fts, std_fts
     else:
         # Return the evaluator object if requested
