@@ -16,9 +16,22 @@ def man_dist(x, y):
     return np.abs(x - y).sum()
 
 
-class TMaze(gym.Env):
+class TMaze:
+    pass
+
+class BaseMaze(gym.Env):
     """
-    T-Maze environment for reinforcement learning.
+    Base maze class for any type of mazes.
+
+    The only thing subclasses need to defined is the `_create_maze()` method, which will fill up initial maze array,
+    with corresponding values for walls, empty cells, agent starting position, good and bad cells.
+
+    The maze is represented as a 2D numpy array with the following values:
+        0: Wall
+        1: Empty cell
+        2: Agent
+        3: Good (reward) cell
+        4: Bad (punishment) cell
 
     Attributes:
         width (int): The width of the environment.
@@ -100,6 +113,7 @@ class TMaze(gym.Env):
         super().__init__()
         self.width = size if width is None else width
         self.height = size if height is None else height
+        self.area = self.width * self.height if self.width is not None and self.height is not None else None
         self.pad = pad
         self.max_steps = int(max_steps)
 
@@ -114,9 +128,10 @@ class TMaze(gym.Env):
         self.reward_inter = reward_inter
 
         # Create important attributes
-        self._calculate_min_step()
         self._create_maze()
+        self._prepare_positions()
         # self._create_reward_function()
+        self._calculate_min_step()
 
         # Gym spaces attributes
         self.observation_space = gym.spaces.Discrete(self._num_state)
@@ -130,24 +145,28 @@ class TMaze(gym.Env):
 
     ## Creation functions
     def _calculate_min_step(self):
-        # Do this before padding
-        up = self.height - 1
-        right = (self.width + 1) // 2 - 1
-        self.min_steps = int(up + right)
+        # # Do this before padding
+        # up = self.height - 1
+        # right = (self.width + 1) // 2 - 1
+        # self.min_steps = int(up + right)
+        self.min_steps = man_dist(self._agent_pos, self._good_pos).item()
 
     def _create_maze(self):
-        # Create empty array (filled with walls, as 1's)
-        self.maze = np.full((self.height, self.width), dtype=np.int8, fill_value=self.WALL)
-        # Add traversing paths (as 0's)
-        mid_width = self.width // 2
-        self.maze[:, mid_width] = self.EMPTY
-        self.maze[0, :] = self.EMPTY
-        # Set agent starting position
-        self.maze[-1, mid_width] = self.AGENT
-        # Set good position at right wing of T
-        self.maze[0, -1] = self.GOOD
-        # Set bad position at left wing of T
-        self.maze[0, 0] = self.BAD
+        raise NotImplementedError("Subclasses must implement _create_maze() method.")
+        # # Create empty array (filled with walls, as 1's)
+        # self.maze = np.full((self.height, self.width), dtype=np.int8, fill_value=self.WALL)
+        # # Add traversing paths (as 0's)
+        # mid_width = self.width // 2
+        # self.maze[:, mid_width] = self.EMPTY
+        # self.maze[0, :] = self.EMPTY
+        # # Set agent starting position
+        # self.maze[-1, mid_width] = self.AGENT
+        # # Set good position at right wing of T
+        # self.maze[0, -1] = self.GOOD
+        # # Set bad position at left wing of T
+        # self.maze[0, 0] = self.BAD
+
+    def _prepare_positions(self):
         # Add walls
         self.maze = np.pad(self.maze, self.pad, mode='constant', constant_values= self.WALL)
         self.width += 2 * self.pad
