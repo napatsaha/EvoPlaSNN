@@ -211,24 +211,55 @@ def eval(results_path: Path | str = None, *, config_path: str | Path = None, num
         simulator.reset()
         simulator.run(T)
         fitness = simulator.get_fitness()
-        snn_plot.plot_spikes(simulator, x_eps=2, x_range=200,
-                             savepath=Path(results_path, f"{prefix}_spikes.png") if save_plots else None, show=show_plots)
-        snn_plot.plot_membranes(simulator, plot_inputs=False, x_scale=0.3, y_scale=3, layout=None, x_range=200,
-                                savepath=Path(results_path, f"{prefix}_membranes.png") if save_plots else None, show=show_plots)
-        snn_plot.plot_weights(simulator, env=evaluator.env,
-                              savepath=Path(results_path, f"{prefix}_weights.png") if save_plots else None, show=show_plots)
-        snn_plot.plot_weight_over_time(simulator, synapse_layer=0,
-                                       savepath=Path(results_path, f"{prefix}_weight_over_time.png") if save_plots else None, show=show_plots)
-        snn_plot.plot_weight_heatmap(simulator, log_scale=False, t_range=500, synapse_layer=0,
-                                     savepath=Path(results_path, f"{prefix}_weight_heatmap.png") if save_plots else None, show=show_plots)
+        # Plot spike raster
+        try:
+            snn_plot.plot_spikes(simulator, x_eps=2, x_range=200,
+                                savepath=Path(results_path, f"{prefix}_spikes.png") if save_plots else None, show=show_plots)
+        except Exception as e:
+            print(f"Error plotting spikes: {e}")
+        # Plot membranes and threshold
+        try:
+            snn_plot.plot_membranes(simulator, plot_inputs=False, x_scale=0.3, y_scale=3, layout=None, x_range=200,
+                                    savepath=Path(results_path, f"{prefix}_membranes.png") if save_plots else None, show=show_plots)
+        except Exception as e:
+            print(f"Error plotting membranes: {e}")
+        # Plot static weight at end of simulation
+        try:
+            snn_plot.plot_weights(simulator, env=evaluator.env, bounded_weights=False, y_scale=0.3, x_scale=0.2,
+                                savepath=Path(results_path, f"{prefix}_weights.png") if save_plots else None, show=show_plots)
+        except Exception as e:
+            print(f"Error plotting weights: {e}")
+        # Plot weight changes as line plots
+        try:
+            snn_plot.plot_weight_over_time(simulator, synapse_layer=0,
+                                        savepath=Path(results_path, f"{prefix}_weight_over_time.png") if save_plots else None, show=show_plots)
+        except Exception as e:
+            print(f"Error plotting weight over time: {e}")
+        # Plot weight changes as horizontal heatmap
+        try:
+            snn_plot.plot_weight_heatmap(simulator, log_scale=False, t_range=500, synapse_layer=0,
+                                         savepath=Path(results_path, f"{prefix}_weight_heatmap.png") if save_plots else None, show=show_plots)
+        except Exception as e:
+            print(f"Error plotting weight heatmap: {e}")
+        # Plot pre-post and post-pre eligibility traces
         if simulator.record_eligibility_pre:
-            snn_plot.plot_eligibility_traces(simulator, etype="pre", synapse_layer=0, 
-                                             savepath=Path(results_path, f"{prefix}_eligibility_pre_traces.png") if save_plots else None, show=show_plots)
+            try:
+                snn_plot.plot_eligibility_traces(simulator, etype="pre", synapse_layer=0, 
+                                                 savepath=Path(results_path, f"{prefix}_eligibility_pre_traces.png") if save_plots else None, show=show_plots)
+            except Exception as e:
+                print(f"Error plotting eligibility pre traces: {e}")
         if simulator.record_eligibility_post:
-            snn_plot.plot_eligibility_traces(simulator, etype="post", synapse_layer=0, 
-                                             savepath=Path(results_path, f"{prefix}_eligibility_post_traces.png") if save_plots else None, show=show_plots)
-        snn_plot.plot_intermediate_fitness(simulator, window_size=20, plot_exploration=True,x_scale=0.025, y_scale=0.75,
-                                           savepath=Path(results_path, f"{prefix}_intermediate_fitness.png") if save_plots else None, show=show_plots)
+            try:
+                snn_plot.plot_eligibility_traces(simulator, etype="post", synapse_layer=0, 
+                                                savepath=Path(results_path, f"{prefix}_eligibility_post_traces.png") if save_plots else None, show=show_plots)
+            except Exception as e:
+                print(f"Error plotting eligibility post traces: {e}")
+        # Plot intermediate fitness within simulation
+        try:
+            snn_plot.plot_intermediate_fitness(simulator, window_size=20, plot_exploration=True,x_scale=0.025, y_scale=0.75,
+                                            savepath=Path(results_path, f"{prefix}_intermediate_fitness.png") if save_plots else None, show=show_plots)
+        except Exception as e:
+            print(f"Error plotting intermediate fitness: {e}")
 
     if not return_evaluator and eval_results:
         return mean_fts, std_fts

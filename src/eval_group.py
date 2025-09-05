@@ -1,3 +1,4 @@
+from typing import List
 import pandas as pd
 import os, yaml, argparse
 from pathlib import Path
@@ -64,6 +65,9 @@ def make_eval_result(run_dir, num_trials=None, filter_vars=True, change_name=Tru
     cfgs = pd.json_normalize(config_list, sep="__").set_index('run_name', drop=True)
     # Select only variables with differing values (disregarding NA)
     if filter_vars:
+        for col in cfgs.columns:
+            if cfgs[col].dtype == "O" and isinstance(cfgs[col].iloc[0], list):
+                cfgs[col] = cfgs[col].astype("str")
         main_vars = cfgs.nunique(axis=0, dropna=True) > 1
         main_vars[["num_sim_steps", "num_evals"]] = True
         cfgs = cfgs.loc[:, main_vars]
@@ -82,6 +86,24 @@ def make_eval_result(run_dir, num_trials=None, filter_vars=True, change_name=Tru
         cfgs.to_csv(results_dir / "eval_result.csv")
     return cfgs
 
+
+def collate_raw_results(exp_path: List | Path | str):
+    subdir_filename = "eval_rule_01_eval_result.csv"
+    subdata_rec = []
+    if isinstance(exp_path, str):
+        exp_path = [Path(exp_path)]
+    elif isinstance(exp_path, Path):
+        exp_path = [exp_path]
+    elif isinstance(exp_path, list):
+        exp_path = [Path(p) if isinstance(p, str) else p for p in exp_path]
+    for sub_dir in exp_path:
+        for dirpath, dirnames, filenames in sub_dir.walk():
+            if subdir_filename in filenames:
+                subdata = pd.read_csv(Path(dirpath, subdir_filename))
+                subdata["run_name"] = dirpath.name
+                subdata_rec.append(subdata)
+    subdata_df = pd.concat(subdata_rec, ignore_index=True, axis=0)
+    return subdata_df
 
 
 if __name__ == "__main__":
