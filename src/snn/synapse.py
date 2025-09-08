@@ -4,6 +4,7 @@ import numpy as np
 from .base import SynapseLayerProtocol, NeuronLayerProtocol
 from lrule import ANN_Rule, LearningRule, Empty_Rule, STDP_Rule
 # from .utils import tile
+from .utils import Array_FIFO
 
 class SynapseLayer(SynapseLayerProtocol):
     """
@@ -27,6 +28,7 @@ class SynapseLayer(SynapseLayerProtocol):
                  learning_rule: LearningRule = None,
                  eligibility_trace: bool = False, eligibility_pre: bool = False, eligibility_post: bool = False,
                  tau_syn: float = None, dt: float = 1e-3,
+                 synaptic_delay: int = 0,
                  sim_method: Literal["event-driven", "step-wise"] = "step-wise",
                  weight_init: Literal["uniform", "normal", "constant"] = "uniform",
                  weight_clip_min: float = 0.0, weight_clip_max: float = 1.0,
@@ -44,6 +46,12 @@ class SynapseLayer(SynapseLayerProtocol):
         self.post_layer = post_layer
         self.learning_rule = learning_rule if learning_rule is not None else Empty_Rule()
         # self._learning_rule_type = self._get_lrule_type()
+
+        # Synaptic Delay
+        self.synaptic_delay = synaptic_delay
+        self._apply_delay = synaptic_delay > 0
+        if self._apply_delay:
+            self.current_buffer = Array_FIFO(shape=(self.post_layer.size, ), size=synaptic_delay + 1)
 
         # Eligibility trace
         # Pre-before-post trace (previously just "eligibility_trace")
@@ -142,6 +150,8 @@ class SynapseLayer(SynapseLayerProtocol):
 
         # Compute the output current
         output_current = np.dot(spike_input, self.weights)
+        if self._apply_delay:
+            output_current = self.current_buffer.push(output_current)
         return output_current
     
     def update_eligibility_trace(self) -> None:

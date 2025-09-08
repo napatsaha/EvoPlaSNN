@@ -125,3 +125,46 @@ class LayerRecorder:
     #         plt.show()
     #     else:
     #         plt.close(fig)
+
+
+class Array_FIFO:
+    """
+    A class representing a fixed-size First-In-First-Out (FIFO) buffer for storing arrays, by using an incrementing index pointer.
+
+    Attributes:
+        size (int): The maximum number of items the buffer can hold.
+        _shape (tuple): The shape of the entire array, including the size.
+        array (numpy.ndarray): The internal buffer array for storing items.
+        _idx (int): The current index for inserting the next item.
+
+    Methods:
+        __init__(shape, size):
+            Initializes the FIFO buffer with the specified item shape and buffer size.
+        reset():
+            Resets the buffer's index to the initial position.
+        push(item):
+            Inserts a new item into the buffer, overwriting the oldest item if the buffer is full.
+            Returns the item that was overwritten.
+    """
+    def __init__(self, shape, size):
+        """
+        A class representing a fixed-size First-In-First-Out (FIFO) buffer for storing arrays, by using an incrementing index pointer.
+
+        Args:
+            shape (tuple): The shape of the individual elements in the array.
+            size (int): The number of elements in the array.
+        """
+        self.size = int(size)
+        self._shape = (size, *shape)
+        self.array = np.zeros(self._shape)
+        self._idx = 0
+
+    def reset(self):
+        self._idx = 0
+
+    def push(self, item):
+        next_idx = (self._idx + 1) % self.size
+        prev_item = self.array[next_idx, ...]
+        self.array[self._idx, ...] = item
+        self._idx = next_idx
+        return prev_item
