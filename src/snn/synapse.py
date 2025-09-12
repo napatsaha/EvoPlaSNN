@@ -141,6 +141,9 @@ class SynapseLayer(SynapseLayerProtocol):
                 self._etssp_post.fill(np.inf)
                 self._elast_post.fill(0.0)
 
+        if self._apply_delay:
+            self.current_buffer.reset()
+
     def forward(self, spike_input: np.ndarray) -> np.ndarray:
         """
         Compute the output current to the next neuron layer given a spike current input from the previous neuron layer.

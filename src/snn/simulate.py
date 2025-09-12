@@ -184,7 +184,7 @@ class SNNSimulator:
             action = self.spike_coder.decode(spk_out)
 
             # Increment environment step if the spike coder says so
-            if self.spike_coder.ready:
+            if self.spike_coder.ready and action is not None:
                 state, reward, terminated, truncated, info = self.env.step(action)
                 episode_done = terminated or truncated
                 if self.update_condition == "on-step":
@@ -295,6 +295,7 @@ class SNNSimulator:
             # Refresh neuron and synaptic states
             if self._soft_reset and episode_done:
                 self.network.soft_reset()
+                # self.spike_coder.reset()
 
     def get_fitness(self) -> float | None:
         # if self._post_process_type == 0:

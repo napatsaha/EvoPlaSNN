@@ -79,14 +79,14 @@ class CustomMaze(BaseMaze):
     A Custome Maze where an array of integers can be passed to create such a maze.  
     Positions for Agent, Good and Bad items must be specified with 2, 3 and 4 respectively.
     """
-    def __init__(self, file: str, pad=1, **kwargs):
-        self.file = file
+    def __init__(self, maze_file: str, pad=1, **kwargs):
+        self.maze_file = maze_file
         super().__init__(pad=pad, **kwargs)
 
     @override
     def _create_maze(self):
         # Load maze from file
-        loaded_maze = np.loadtxt(self.file, dtype=np.int8)
+        loaded_maze = np.loadtxt(self.maze_file, dtype=np.int8)
         if loaded_maze.ndim != 2:
             raise ValueError("Loaded maze must be a 2D array.")
         if not ((loaded_maze == self.WALL) | (loaded_maze == self.EMPTY) | 

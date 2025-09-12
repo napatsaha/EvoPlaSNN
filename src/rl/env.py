@@ -272,7 +272,7 @@ class BaseMaze(gym.Env):
         ax.set_yticks(np.arange(0, self.height, 1), labels=[])
         ax.grid(visible=True, color='gray', linewidth=1)
         plt.show()
-        # return fig
+        return fig
     
     def reset(self, *, seed = None, options = None):
         super().reset(seed=seed, options=options)

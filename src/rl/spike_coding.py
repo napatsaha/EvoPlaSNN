@@ -12,16 +12,25 @@ class SpikeCoder:
     Encode state / observation values to input spikes.  
     Decoder output spikes to action values.
     """
-    def __init__(self, num_states: int, num_actions: int, *, input_delay: int = 3):
+    def __init__(self, num_states: int, num_actions: int, *, input_delay: int = 3, output_delay: int = 0):
         self.num_states = num_states
         self.num_actions = num_actions
         self.input_delay = input_delay
         self._delay_count = 0
         self._ready = False # Determines whether environment should be incremented
+        self._apply_output_delay = output_delay > 0
+        if self._apply_output_delay:
+            self.output_delay = output_delay
+            self._output_ready = False
+            self._output_delay_count = 0
+
 
     def reset(self):
         self._delay_count = 0
         self._ready = False
+        if self._apply_output_delay:
+            self._output_ready = False
+            self._output_delay_count = 0
 
     def encode(self, state: int) -> np.ndarray:
         """
@@ -40,6 +49,12 @@ class SpikeCoder:
             self._delay_count = 0
         else:
             self._delay_count += 1
+        if self._apply_output_delay:
+            self._output_ready = self._output_delay_count >= (self.input_delay + self.output_delay - 1)
+            if self._output_ready:
+                self._output_delay_count = self.output_delay
+            else:
+                self._output_delay_count += 1
         return spikes
     
     def decode(self, spikes: np.ndarray) -> int | None:
@@ -54,7 +69,10 @@ class SpikeCoder:
 
             Returns None only when Spike Coder is not ready (i.e. it is within waiting interval of input encoding).
         """
-        if not self._ready:
+        if self._apply_output_delay:
+            if not self._output_ready:
+                return None
+        elif not self._ready:
             return None
         spk_idx = spikes.nonzero()[0]
         if len(spk_idx) == 0:
@@ -70,4 +88,7 @@ class SpikeCoder:
         """
         Determines whether environment should be incremented
         """
-        return self._ready
+        if self._apply_output_delay:
+            return self._output_ready
+        else:
+            return self._ready
