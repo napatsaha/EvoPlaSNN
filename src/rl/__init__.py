@@ -1,7 +1,7 @@
 from .env import BaseMaze
 from .maze import TMaze
 from . import maze
-from .spike_coding import SpikeCoder
+from .spike_coding import StateCoder
 from .collector import RewardCollector
 
 

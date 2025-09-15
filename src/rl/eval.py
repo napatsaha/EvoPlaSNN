@@ -13,7 +13,7 @@ import snn.spikegen as spkgen
 # import snn.spikegen
 
 from lrule import ANN_Rule, LearningRule
-from rl import ENV_DICT, SpikeCoder, RewardCollector
+from rl import ENV_DICT, StateCoder, RewardCollector
     
 
 class RL_Evaluator(Evaluator):
@@ -44,7 +44,7 @@ class RL_Evaluator(Evaluator):
         self.env = ENV_DICT.get(env_name)(**params["env_params"])
         num_states = self.env.observation_space.n
         num_actions = self.env.action_space.n
-        self.spike_coder = SpikeCoder(num_states, num_actions, **params["spike_coder_params"])
+        self.spike_coder = StateCoder(num_states, num_actions, **params["spike_coder_params"])
         self.arule = ANN_Rule(**params["arule_params"]) if learning_rule is None else learning_rule
         self.snn = SNN(input_size=num_states, output_size=num_actions, learning_rule=self.arule, **params["snn_params"])
         self.reward_collector = RewardCollector(**params["collector_params"])

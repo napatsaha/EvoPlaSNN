@@ -2,10 +2,29 @@
 2025-08-15
 """
 import numpy as np
+import gymnasium as gym
+from abc import ABC
 
 
+class SpikeCoder(ABC):
+    """
+    An interface between RL Environment and SNN.
+    """
+    def encode(self, state: int | np.ndarray) -> np.ndarray:
+        raise NotImplementedError
 
-class SpikeCoder:
+    def decode(self, spikes: np.ndarray) -> int | None:
+        raise NotImplementedError
+
+    def reset(self):
+        raise NotImplementedError
+    
+    @property
+    def ready(self) -> bool:
+        raise NotImplementedError
+
+
+class StateCoder(SpikeCoder):
     """
     An interface between RL Environment and SNN.
 
@@ -92,3 +111,77 @@ class SpikeCoder:
             return self._output_ready
         else:
             return self._ready
+        
+
+class ObservationCoder(SpikeCoder):
+    """
+    Spike Coder which converts an observation array of real-values into spikes with the same number of channels as the observation array.
+
+    Uses temporal encoding and decoding. 
+    Encodes observation array into input neurons by times of spikes.  
+    Decodes output neurons into actions based on which one spike first.
+    """
+    def __init__(self, obs_space: gym.spaces, action_space: gym.spaces, time_window: int = 10):
+        self.obs_space = obs_space
+        self.action_space = action_space
+        self.time_window = time_window
+        self.num_obs = obs_space.shape[0]
+        self.num_actions = action_space.n
+
+        # Container objects
+        self.array = np.zeros((self.num_obs, self.time_window), dtype=np.int8)
+        self.output_buffer = np.zeros((self.num_actions, self.time_window), dtype=np.int8)
+
+        # Boolean flags
+        self._ready = False # Whether or not the window has finished, and decoding can begin
+        self._should_parse = True # Whether or not to process new observations into spike. (only occurs at start of time window)
+
+        # Counting metrics
+        self._count = 0
+
+    def _parse_input(self, obs: np.ndarray):
+        """
+        Convert real values to spike times by scaling low-high to time window.
+        """
+        low, high = self.obs_space.low, self.obs_space.high
+        scaled_obs = (obs - low) / (high - low)
+        timing = (scaled_obs * self.time_window).round(0).astype(int)
+        return timing
+    
+    def encode(self, obs: np.ndarray) -> np.ndarray:
+        if self._should_parse:
+            self._soft_reset()
+            timing = self._parse_input(obs)
+            np.put_along_axis(self.array, timing[:, np.newaxis], 1, axis=1)
+            self._should_parse = False
+
+        spikes = self.array[:, self._count]
+        self._count += 1
+        self._ready = self._count >= (self.time_window)
+        return spikes
+
+    def decode(self, spikes: np.ndarray) -> int | None:
+        self.output_buffer[:, (self._count - 1)] = spikes
+        if not self._ready:
+            return None
+        else:
+            # Find time to first spike for each neuron
+            ttfs = np.argmax(self.output_buffer, axis=1)
+            # To handle neurons that never spike, we set their time to first spike to the time window (maximum)
+            ttfs = np.where(np.sum(self.output_buffer, axis=1) == 0, self.time_window, ttfs)
+            self._should_parse = True
+            return ttfs
+        
+    def _soft_reset(self):
+        self.output_buffer.fill(0)
+        self.array.fill(0)
+        self._ready = False
+        self._count = 0
+
+    def reset(self):
+        self._soft_reset()
+        self._should_parse = True
+
+    @property
+    def ready(self) -> bool:
+        return self._ready
