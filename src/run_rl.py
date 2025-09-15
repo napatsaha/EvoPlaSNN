@@ -155,6 +155,7 @@ def eval(results_path: Path | str = None, *, config_path: str | Path = None, num
     else:
         assert isinstance(learning_rule, LearningRule), f"{type(learning_rule)} is not a LearningRule object."
         lrule = learning_rule
+        prefix = f"eval_custom_rule"
 
     # spikegen_cls = getattr(spkgen, config["spikegen_params"].pop("class", "BinaryClassGenerator"))
     # spikegen = spikegen_cls(input_size=config["snn_params"].get("input_size"), **config["spikegen_params"])
@@ -225,7 +226,7 @@ def eval(results_path: Path | str = None, *, config_path: str | Path = None, num
             print(f"Error plotting membranes: {e}")
         # Plot static weight at end of simulation
         try:
-            snn_plot.plot_weights(simulator, env=evaluator.env, bounded_weights=False, y_scale=0.3, x_scale=0.2,
+            snn_plot.plot_weights(simulator, env=evaluator.env, bounded_weights=False, y_scale=1.0, x_scale=1.0,
                                 savepath=Path(results_path, f"{prefix}_weights.png") if save_plots else None, show=show_plots)
         except Exception as e:
             print(f"Error plotting weights: {e}")
@@ -260,6 +261,12 @@ def eval(results_path: Path | str = None, *, config_path: str | Path = None, num
                                             savepath=Path(results_path, f"{prefix}_intermediate_fitness.png") if save_plots else None, show=show_plots)
         except Exception as e:
             print(f"Error plotting intermediate fitness: {e}")
+        # Plot Learning Rule Response
+        try:
+            snn_plot.plot_learning_rule(lrule, simulator, rew_list=evaluator.env.reward_list,
+                                        savepath=Path(results_path, f"{prefix}_learning_rule.png") if save_plots else None, show=show_plots)
+        except Exception as e:
+            print(f"Error plotting learning rule: {e}")
 
     if not return_evaluator and eval_results:
         return mean_fts, std_fts

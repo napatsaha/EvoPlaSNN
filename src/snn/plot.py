@@ -602,6 +602,75 @@ def plot_intermediate_fitness(simulator: 'SNN_Simulator' = None, values: np.ndar
     # plt.close(fig)
 
 
+### Plotting functions for Learning Rule ###
+
+def plot_learning_rule(lrule: 'LearningRule', simulator: 'SNNSimulator' = None, *, 
+                       cmap: str = "RdBu", num_mesh: int = 100,
+                       wmax: float = 1.0, wmin: float = -1.0, emax: float = 2.0, emin: float = 0.0,
+                       rew_list: List[float] = None,
+                       x_scale: float = 1.0, y_scale: float = 1.0,
+                       savepath: str | Path = None, show: bool = True):
+
+    if simulator is not None:
+        assert simulator.record_eligibility_pre or simulator.record_eligibility_post, "Eligibility trace recording is not enabled."
+        assert simulator.record_weights, "Weight recording is not enabled."
+        wmax = max(wmax, simulator.weight_recorder.values[0].max())
+        wmin = min(wmin, simulator.weight_recorder.values[0].min())
+        emax = max(emax, simulator.eligibility_pre_recorder.values[0].max())
+        emin = min(emin, simulator.eligibility_pre_recorder.values[0].min())
+    else:
+        wmax = wmax
+        wmin = wmin
+        emax = emax
+        emin = emin
+
+    arule = lrule.ann
+    N = num_mesh
+    # Eligibility trace range
+    etrace_r = np.linspace(emin, emax, N)
+    # Weight range
+    weight_r = np.linspace(wmin, wmax, N)
+    ee, ww = np.meshgrid(etrace_r, weight_r)
+
+    # Reward range
+    if rew_list is not None:
+        rew_r = np.array(rew_list)
+    else:
+        rew_r = np.array([-1.0, -0.1, 0.1, 1.0])
+    rr = np.full((N, N), rew_r[0])
+
+    # Combine
+    dw_rec = np.zeros((N, N, len(rew_r)))
+
+    for i, r in enumerate(rew_r):
+        rr = np.full((N, N), r)
+        inp = np.concatenate([ww[..., np.newaxis], rr[..., np.newaxis], ee[..., np.newaxis]], axis=2)
+        # inp = np.concatenate([rr[..., np.newaxis], ee[..., np.newaxis]], axis=2)
+        dw = arule.forward(inp)
+        dw_rec[..., i] = dw.reshape(N, N)
+    
+    # Start plotting
+    ncol = int(np.ceil(np.sqrt(len(rew_r))))
+    nrow = int(np.ceil(len(rew_r) / ncol))
+    fig, axs = plt.subplots(nrow, ncol, figsize=(ncol * 7.5 * x_scale, nrow * 7.5 * y_scale), squeeze=False)
+
+    for i, r in enumerate(rew_r):
+        ax = axs.flat[i]
+        ax.imshow(dw_rec[..., i], extent=[emin, emax, wmin, wmax], origin='lower', aspect='auto', vmin=-1, vmax=1, cmap=cmap)
+        ax.set_title(f"Reward = {r}")
+        ax.set_xlabel("Eligibility Trace")
+        ax.set_ylabel("Weight")
+
+    fig.colorbar(axs[0, 0].images[0], ax=axs, orientation='vertical', fraction=.1, label='ΔWeight')
+    fig.text(0.5, 0.9, f"Learning Rule Response to Inputs:\nf({lrule.input_order}) -> ΔWeight", ha="center", transform=fig.transFigure, fontsize=16)
+    
+    if savepath is not None:
+        plt.savefig(savepath)
+    if show:
+        plt.show()
+    # plt.close(fig)
+
+
 ### Plotting functions for Evolutionary Results ###
 
 

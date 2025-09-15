@@ -272,7 +272,7 @@ class BaseMaze(gym.Env):
         ax.set_yticks(np.arange(0, self.height, 1), labels=[])
         ax.grid(visible=True, color='gray', linewidth=1)
         plt.show()
-        return fig
+        # return fig
     
     def reset(self, *, seed = None, options = None):
         super().reset(seed=seed, options=options)
@@ -319,6 +319,10 @@ class BaseMaze(gym.Env):
     
     def get_max_reward(self):
         return max(self.reward_bad, self.reward_good, self.penalty, self.reward_trunc, self.reward_inter)
+
+    @property
+    def reward_list(self):
+        return sorted(set([0.0, self.reward_bad, self.reward_good, self.penalty, self.reward_trunc, self.reward_inter]))
 
     # def _create_reward_function(self):
     #     if self.reward_function == "A":
