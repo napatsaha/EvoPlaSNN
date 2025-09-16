@@ -76,7 +76,7 @@ class BaseMaze(gym.Env):
     }
 
     def __init__(self, size=None, width=None, height=None, pad=1, *, 
-                 max_steps=50, 
+                 max_steps=50, randomise_start: bool = False, random_min_dist: int = 0,
                  reward_step_closer: bool = False,
                  penalty: float = -0.1, reward_inter: float = 0.1,
                  reward_bad: float = -1.0, reward_good: float = 1.0, reward_trunc: float = -1.0):
@@ -116,6 +116,9 @@ class BaseMaze(gym.Env):
         self.area = self.width * self.height if self.width is not None and self.height is not None else None
         self.pad = pad
         self.max_steps = int(max_steps)
+
+        self.randomise_start = randomise_start
+        self.random_min_dist = max(0, int(random_min_dist))
 
         # Reward parameters
         # Final episode reward
@@ -177,7 +180,22 @@ class BaseMaze(gym.Env):
         self._agent_pos = np.argwhere(self.maze == self.AGENT)[0]
         self._good_pos = np.argwhere(self.maze == self.GOOD)[0]
         self._bad_pos = np.argwhere(self.maze == self.BAD)[0]
-        self._starting_state = self._convert_pos_to_state(self._agent_pos)
+        if self.randomise_start:
+            # Pre-determine list of indices which is at least `random_min_dist` away from either good or bad rewards
+            self._idx_dist_rec = []
+            for idx in self._empty_idx:
+                idx2d = np.unravel_index(idx, self.maze.shape)
+                good_dist = man_dist(self._good_pos, idx2d)
+                bad_dist = man_dist(self._bad_pos, idx2d)
+                self._idx_dist_rec.append((int(idx), idx2d, int(good_dist), int(bad_dist)))
+            self._valid_idx = [idx for idx, _, gd, bd in self._idx_dist_rec if gd >= self.random_min_dist and bd >= self.random_min_dist]
+            # Randomly choose starting position from this list
+            self.maze[*self._agent_pos] = self.EMPTY
+            rand_idx = self.np_random.choice(self._valid_idx)
+            self._agent_pos = np.unravel_index(rand_idx, self.maze.shape)
+            self.maze[*self._agent_pos] = self.AGENT
+        else:
+            self._starting_pos = self._agent_pos.copy()
         self._state_pos_dict = {state: self._convert_state_to_pos(state) for state in range(self._num_state)}
 
     ## Internal functions
@@ -185,9 +203,13 @@ class BaseMaze(gym.Env):
         self.maze[np.unravel_index(self._empty_idx, self.maze.shape)] = self.EMPTY
         self.maze[*self._good_pos] = self.GOOD
         self.maze[*self._bad_pos] = self.BAD
-        self._agent_pos = self._convert_state_to_pos(self._starting_state)
+        if self.randomise_start:
+            rand_idx = self.np_random.choice(self._valid_idx)
+            self._agent_pos = np.unravel_index(rand_idx, self.maze.shape)
+        else:
+            self._agent_pos = self._starting_pos.copy()
         self.maze[*self._agent_pos] = self.AGENT
-        self._step_count = 0
+        # self._step_count = 0
 
     def _take_action(self, action: int, info: dict) -> Tuple[float, dict]:
         """
@@ -278,12 +300,13 @@ class BaseMaze(gym.Env):
         super().reset(seed=seed, options=options)
         self._step_count = 0
         self._reset_position()
-        state = self.get_agent_position()
+        state = self.get_agent_state()
         info = {
             'step_count': self._step_count,
             # 'reward_position': self.get_reward_position()
         }
         if self._check_closest_distance:
+            self._calculate_min_step()
             self._closest_dist = self.min_steps
             self._prev_dist = self._closest_dist
             info['closest_dist'] = self._closest_dist
@@ -297,7 +320,7 @@ class BaseMaze(gym.Env):
         terminated = info.get('terminated', None)
         if truncated and not terminated:
             reward = self.reward_trunc
-        state = self.get_agent_position()
+        state = self.get_agent_state()
         return state, reward, terminated, truncated, info
 
     ## Other functions
@@ -308,11 +331,17 @@ class BaseMaze(gym.Env):
     def get_maze(self):
         return self.maze.copy()
     
-    def get_agent_position(self):
+    def get_agent_state(self):
         return self._convert_pos_to_state(self._agent_pos)
     
-    def get_reward_position(self):
+    def get_good_state(self):
         return self._convert_pos_to_state(self._good_pos)
+    
+    def get_bad_state(self):
+        return self._convert_pos_to_state(self._bad_pos)
+    
+    def get_agent_position(self):
+        return np.array(self._agent_pos)
 
     def get_min_reward(self):
         return min(self.reward_bad, self.reward_good, self.penalty, self.reward_trunc, self.reward_inter)
