@@ -350,8 +350,12 @@ def _plot_spikes_single(ax: Axes, tf_spikes: np.ndarray, x_max: int, label: str 
 #     # plt.close(fig)
 
 def plot_weights(simulator: "SNNSimulator" = None, values: List[np.ndarray] = None, *, env = None,
-                 x_scale: float = 0.3, y_scale: float = 0.3, cmap: str = "viridis", bounded_weights: bool = True,
+                 x_scale: float = 1.0, y_scale: float = 1.0, cmap: str = "viridis", bounded_weights: bool = True,
+                 color_scale: str = "linear",
                  savepath: str | Path = None, show: bool = True):
+    """
+    Plot the current synaptic weights of all layers in the SNN, as a heatmap.
+    """
     if simulator is not None:
         assert simulator.record_weights, "Weight recording is not enabled."
         values = simulator.network.weights
@@ -361,7 +365,12 @@ def plot_weights(simulator: "SNNSimulator" = None, values: List[np.ndarray] = No
         num_layers = len(values)
     else:
         raise ValueError("Either simulator with weight recording enabled or list of weight values for each synapse layer must be provided.")
-    fig, axs = plt.subplots(1, num_layers, figsize=(20*y_scale*num_layers, 20*x_scale), squeeze=False, layout="constrained")
+    
+    neurons_in = [w.shape[0] for w in values]
+    neurons_out = [w.shape[1] for w in values]
+    width = sum(neurons_out) * x_scale * 1.5
+    height = max(neurons_in) * y_scale
+    fig, axs = plt.subplots(1, num_layers, figsize=(width, height), squeeze=False, layout="constrained", gridspec_kw={"hspace": 0, "wspace": 0})
     wmin = min([np.min(w) for w in values])
     if bounded_weights:
         wmin = min(wmin, 0)
@@ -371,8 +380,8 @@ def plot_weights(simulator: "SNNSimulator" = None, values: List[np.ndarray] = No
     
     for i in range(num_layers):
         ax = axs[0, i]
-        img = ax.imshow(values[i], cmap=cmap, vmin=wmin, vmax=wmax, aspect=1.0)
-        annotate_heatmap(img, valfmt="{x:.3f}", fontsize=10)
+        img = ax.imshow(values[i], cmap=cmap, vmin=wmin, vmax=wmax, aspect=1.0, norm=color_scale)
+        annotate_heatmap(img, valfmt="{x:.3f}", fontsize=10, textcolors=("white", "black"))
         ax.xaxis.set_major_locator(plt.MultipleLocator(1))
         ax.yaxis.set_major_locator(plt.MultipleLocator(1))
         ax.set_title(f"Synapse Layer {i}")
@@ -387,7 +396,7 @@ def plot_weights(simulator: "SNNSimulator" = None, values: List[np.ndarray] = No
             ax.set_ylabel("State")
 
     fig.colorbar(img, ax=axs, orientation='vertical', label='Weight Value')
-    fig.text(x=0.5, y=1.01, s="SNN Synaptic Weights", fontsize=20, ha='center')
+    fig.text(x=0.5, y=0.99, s="SNN Synaptic Weights", fontsize=20, ha='center')
     if savepath is not None:
         plt.savefig(savepath)
     if show:
