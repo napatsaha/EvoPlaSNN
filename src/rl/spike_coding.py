@@ -23,6 +23,14 @@ class SpikeCoder(ABC):
     def ready(self) -> bool:
         raise NotImplementedError
 
+    @property
+    def input_size(self) -> int:
+        raise NotImplementedError
+    
+    @property
+    def output_size(self) -> int:
+        raise NotImplementedError
+
 
 class StateCoder(SpikeCoder):
     """
@@ -31,9 +39,12 @@ class StateCoder(SpikeCoder):
     Encode state / observation values to input spikes.  
     Decoder output spikes to action values.
     """
-    def __init__(self, num_states: int, num_actions: int, *, input_delay: int = 3, output_delay: int = 0):
-        self.num_states = num_states
-        self.num_actions = num_actions
+    def __init__(self, obs_space: gym.spaces, action_space: gym.spaces, *,
+                 input_delay: int = 3, output_delay: int = 0):
+        self.obs_space = obs_space
+        self.action_space = action_space
+        self.num_states = obs_space.n # Assumed to be a Discrete space
+        self.num_actions = action_space.n
         self.input_delay = input_delay
         self._delay_count = 0
         self._ready = False # Determines whether environment should be incremented
@@ -112,6 +123,13 @@ class StateCoder(SpikeCoder):
         else:
             return self._ready
         
+    @property
+    def input_size(self) -> int:
+        return self.num_states
+    @property
+    def output_size(self) -> int:
+        return self.num_actions
+
 
 class ObservationCoder(SpikeCoder):
     """
@@ -145,7 +163,7 @@ class ObservationCoder(SpikeCoder):
         """
         low, high = self.obs_space.low, self.obs_space.high
         scaled_obs = (obs - low) / (high - low)
-        timing = (scaled_obs * self.time_window).round(0).astype(int)
+        timing = (scaled_obs * (self.time_window - 1)).round(0).astype(int)
         return timing
     
     def encode(self, obs: np.ndarray) -> np.ndarray:
@@ -170,7 +188,7 @@ class ObservationCoder(SpikeCoder):
             # To handle neurons that never spike, we set their time to first spike to the time window (maximum)
             ttfs = np.where(np.sum(self.output_buffer, axis=1) == 0, self.time_window, ttfs)
             self._should_parse = True
-            return ttfs
+            return int(np.argmin(ttfs))
         
     def _soft_reset(self):
         self.output_buffer.fill(0)
@@ -185,3 +203,11 @@ class ObservationCoder(SpikeCoder):
     @property
     def ready(self) -> bool:
         return self._ready
+    
+    @property
+    def input_size(self) -> int:
+        return self.num_obs
+    @property
+    def output_size(self) -> int:
+        return self.num_actions
+    

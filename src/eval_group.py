@@ -18,7 +18,7 @@ def convert_name(x):
     else:
         return tokens[-1]
 
-def make_eval_result(run_dir, num_trials=None, filter_vars=True, change_name=True, save=True):
+def make_eval_result(run_dir, num_trials=None, filter_vars=True, change_name=True, save=True, ignore_na=True):
     results_dir = Path(run_dir)   
 
     if (results_dir / "eval_result.csv").exists():
@@ -68,7 +68,7 @@ def make_eval_result(run_dir, num_trials=None, filter_vars=True, change_name=Tru
         for col in cfgs.columns:
             if cfgs[col].dtype == "O" and isinstance(cfgs[col].iloc[0], list):
                 cfgs[col] = cfgs[col].astype("str")
-        main_vars = cfgs.nunique(axis=0, dropna=True) > 1
+        main_vars = cfgs.nunique(axis=0, dropna=ignore_na) > 1
         main_vars[["num_sim_steps", "num_evals"]] = True
         cfgs = cfgs.loc[:, main_vars]
     # Removes "aaa_params__" in config names

@@ -13,7 +13,7 @@ import snn.spikegen as spkgen
 # import snn.spikegen
 
 from lrule import ANN_Rule, LearningRule
-from rl import ENV_DICT, StateCoder, RewardCollector
+from rl import ENV_DICT, StateCoder, RewardCollector, BaseMaze
     
 
 class RL_Evaluator(Evaluator):
@@ -41,12 +41,13 @@ class RL_Evaluator(Evaluator):
         if env_name not in ENV_DICT:
             raise ValueError(f"Environment '{env_name}' not yet supported. "
                              f"Supported environments: {list(ENV_DICT.keys())}")
-        self.env = ENV_DICT.get(env_name)(**params["env_params"])
-        num_states = self.env.observation_space.n
-        num_actions = self.env.action_space.n
-        self.spike_coder = StateCoder(num_states, num_actions, **params["spike_coder_params"])
+        self.env: BaseMaze = ENV_DICT.get(env_name)(**params["env_params"])
+        # num_states = self.env.observation_space.n
+        # num_actions = self.env.action_space.n
+        self.spike_coder = StateCoder(self.env.observation_space, self.env.action_space, **params["spike_coder_params"])
         self.arule = ANN_Rule(**params["arule_params"]) if learning_rule is None else learning_rule
-        self.snn = SNN(input_size=num_states, output_size=num_actions, learning_rule=self.arule, **params["snn_params"])
+        self.snn = SNN(input_size=self.spike_coder.input_size, output_size=self.spike_coder.output_size, 
+                       learning_rule=self.arule, **params["snn_params"])
         self.reward_collector = RewardCollector(**params["collector_params"])
         # Update min and max fitness from environment
         self.reward_collector.min_fitness = self.env.get_min_reward()

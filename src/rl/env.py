@@ -77,6 +77,8 @@ class BaseMaze(gym.Env):
 
     def __init__(self, size=None, width=None, height=None, pad=1, *, 
                  max_steps=50, randomise_start: bool = False, random_min_dist: int = 0,
+                 obs_type: Literal["state", "position", "surroundings"] = "state",
+                 include_agent_pos: bool = False,
                  reward_step_closer: bool = False,
                  penalty: float = -0.1, reward_inter: float = 0.1,
                  reward_bad: float = -1.0, reward_good: float = 1.0, reward_trunc: float = -1.0):
@@ -130,6 +132,22 @@ class BaseMaze(gym.Env):
         self.penalty = penalty
         self.reward_inter = reward_inter
 
+        # Observation type
+        if obs_type not in ["state", "position", "surroundings"]:
+            raise ValueError(f"Invalid obs_type: {obs_type}. Must be 'state', 'position' or 'surroundings'.")
+        self.obs_type = obs_type
+        self._use_obs_state = obs_type == "state"
+        self._use_obs_pos = obs_type == "position"
+        self._use_obs_surr = obs_type == "surroundings"
+        if self._use_obs_surr and include_agent_pos:
+            self.neighbouring = np.array([[-1, -1], [-1, 0], [-1, 1],
+                                          [0, -1],  [0, 0], [0, 1],
+                                          [1, -1], [1, 0], [1, 1]])
+        elif self._use_obs_surr and not include_agent_pos:
+            self.neighbouring = np.array([[-1, -1], [-1, 0], [-1, 1],
+                                          [0, -1],           [0, 1],
+                                          [1, -1], [1, 0], [1, 1]])
+
         # Create important attributes
         self._create_maze()
         self._prepare_positions()
@@ -137,7 +155,16 @@ class BaseMaze(gym.Env):
         self._calculate_min_step()
 
         # Gym spaces attributes
-        self.observation_space = gym.spaces.Discrete(self._num_state)
+        if self._use_obs_state:
+            self.observation_space = gym.spaces.Discrete(self._num_state)
+        elif self._use_obs_pos:
+            self.observation_space = gym.spaces.Box(low=np.zeros((2,), dtype=np.int8) + self.pad,
+                                                    high=np.array((self.height, self.width)) - self.pad - 1,
+                                                    shape=(2,), dtype=np.int8)
+        elif self._use_obs_surr:
+            self.observation_space = gym.spaces.MultiDiscrete([5] * len(self.neighbouring))
+        else:
+            raise ValueError("Invalid observation type.")
         self.action_space = gym.spaces.Discrete(4)
         self._step_count = 0
         self._closest_dist = self.min_steps
@@ -300,7 +327,7 @@ class BaseMaze(gym.Env):
         super().reset(seed=seed, options=options)
         self._step_count = 0
         self._reset_position()
-        state = self.get_agent_state()
+        state = self.get_observation()
         info = {
             'step_count': self._step_count,
             # 'reward_position': self.get_reward_position()
@@ -320,7 +347,7 @@ class BaseMaze(gym.Env):
         terminated = info.get('terminated', None)
         if truncated and not terminated:
             reward = self.reward_trunc
-        state = self.get_agent_state()
+        state = self.get_observation()
         return state, reward, terminated, truncated, info
 
     ## Other functions
@@ -331,8 +358,15 @@ class BaseMaze(gym.Env):
     def get_maze(self):
         return self.maze.copy()
     
-    def get_agent_state(self):
-        return self._convert_pos_to_state(self._agent_pos)
+    def get_observation(self):
+        if self._use_obs_state:
+            return self._convert_pos_to_state(self._agent_pos)
+        elif self._use_obs_pos:
+            return np.asarray(self._agent_pos)
+        elif self._use_obs_surr:
+            indices = self._agent_pos + self.neighbouring
+            obs = self.maze[indices[:, 0], indices[:, 1]]
+            return obs
     
     def get_good_state(self):
         return self._convert_pos_to_state(self._good_pos)
