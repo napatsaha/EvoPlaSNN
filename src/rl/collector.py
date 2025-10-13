@@ -66,3 +66,24 @@ class RewardCollector:
         if len(rewards) == 0:
             return self.min_fitness
         return np.mean(rewards)
+    
+
+Trajectory = namedtuple("Trajectory", ["state", "observation", "action", "reward", "done", "info"])
+
+class TrajectoryCollector:
+    records: List[Trajectory]
+    def __init__(self):
+        self.records = []
+
+    def reset(self):
+        self.records.clear()
+
+    def collect(self, observation, action, reward, done, info, state = None):
+        self.records.append(Trajectory(
+            state = state,
+            observation = observation,
+            action = action,
+            reward = reward,
+            done = done,
+            info = info
+        ))

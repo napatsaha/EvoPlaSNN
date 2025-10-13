@@ -14,7 +14,7 @@ from .spikegen import BinaryClassGenerator
 from .decoding import get_decoder_class, get_fitnessor_class, BaseDecoder, BaseFitnessor
 from .rewarder import create_rewarder, create_collector, RewarderProtocol, CollectorProtocol
 from rl.spike_coding import SpikeCoder
-from rl.collector import RewardCollector
+from rl.collector import RewardCollector, TrajectoryCollector
 import gymnasium as gym
 
 
@@ -25,6 +25,7 @@ class SNNSimulator:
     collector: CollectorProtocol | None
     def __init__(self, network: SNN, #spike_generator: SpikeGenerator = None, 
                  env: gym.Env = None, spike_coder: SpikeCoder = None, reward_collector: RewardCollector = None,
+                 trajectory_collector: TrajectoryCollector = None,
                  update_condition: Literal["on-step", "on-end"] = "on-end",
                  *, 
                 #  params: dict = {},
@@ -41,6 +42,7 @@ class SNNSimulator:
         self.env = env
         self.spike_coder = spike_coder
         self.reward_collector = reward_collector
+        self.trajectory_collector = trajectory_collector
 
         # Flags to indicate what to record
         self.record_membrane = record_membrane
@@ -158,6 +160,8 @@ class SNNSimulator:
         self.spike_coder.reset()
         if self.reward_collector is not None:
             self.reward_collector.reset()
+        if self.trajectory_collector is not None:
+            self.trajectory_collector.reset()
 
         # Reset network
         self.network.reset()
@@ -187,6 +191,17 @@ class SNNSimulator:
             if self.spike_coder.ready and action is not None:
                 state, reward, terminated, truncated, info = self.env.step(action)
                 episode_done = terminated or truncated
+
+                # Optional: Record step data
+                if self.trajectory_collector is not None:
+                    self.trajectory_collector.collect(
+                        state=self.env.get_agent_state() if hasattr(self.env, "get_agent_state") else None,
+                        observation=state,
+                        action=action,
+                        reward=reward,
+                        done=episode_done,
+                        info=info)
+                
                 if self.update_condition == "on-step":
                     self.network.update_synapses(reward=reward)
                 if episode_done:

@@ -162,7 +162,7 @@ class BaseMaze(gym.Env):
                                                     high=np.array((self.height, self.width)) - self.pad - 1,
                                                     shape=(2,), dtype=np.int8)
         elif self._use_obs_surr:
-            self.observation_space = gym.spaces.MultiDiscrete([5] * len(self.neighbouring))
+            self.observation_space = gym.spaces.Box(low=0, high=4, shape=(self.neighbouring.shape[0],), dtype=np.int8)
         else:
             raise ValueError("Invalid observation type.")
         self.action_space = gym.spaces.Discrete(4)
@@ -373,6 +373,9 @@ class BaseMaze(gym.Env):
     
     def get_bad_state(self):
         return self._convert_pos_to_state(self._bad_pos)
+    
+    def get_agent_state(self):
+        return self._convert_pos_to_state(self._agent_pos)
     
     def get_agent_position(self):
         return np.array(self._agent_pos)
