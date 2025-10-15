@@ -82,18 +82,37 @@ class R_STDP(LearningRule):
     """
     An STDP-Rule that only uses Reward and Eligibility Trace as inputs.
     """
-    def __init__(self, learning_rate: float = 0.01,):
+    def __init__(self, learning_rate: float = 0.01, use_eligibility_pre: bool = True, use_eligibility_post: bool = False):
         super().__init__()
         self.learning_rate = learning_rate
+        self.use_eligibility_pre = use_eligibility_pre
+        self.use_eligibility_post = use_eligibility_post
 
-    def update(self, synapse: 'SynapseLayerProtocol', reward=None) -> np.ndarray:
+    def update(self, synapse: 'SynapseLayerProtocol', reward=None, always_return_tuple: bool = False) -> np.ndarray:
         if reward is None:
             reward = 1.0
 
         # Get the eligibility trace
-        etrace = synapse.eligibility_trace # shape: [N_pre, N_post]
+        if self.use_eligibility_pre:
+            etrace_pre = synapse.eligibility_pre # shape: [N_pre, N_post]
+        else:
+            etrace_pre = 0.0
+
+        if self.use_eligibility_post:
+            etrace_post = synapse.eligibility_post # shape: [N_pre, N_post]
+        else:
+            etrace_post = 0.0
+
+        # Combine the eligibility traces
+        if self.use_eligibility_pre or self.use_eligibility_post:
+            etrace = etrace_pre - etrace_post
+        else:
+            etrace = 1.0
 
         # Compute the weight change
         dw = self.learning_rate * reward * etrace
 
-        return dw
+        if always_return_tuple:
+            return dw, None
+        else:
+            return dw

@@ -401,7 +401,7 @@ def plot_weights(simulator: "SNNSimulator" = None, values: List[np.ndarray] = No
         plt.savefig(savepath)
     if show:
         plt.show()
-    plt.close(fig)
+    # plt.close(fig)
 
 
 def plot_weight_over_time(simulator: 'SNNSimulator' = None, values: List[np.ndarray] = None, *, title: str = None, x_min=None, x_max=None,
