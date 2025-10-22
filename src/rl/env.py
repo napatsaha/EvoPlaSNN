@@ -120,7 +120,7 @@ class BaseMaze(gym.Env):
         self.max_steps = int(max_steps)
 
         self.randomise_start = randomise_start
-        self.random_min_dist = max(0, int(random_min_dist))
+        self._random_min_dist = max(0, int(random_min_dist))
 
         # Reward parameters
         # Final episode reward
@@ -215,7 +215,7 @@ class BaseMaze(gym.Env):
                 good_dist = man_dist(self._good_pos, idx2d)
                 bad_dist = man_dist(self._bad_pos, idx2d)
                 self._idx_dist_rec.append((int(idx), idx2d, int(good_dist), int(bad_dist)))
-            self._valid_idx = [idx for idx, _, gd, bd in self._idx_dist_rec if gd >= self.random_min_dist and bd >= self.random_min_dist]
+            self._valid_idx = [idx for idx, _, gd, bd in self._idx_dist_rec if gd >= self._random_min_dist and bd >= self._random_min_dist]
             # Randomly choose starting position from this list
             self.maze[*self._agent_pos] = self.EMPTY
             rand_idx = self.np_random.choice(self._valid_idx)
@@ -389,6 +389,16 @@ class BaseMaze(gym.Env):
     @property
     def reward_list(self):
         return sorted(set([0.0, self.reward_bad, self.reward_good, self.penalty, self.reward_trunc, self.reward_inter]))
+
+    @property
+    def random_min_dist(self):
+        return self._random_min_dist
+    
+    @random_min_dist.setter
+    def random_min_dist(self, value: int):
+        self._random_min_dist = max(0, int(value))
+        # Updates list of valid indices a set distance from either goals
+        self._valid_idx = [idx for idx, _, gd, bd in self._idx_dist_rec if gd >= self._random_min_dist and bd >= self._random_min_dist]
 
     # def _create_reward_function(self):
     #     if self.reward_function == "A":
