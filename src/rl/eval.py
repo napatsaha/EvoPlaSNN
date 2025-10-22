@@ -21,6 +21,8 @@ class RL_Evaluator(Evaluator):
                  params: Dict = {},
                  record_info: bool = False,
                  log_level: int = 2,
+                 record_inter_fitness: bool = True,
+                 precision: int = 3,
                  learning_rule: LearningRule = None,
                  ):
         super().__init__()
@@ -30,6 +32,8 @@ class RL_Evaluator(Evaluator):
         self.results_path: Path = None
         self._log_info = int(log_level)
         self.record_info = bool(record_info)
+        self.record_inter_fitness = record_inter_fitness
+        self.precision = precision if not record_inter_fitness else 1
 
         # Generation and other trackers
         self.gen_count = 0
@@ -147,8 +151,8 @@ class RL_Evaluator(Evaluator):
             if self._log_info >= 1:
                 self.logger.info(f"Trial {i+1}/{num_trials}: Finished Evaluation. Time taken: {t1 - t0:.4f} seconds.")
                 # Get intermediate fitness across samples
-                intermediate_fitness = self.simulator.get_intermediate_fitness(use_portion=True)
-                self.write_trial(self.gen_count, self.inv_count, i, fitness, intermediate_fitness)
+                intermediate_fitness = self.simulator.get_intermediate_fitness(use_portion=True) if self.record_inter_fitness else None
+                self.write_trial(self.gen_count, self.inv_count, i, fitness, intermediate_fitness, precision=self.precision)
         
         if return_fitness_list:
             return fitnesses        
@@ -205,7 +209,7 @@ class RL_Evaluator(Evaluator):
         #         for j, cls in enumerate(pairs):
         #             f.write(f"Pair: {i:>2}, Class: {j:>2}, {cls.tolist()}\n")
 
-    def write_trial(self, gen: int, indiv: int, trial: int, fitness: float, inter_fitness: List[float], precision: int = 1):
+    def write_trial(self, gen: int, indiv: int, trial: int, fitness: float, inter_fitness: List[float] = None, precision: int = 1):
         """
         Records generation number, individual number, trial number, final fitness, and intermediate fitness at the end of each trial.
         """
