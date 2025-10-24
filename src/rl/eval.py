@@ -24,11 +24,23 @@ class RL_Evaluator(Evaluator):
                  record_inter_fitness: bool = True,
                  precision: int = 3,
                  learning_rule: LearningRule = None,
+                 max_steps: int = None,
+                 max_episodes: int = None,
+                 eval_episodes: int = None,
+                 **kwargs
                  ):
         super().__init__()
         # self.input_size = input_size
         params = copy.deepcopy(params)
-        self.num_simulation_steps = params["num_sim_steps"]
+        self.max_steps = max_steps
+        self.max_episodes = max_episodes
+        self.eval_episodes = eval_episodes
+        # if self.num_simulation_steps is None:
+        #     max_steps_per_eps = params.get("env_params", {}).get("max_steps", 0)
+        #     if self.num_episodes is not None:
+        #         self.num_simulation_steps = max_steps_per_eps * self.num_episodes
+        #     else:
+        #         raise ValueError("Either 'simulator_params.num_steps' or ('env_params.max_steps' and 'simulator_params.num_episodes') must be specified in params.")
         self.results_path: Path = None
         self._log_info = int(log_level)
         self.record_info = bool(record_info)
@@ -140,10 +152,14 @@ class RL_Evaluator(Evaluator):
             # Reset everything
             self.simulator.reset()
 
-            # Run an evaluation
+            # Training
             t0 = time.time()
-            self.simulator.run(self.num_simulation_steps)
+            self.simulator.run(num_steps=self.max_steps, num_eps=self.max_episodes)
             t1 = time.time()
+
+            # Evaluation
+            self.simulator.soft_reset(deterministic=True)
+            self.simulator.run(num_eps=self.eval_episodes)
 
             # Final Fitness
             fitness = self.reward_collector.get_fitness()

@@ -31,11 +31,18 @@ class SNNSimulator:
                 #  params: dict = {},
                 #  decoder_type: Literal["final", "rate", "latency"] = "final", decoder_params: dict = {},
                 #  fitnessor_type: Literal["accuracy", "reward", "cross-entropy", "mse"] = "accuracy", fitnessor_params: dict = {},
+                #  num_steps: int = None, num_episodes: int = None,
                  supervised: bool = True, decay: bool = False,
+                 decay_method: Literal["time", "constant"] = "time",
                  decay_rate: float = None, decay_cutoff: int = None, 
                  record_membrane: bool = True, record_spikes: bool = True, record_traces: bool = True, record_thresholds: bool = False,
-                 record_weights: bool = False, record_eligibility_pre: bool = False, record_eligibility_post: bool = False):
+                 record_weights: bool = False, record_eligibility_pre: bool = False, record_eligibility_post: bool = False,
+                 **kwargs):
+        # Duration params
         self.num_steps = 0
+        # self.num_steps = num_steps
+        # self.num_eps = num_episodes
+
         self.network = network
         # self.spike_generator = spike_generator
         self._learning_rule = network.learning_rule
@@ -73,11 +80,12 @@ class SNNSimulator:
         # Deal with decaying exploration over course of simulation
         self._use_decay = decay
         self._decay = decay
+        self.decay_method = decay_method
         self.decay_rate = decay_rate
         self.decay_cutoff = decay_cutoff
         self.decay_init_value = self.network.get_exploration_rate(simplify=True)
         if self._decay and self.reward_collector is not None:
-            self.reward_collector.cutoff_timestep = decay_cutoff
+            self.reward_collector.cutoff_timestep = decay_cutoff ### *** PROBLEMATIC
 
         # # Initialize post-processing components
         # params = copy.deepcopy(params)
@@ -166,8 +174,30 @@ class SNNSimulator:
         # Reset network
         self.network.reset()
 
-    def run(self, num_steps: int):
+    def soft_reset(self, deterministic: bool = False):
+        """Reset only for evaluation while keeping learned weights."""
+        self.num_steps = 0
+        self.network.soft_reset()
+        self.spike_coder.reset()
+        self.env.reset()
+        if self.reward_collector is not None:
+            self.reward_collector.reset()
+        if self.trajectory_collector is not None:
+            self.trajectory_collector.reset()
+
+        if deterministic:
+            self.network.set_deterministic()
+            self._decay = False
+
+    def run(self, num_steps: int = None, num_eps: int = None):
         t_start = self.num_steps
+        if num_steps is None and num_eps is None:
+            raise ValueError("Either num_steps or num_eps must be specified.")
+        if num_steps is None and num_eps is not None:
+            max_steps_per_eps = getattr(self.env, "max_steps", None)
+            if max_steps_per_eps is None:
+                raise ValueError("Environment does not have max_steps attribute. num_steps must be specified.")
+            num_steps = num_eps * max_steps_per_eps * self.spike_coder.input_delay
         self._setup_run(num_steps)
         # _new_sample = True
         state, info = self.env.reset()
@@ -311,6 +341,10 @@ class SNNSimulator:
             if self._soft_reset and episode_done:
                 self.network.soft_reset()
                 # self.spike_coder.reset()
+
+            if num_eps is not None and episode_count >= num_eps:
+                self.num_steps = t
+                break
 
     def get_fitness(self) -> float | None:
         # if self._post_process_type == 0:
