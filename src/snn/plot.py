@@ -512,6 +512,8 @@ def plot_eligibility_traces(simulator: 'SNNSimulator' = None, values: np.ndarray
     if t_min is None:
         t_min = max(0, t_max - t_range)
 
+    emin = np.min(etrace)
+    emax = np.max(etrace)
 
     fig_size = ((t_max - t_min) * x_scale, num_outputs * num_inputs * y_scale)
     fig, axs = plt.subplots(num_outputs, 1, figsize=fig_size, sharex=True, layout="constrained", gridspec_kw={"hspace": 0.0},
@@ -519,7 +521,7 @@ def plot_eligibility_traces(simulator: 'SNNSimulator' = None, values: np.ndarray
 
     for i, j in enumerate(reversed(range(num_outputs))):
         ax = axs[i, 0]
-        m = ax.imshow(etrace[:, j, t_min:t_max], cmap=cmap, aspect='auto', origin="lower")
+        m = ax.imshow(etrace[:, j, t_min:t_max], cmap=cmap, aspect='auto', origin="lower", vmin=emin, vmax=emax)
         ax.xaxis.set_ticks(np.arange(0, t_max - t_min, 10), labels= np.arange(t_min, t_max, 10))
         ax.set_ylabel(f'Neuron {j}')
 
@@ -534,16 +536,18 @@ def plot_eligibility_traces(simulator: 'SNNSimulator' = None, values: np.ndarray
 
 
 def plot_intermediate_fitness(simulator: 'SNN_Simulator' = None, values: np.ndarray = None, *, plot_exploration: bool = False,
+                              use_cutoff: bool = False,
                               num_steps: int = None, timestamps: np.ndarray = None,
                               x_scale: float = 0.01, y_scale: float = 1.0, x_eps: int = 1,
-                              t_min: int = None, t_max: int = None, t_range: int = None, window_size: int = 10,
+                              t_min: int = None, t_max: int = None, t_range: int = None, window_size: int = 10, figsize: tuple = None,
                               savepath: str | Path = None, show: bool = True):
     if simulator is not None:
-        fts = simulator.get_intermediate_fitness(use_portion=False)
+        fts = simulator.get_intermediate_fitness(use_cutoff=use_cutoff)
         ft = simulator.get_fitness()
         T = simulator.num_steps
-        eps_len = simulator.reward_collector.get_episode_lengths()
-        eps_timestamp = np.cumsum(eps_len) * simulator.spike_coder.input_delay
+        # eps_len = simulator.reward_collector.get_episode_lengths()
+        # eps_timestamp = np.cumsum(eps_len) * simulator.spike_coder.input_delay
+        eps_timestamp = simulator.get_episode_timestamps(use_cutoff=use_cutoff)
     elif values is not None:
         fts = values
         ft = np.mean(fts)
@@ -560,6 +564,7 @@ def plot_intermediate_fitness(simulator: 'SNN_Simulator' = None, values: np.ndar
         assert len(timestamps) == len(fts), "Timestamps must match the length of fitness values."
         ts = timestamps
     # ts = np.arange(simulator.spike_generator.pattern_length - 1, T, simulator.spike_generator.length)
+    window_size = min(window_size, len(fts))
     runavg = np.convolve(fts, np.ones(window_size) / window_size, mode='same')
 
     if t_range is None:
@@ -569,8 +574,8 @@ def plot_intermediate_fitness(simulator: 'SNN_Simulator' = None, values: np.ndar
     if t_min is None:
         t_min = max(0, t_max - t_range)
 
-
-    fig, axs = plt.subplots(1 + int(plot_exploration), 1, figsize=((t_max - t_min) * x_scale, 10 * y_scale * (int(plot_exploration) + 1)), layout="constrained",
+    figsize = (((t_max - t_min) * x_scale, 10 * y_scale * (int(plot_exploration) + 1))) if figsize is None else figsize
+    fig, axs = plt.subplots(1 + int(plot_exploration), 1, figsize=figsize, layout="constrained",
                             squeeze=False)
     ax = axs[0, 0]
     ax.plot(
@@ -578,7 +583,7 @@ def plot_intermediate_fitness(simulator: 'SNN_Simulator' = None, values: np.ndar
         color="gray", alpha=0.8,
         drawstyle="steps-pre",
         linewidth=1, label="Intermediate Fitness",
-        marker="o", markersize=20
+        marker="o", markersize=5
     )
     ax.plot(ts, runavg, color="blue", linewidth=2, label=f"Running Average ({window_size})", markersize=10, marker="o")
     ax.legend(loc="lower right", fontsize=12)

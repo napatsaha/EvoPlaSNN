@@ -1,6 +1,6 @@
 import copy
 from pathlib import Path
-from typing import List, Literal
+from typing import List, Literal, Optional
 from matplotlib import ticker
 import numpy as np
 import matplotlib.pyplot as plt
@@ -34,7 +34,7 @@ class SNNSimulator:
                 #  num_steps: int = None, num_episodes: int = None,
                  supervised: bool = True, decay: bool = False,
                  decay_method: Literal["time", "constant"] = "time",
-                 decay_rate: float = None, decay_cutoff: int = None, 
+                 decay_rate: float = None, decay_cutoff: Optional[int] = None, 
                  record_membrane: bool = True, record_spikes: bool = True, record_traces: bool = True, record_thresholds: bool = False,
                  record_weights: bool = False, record_eligibility_pre: bool = False, record_eligibility_post: bool = False,
                  **kwargs):
@@ -83,9 +83,10 @@ class SNNSimulator:
         self.decay_method = decay_method
         self.decay_rate = decay_rate
         self.decay_cutoff = decay_cutoff
+        self._explore = self._should_explore(0)
         self.decay_init_value = self.network.get_exploration_rate(simplify=True)
-        if self._decay and self.reward_collector is not None:
-            self.reward_collector.cutoff_timestep = decay_cutoff ### *** PROBLEMATIC
+        # if self._decay and self.reward_collector is not None:
+        #     self.reward_collector.cutoff_timestep = decay_cutoff ### *** PROBLEMATIC
 
         # # Initialize post-processing components
         # params = copy.deepcopy(params)
@@ -174,6 +175,9 @@ class SNNSimulator:
         # Reset network
         self.network.reset()
 
+        # Reset decay/exploration
+        self._explore = self._should_explore(0)
+
     def soft_reset(self, deterministic: bool = False):
         """Reset only for evaluation while keeping learned weights."""
         self.num_steps = 0
@@ -188,6 +192,7 @@ class SNNSimulator:
         if deterministic:
             self.network.set_deterministic()
             self._decay = False
+            self._explore = False
 
     def run(self, num_steps: int = None, num_eps: int = None):
         t_start = self.num_steps
@@ -254,15 +259,19 @@ class SNNSimulator:
                 self.network.update_synapses(reward=reward)
 
             # Update softmax temperature / exploration rate
-            if episode_done and self._decay:
-                if t < self.decay_cutoff:
-                    # Update softmax temp at end of episode
-                    new_rate = self.decay_init_value * np.exp(-t * self.decay_rate / self.decay_cutoff)
-                    self.network.set_exploration_rate(new_rate)
-                else:
-                    # Set simulator to deterministic
-                    self.network.set_deterministic()
-                    self._decay = False
+            if episode_done and self._explore:
+                self._update_exploration_rate(t, episode_count)
+                # # Update softmax temp at end of episode
+                # if self._explore:
+                #     if self.decay_method == "time":
+                #         new_rate = self.decay_init_value * np.exp(-t * self.decay_rate / self.decay_cutoff)
+                #     elif self.decay_method == "constant":
+                #         new_rate = self.network.get_exploration_rate(simplify=True) * self.decay_rate
+                #     self.network.set_exploration_rate(new_rate)
+                # else:
+                #     # Set simulator to deterministic
+                #     self.network.set_deterministic()
+                #     self._decay = False
 
 
             # # Post-processing
@@ -359,9 +368,12 @@ class SNNSimulator:
         #     return self.collector.calculate_fitness()
         # else:
             # return None
-        return self.reward_collector.get_fitness() if self.reward_collector is not None else None
+        if self.reward_collector is None:
+            Warning("Reward collector is not set. Fitness cannot be calculated.")
+            return None
+        return self.reward_collector.get_fitness(cutoff=self.decay_cutoff)
 
-    def get_intermediate_fitness(self, use_portion: bool = False) -> List[float] | None:
+    def get_intermediate_fitness(self, use_cutoff: bool = False) -> List[float] | None:
         # if self._post_process_type == 0:
         #     if self.fitnessor is None:
         #         Warning("Fitnessor is not set. Intermediate fitness cannot be calculated.")
@@ -374,7 +386,17 @@ class SNNSimulator:
         #     return self.collector.get_intermediate_fitness(use_portion=use_portion)
         # else:
             # return None
-        return self.reward_collector.get_rewards(use_cutoff=use_portion) if self.reward_collector is not None else None
+        if self.reward_collector is None:
+            Warning("Reward collector is not set. Intermediate fitness cannot be calculated.")
+            return None
+        return self.reward_collector.get_rewards(cutoff=self.decay_cutoff if use_cutoff else None)
+
+    def get_episode_timestamps(self, use_cutoff: bool = False) -> np.ndarray[int] | None:
+        if self.reward_collector is None:
+            Warning("Reward collector is not set. Episode timestamps cannot be calculated.")
+            return None
+        eps_timestamp = self.reward_collector.get_timestamps(cutoff=self.decay_cutoff if use_cutoff else None)
+        return eps_timestamp
 
     def get_target_fitness(self) -> float | None:
         # if self._post_process_type == 0:
@@ -433,6 +455,37 @@ class SNNSimulator:
             self.eligibility_pre_recorder.setup(num_steps)
         if self.record_eligibility_post:
             self.eligibility_post_recorder.setup(num_steps)
+
+    def _should_explore(self, t: int) -> bool:
+        """
+        Determine if exploration should continue based on decay_cutoff.
+        """
+        if self.decay_cutoff is None:
+            return True  # Continuous decay
+        if self.decay_cutoff == 0:
+            return False  # Cease exploration immediately
+        return t < self.decay_cutoff  # Explore until cutoff
+
+    def _update_exploration_rate(self, t: int, episode_count: int):
+        """
+        Update the exploration rate based on the decay method and cutoff.
+        """
+        if not self._decay:
+            return
+
+        if self._should_explore(t if self.decay_method == "time" else episode_count):
+            if self.decay_method == "time":
+                # Decay based on timestep
+                new_rate = self.decay_init_value * np.exp(-t * self.decay_rate / (self.decay_cutoff or 1))
+            elif self.decay_method == "constant":
+                # Decay by multiplying with a constant
+                new_rate = self.network.get_exploration_rate(simplify=True) * self.decay_rate
+            self.network.set_exploration_rate(new_rate)
+        else:
+            # Cease exploration and make deterministic
+            self.network.set_deterministic()
+            self._decay = False
+            self._explore = False
 
     def plot_membranes(self, *args, **kwargs):
         Warning("SNNSimulator.plot_membranes is deprecated. Use plot.plot_membranes(SNN.Simulator) instead.")

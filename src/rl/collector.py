@@ -8,11 +8,10 @@ EpsInfo = namedtuple("EpsInfo", ["t", "episode", "reward", "length", "exploratio
 
 class RewardCollector:
     records: List[EpsInfo]
-    def __init__(self, *, cutoff_timestep: int = 0, max_fitness: float = 1.0, min_fitness: float = -1.0):
+    def __init__(self, *, max_fitness: float = 1.0, min_fitness: float = -1.0):
         # self.reward_history = []
         # self.episode_lengths = []
         self.records = []
-        self.cutoff_timestep = cutoff_timestep
         self.minimise = False
         self.max_fitness = max_fitness
         self.min_fitness = min_fitness
@@ -43,30 +42,36 @@ class RewardCollector:
             trajectory = trajectory
         ))
 
-    def get_rewards(self, use_cutoff: bool = False) -> list[float]:
-        if use_cutoff and self.cutoff_timestep > 0:
-            return [r.reward for r in self.records if r.t >= self.cutoff_timestep]
+    def get_rewards(self, cutoff: int = None) -> list[float]:
+        if cutoff is not None:
+            return [r.reward for r in self.records if r.t >= cutoff]
         else:
             return [r.reward for r in self.records]
     
-    def get_episode_lengths(self, use_cutoff: bool = False) -> list[int]:
-        if use_cutoff and self.cutoff_timestep > 0:
-            return [r.length for r in self.records if r.t >= self.cutoff_timestep]
+    def get_episode_lengths(self, cutoff: int = None) -> list[int]:
+        if cutoff is not None:
+            return [r.length for r in self.records if r.t >= cutoff]
         else:
             return [r.length for r in self.records]
     
-    def get_explorations(self, use_cutoff: bool = False) -> list[float]:
-        if use_cutoff and self.cutoff_timestep > 0:
-            return [r.exploration for r in self.records if r.t >= self.cutoff_timestep]
+    def get_timestamps(self, cutoff: int = None) -> list[int]:
+        if cutoff is not None:
+            return [r.t for r in self.records if r.t >= cutoff]
+        else:
+            return [r.t for r in self.records]
+
+    def get_explorations(self, cutoff: int = None) -> list[float]:
+        if cutoff is not None:
+            return [r.exploration for r in self.records if r.t >= cutoff]
         else:
             return [r.exploration for r in self.records]
     
-    def get_fitness(self):
+    def get_fitness(self, cutoff: int = None) -> float:
         """
         Sum of all rewards collected.  
         (Assuming fixed simulation length, larger sum means shorter episode.)
         """
-        rewards = self.get_rewards(use_cutoff=True)
+        rewards = self.get_rewards(cutoff=cutoff)
         if len(rewards) == 0:
             return self.min_fitness
         return np.mean(rewards)

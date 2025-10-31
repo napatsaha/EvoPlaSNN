@@ -87,6 +87,7 @@ class R_STDP(LearningRule):
         self.learning_rate = learning_rate
         self.use_eligibility_pre = use_eligibility_pre
         self.use_eligibility_post = use_eligibility_post
+        self.delta_weight = True # For synapse.learning_rule.setter to register updating weights
 
     def update(self, synapse: 'SynapseLayerProtocol', reward=None, always_return_tuple: bool = False) -> np.ndarray:
         if reward is None:
