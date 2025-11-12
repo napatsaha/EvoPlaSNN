@@ -9,6 +9,7 @@ from .base import SpikeGenerator
 
 from .utils import LayerRecorder, MatrixRecorder
 from .snn import SNN
+from .modulation import Modulator, Reward_Modulator, TD_Error_Modulator
 # from lrule import LearningRule
 from .spikegen import BinaryClassGenerator
 from .decoding import get_decoder_class, get_fitnessor_class, BaseDecoder, BaseFitnessor
@@ -27,6 +28,7 @@ class SNNSimulator:
                  env: gym.Env = None, spike_coder: SpikeCoder = None, reward_collector: RewardCollector = None,
                  trajectory_collector: TrajectoryCollector = None,
                  update_condition: Literal["on-step", "on-end"] = "on-end",
+                 modulation: Literal["reward", "td-error"] = None, modulation_params: dict = {},
                  *, 
                 #  params: dict = {},
                 #  decoder_type: Literal["final", "rate", "latency"] = "final", decoder_params: dict = {},
@@ -76,6 +78,15 @@ class SNNSimulator:
         #     self._supervised = False
         self._soft_reset = self.network.use_soft_reset()
         self.update_condition = update_condition
+
+        # Neuro-modulation
+        self._modulation = modulation if modulation is not None else False
+        if self._modulation == "reward":
+            self.modulator = Reward_Modulator(**modulation_params)
+        elif self._modulation == "td-error":
+            self.modulator = TD_Error_Modulator(**modulation_params)
+        else:
+            self.modulator = None
 
         # Deal with decaying exploration over course of simulation
         self._use_decay = decay
@@ -224,7 +235,7 @@ class SNNSimulator:
 
             # Increment environment step if the spike coder says so
             if self.spike_coder.ready and action is not None:
-                state, reward, terminated, truncated, info = self.env.step(action)
+                next_state, reward, terminated, truncated, info = self.env.step(action)
                 episode_done = terminated or truncated
 
                 # Optional: Record step data
@@ -237,8 +248,17 @@ class SNNSimulator:
                         done=episode_done,
                         info=info)
                 
+                # Updates at every environment step
                 if self.update_condition == "on-step":
-                    self.network.update_synapses(reward=reward)
+                    signal = self.modulator.signal(locals=locals()) if self._modulation else reward
+                    self.network.update_synapses(reward=signal)
+                # Update network at the end of each episode
+                elif self.update_condition == "on-end":
+                    if episode_done:
+                        signal = self.modulator.signal(locals=locals()) if self._modulation else reward
+                        self.network.update_synapses(reward=reward)
+
+                # Perform episode reset or proceed to next env step
                 if episode_done:
                     if self.reward_collector is not None:
                         self.reward_collector.collect(
@@ -250,13 +270,13 @@ class SNNSimulator:
                     self.env.reset()
                     state, info = self.env.reset()
                     episode_count += 1
+                else:
+                    state = next_state
             else:
                 episode_done = False
                 reward = None
 
-            # Update network at the end of each episode
-            if episode_done and self.update_condition == "on-end":
-                self.network.update_synapses(reward=reward)
+
 
             # Update softmax temperature / exploration rate
             if episode_done and self._explore:
@@ -273,43 +293,6 @@ class SNNSimulator:
                 #     self.network.set_deterministic()
                 #     self._decay = False
 
-
-            # # Post-processing
-            # # If using Decoder-Fitnessor scheme
-            # if self._post_process_type == 0:
-            #     if self._supervised and self.spike_generator.active:
-            #         self.decoder.record(spk_out)
-
-            #     if self._supervised and self.spike_generator.ready:
-            #         label = self.spike_generator.get_label()
-            #         output = self.decoder.decode()
-            #         pred = self.decoder.predict(output)
-            #         reward = self.decoder.calculate_reward(label, pred)
-            #         self.fitnessor.record(label=label, output=output, reward=reward, pred=pred) # Prevent changing of arg order
-            #         # self.reward_collector.append((t, label, reward))
-            #         self.network.update_synapses(reward=reward)
-
-            # # If using Rewarder-Collector scheme
-            # elif self._post_process_type == 1:
-            #     # Since Rewarder relies on precise timing of spikes and whether the input spikes is active,
-            #     # it needs to be updated whenever the spike input pattern changes.
-            #     if not self.spike_generator.is_static() and _new_sample:
-            #         self.rewarder.update_target_array(self.spike_generator.array, self.spike_generator.get_label())
-                    
-            #     # target = self.rewarder.get_target(self.spike_generator.get_label())
-            #     error, reward = self.rewarder.get_reward(self.spike_generator.get_label(), spk_out)
-            #     if self.spike_generator.active:
-            #         self.collector.record(reward, error)
-
-            #     if self.spike_generator.ready:
-            #         self.collector.collate()
-
-            #     self.network.update_synapses(reward=reward)
-
-            # else:
-            #     if not self._supervised:
-            #         # Update synaptic weights every timestep
-            #         self.network.update_synapses(reward=None)
 
             # Record membrane potentials
             if self.record_membrane:
