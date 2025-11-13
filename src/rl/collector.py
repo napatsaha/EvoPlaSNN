@@ -3,7 +3,7 @@ from collections import namedtuple
 from typing import List
 
 
-EpsInfo = namedtuple("EpsInfo", ["t", "episode", "reward", "length", "exploration", "truncated", "terminated", "trajectory"])
+EpsInfo = namedtuple("EpsInfo", ["t", "episode", "reward", "length", "starting_state", "exploration", "truncated", "terminated", "trajectory"])
 
 
 class RewardCollector:
@@ -24,7 +24,8 @@ class RewardCollector:
         # self.episode_lengths.clear()
         self.records.clear()
 
-    def collect(self, t: int, episode: int, reward: float, episode_length: int, exploration: float = None,
+    def collect(self, t: int, episode: int, reward: float, episode_length: int, 
+                starting_state: int = None, exploration: float = None, 
                 truncated: bool = False, terminated: bool = False, trajectory = None):
         """
         Record final reward and total step count at the end of an episode.
@@ -36,6 +37,7 @@ class RewardCollector:
             episode = episode,
             reward = reward,
             length = episode_length,
+            starting_state = starting_state,
             exploration = exploration,
             truncated = truncated,
             terminated = terminated,

@@ -143,7 +143,7 @@ def eval(results_path: Path | str = None, *, config_path: str | Path = None, num
     with open(config_path, "r") as f:
         config = yaml.safe_load(f)
 
-    T = config["num_sim_steps"] if num_steps is None else num_steps
+    # T = config["num_sim_steps"] if num_steps is None else num_steps
     if learning_rule is None:
         rule_id_name = f"best_rule_{rule_id:02d}.txt"
         if not (results_path / rule_id_name).exists():
@@ -175,11 +175,17 @@ def eval(results_path: Path | str = None, *, config_path: str | Path = None, num
     #                         #  fitnessor_type=fitnessor_type, fitnessor_params=config["fitness_params"]
     #                          )
 
+    config["evo_params"]["evaluator"].update(
+        {"log_level": 0,
+         "record_inter_fitness": False}
+    )
+
     evaluator = RL_Evaluator(
         params=config,
         record_info=True,
         learning_rule=lrule,
-        log_level=0
+        # log_level=0,
+        **config["evo_params"]["evaluator"]
     )
 
     if eval_results:
@@ -210,7 +216,7 @@ def eval(results_path: Path | str = None, *, config_path: str | Path = None, num
         evaluator.setup_trial(trial_count=0)
         simulator = evaluator.simulator
         simulator.reset()
-        simulator.run(T)
+        simulator.run(num_steps=evaluator.max_steps, num_eps=evaluator.max_episodes)
         fitness = simulator.get_fitness()
         # Plot spike raster
         try:

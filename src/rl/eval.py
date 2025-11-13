@@ -167,7 +167,7 @@ class RL_Evaluator(Evaluator):
             if self._log_info >= 1:
                 self.logger.info(f"Trial {i+1}/{num_trials}: Finished Evaluation. Time taken: {t1 - t0:.4f} seconds.")
                 # Get intermediate fitness across samples
-                intermediate_fitness = self.simulator.get_intermediate_fitness(use_portion=True) if self.record_inter_fitness else None
+                intermediate_fitness = self.simulator.get_intermediate_fitness(use_cutoff=True) if self.record_inter_fitness else None
                 self.write_trial(self.gen_count, self.inv_count, i, fitness, intermediate_fitness, precision=self.precision)
         
         if return_fitness_list:

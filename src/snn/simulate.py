@@ -217,6 +217,7 @@ class SNNSimulator:
         self._setup_run(num_steps)
         # _new_sample = True
         state, info = self.env.reset()
+        starting_state = self.env.get_agent_state()
         episode_done = False
         episode_count = 0
         for t in range(t_start, self.num_steps):
@@ -266,9 +267,13 @@ class SNNSimulator:
                             episode=episode_count,
                             reward=reward, 
                             episode_length=info.get('step_count', None),
-                            exploration=self.network.get_exploration_rate(simplify=True))
+                            starting_state=starting_state,
+                            exploration=self.network.get_exploration_rate(simplify=True),
+                            terminated=terminated,
+                            truncated=truncated)
                     self.env.reset()
                     state, info = self.env.reset()
+                    starting_state = self.env.get_agent_state()
                     episode_count += 1
                 else:
                     state = next_state
