@@ -263,7 +263,7 @@ def eval(results_path: Path | str = None, *, config_path: str | Path = None, num
                 print(f"Error plotting eligibility post traces: {e}")
         # Plot intermediate fitness within simulation
         try:
-            snn_plot.plot_intermediate_fitness(simulator, window_size=20, plot_exploration=True,x_scale=0.025, y_scale=0.75,
+            snn_plot.plot_intermediate_fitness(simulator, window_size=20, plot_exploration=True, figsize=(20, 10),
                                             savepath=Path(results_path, f"{prefix}_intermediate_fitness.png") if save_plots else None, show=show_plots)
         except Exception as e:
             print(f"Error plotting intermediate fitness: {e}")

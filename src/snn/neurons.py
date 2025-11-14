@@ -31,8 +31,11 @@ def trace_x3(t, dt, tau, A):
     x = A * np.exp(-t / tau)
     return x
 
+# Safer softmax with max normalisation to prevent exponential overflow with low temperature
 def softmax(x, temperature=1.0):
-    ex = np.exp(x / temperature)
+    a = x / temperature
+    a = a - np.max(a)
+    ex = np.exp(a)
     return ex / np.sum(ex)
 
 class NeuronLayer(NeuronLayerProtocol):
@@ -53,7 +56,7 @@ class NeuronLayer(NeuronLayerProtocol):
     def __init__(self, size: int, *, tau_mem: float = None, tau_trace: float = None, dt: float = 1e-3, threshold: float = 1.0, 
                  wta: bool = False, sim_method: Literal["event-driven", "step-wise"] = "step-wise",
                  spike_method: Literal["deterministic", "stochastic"] = "deterministic", 
-                 softmax_temp: float = 1.0, 
+                 softmax_temp: float = 1.0, minimum_softmax_temp: float = 1e-3,
                  spike_condition: Literal["every", "input"] = "every",
                  ignore_threshold: bool = False,
                  reset_mechanism: Literal["rest", "zero", "subtract"] = "rest", mem_rest: float = 0.0, 
@@ -90,6 +93,7 @@ class NeuronLayer(NeuronLayerProtocol):
         self._stochastic_spike = spike_method == "stochastic"
         self._initial_softmax_temp = softmax_temp
         self._softmax_temp = softmax_temp
+        self._minimum_softmax_temp = minimum_softmax_temp
         self.wta = wta if not self._stochastic_spike else True # Assume winner take all when spiking is stochastic
         # Spike condition
         self.spike_condition = spike_condition
@@ -306,6 +310,11 @@ class NeuronLayer(NeuronLayerProtocol):
     
     @softmax_temp.setter
     def softmax_temp(self, value: float):
+        # Prevents a temperature too low from being set
+        # Also considers deterministic spiking if temperature is too low
+        if np.abs(value) < self._minimum_softmax_temp:
+            value = 0.0
+            self.spike_method = "deterministic"
         self._softmax_temp = value
 
     def __repr__(self):

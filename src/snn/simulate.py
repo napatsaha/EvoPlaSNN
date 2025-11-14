@@ -464,7 +464,7 @@ class SNNSimulator:
         if self._should_explore(t if self.decay_method == "time" else episode_count):
             if self.decay_method == "time":
                 # Decay based on timestep
-                new_rate = self.decay_init_value * np.exp(-t * self.decay_rate / (self.decay_cutoff or 1))
+                new_rate = self.decay_init_value * np.exp(-t * self.decay_rate / (self.decay_cutoff or self.num_steps))
             elif self.decay_method == "constant":
                 # Decay by multiplying with a constant
                 new_rate = self.network.get_exploration_rate(simplify=True) * self.decay_rate
