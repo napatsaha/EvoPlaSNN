@@ -8,6 +8,12 @@ from .utils import tile_array
 
 
 class STDP_Rule(LearningRule):
+    """
+    This version of STDP using local variables is based on:
+    Morrison, A., Diesmann, M., & Gerstner, W. (2008). Phenomenological models of synaptic plasticity based on spike timing. 
+        Biological Cybernetics, 98(6), 459–478. https://doi.org/10.1007/s00422-008-0233-1
+
+    """
     def __init__(self, mu = 0.0, lambd = 0.1, alpha = 1.0, *,
                 #  w_min: float = 0.0, w_max: float = 1.0, clip_w: bool = True,
                   condition: Literal["on-spike", "on-reward"] = "on-spike"):

@@ -1,0 +1,6 @@
+exp09
+
+2026-01-09
+- Added detailed comments to synapse.py -> SynapseLayer.update_eligibility
+- Added e_max as way to limit maximum eligibility trace 
+- Added source article for unsupervised STDP_Rule in stdp.py

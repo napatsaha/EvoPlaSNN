@@ -27,6 +27,7 @@ class SynapseLayer(SynapseLayerProtocol):
     def __init__(self, pre_layer: NeuronLayerProtocol, post_layer: NeuronLayerProtocol, *, 
                  learning_rule: LearningRule = None,
                  eligibility_trace: bool = False, eligibility_pre: bool = False, eligibility_post: bool = False,
+                 e_max: float = None,
                  tau_syn: float = None, dt: float = 1e-3,
                  synaptic_delay: int = 0,
                  sim_method: Literal["event-driven", "step-wise"] = "step-wise",
@@ -75,6 +76,7 @@ class SynapseLayer(SynapseLayerProtocol):
             tau_syn = tau_syn * dt
         self.tau_syn = tau_syn if tau_syn is not None else dt
         self.beta_syn = np.exp(-self.dt / self.tau_syn)  # Decay rate for eligibility trace
+        self.e_max = e_max if e_max is not None else np.inf
         
         # Initialize weights
         if weight_init not in ['uniform', 'normal', 'constant']:
@@ -158,7 +160,11 @@ class SynapseLayer(SynapseLayerProtocol):
         return output_current
     
     def update_eligibility_trace(self) -> None:
+        # Gets called every timestep
+        # Eligibility trace: pre-before-post
         if self._use_elig_pre:
+            # Step-wise method:
+            # Updates all synapses' traces based on decay rate + add a value rise when spike
             if self._step_wise:
                 # self._update_etrace_step(self.post_layer, self.pre_layer, self._etrace_pre)
                 post_spike = self.post_layer.spike
@@ -168,22 +174,34 @@ class SynapseLayer(SynapseLayerProtocol):
                     pre_trace = self.pre_layer.get_trace()
                     pre_trace, post_spike = self._tile(pre_trace, post_spike)
                     rise = pre_trace * post_spike
-                self._etrace_pre = self._etrace_pre * self.beta_syn + rise
+                # TODO: Insert ceiling operation here
+                self._etrace_pre = np.minimum(self._etrace_pre * self.beta_syn + rise, self.e_max)
+            # Event-driven method:
+            # Updates latest peak whenever new spike comes in. Actual trace value calculated when called.
+            # (Actually more expensive since updating peaks require knowing current value and hence exponential calculation as well)
             elif self._event_driven:
                 # self._update_etrace_event(self.post_layer, self.pre_layer, self._elast_pre, self._etssp_pre)
+                # Always increment time since last peak for all synapses
                 self._etssp_pre += 1
                 post_spike = self.post_layer.spike
+                # Check for incoming spike
                 idx_spike = post_spike.nonzero()[0]
                 if len(idx_spike) == 0:
+                    # Skips entirely if no spikes
                     pass
                 else:
-                    pre_trace = self.pre_layer.get_trace() # Shape: [pre_size,]
-                        # Value before rise
+                    # If at least 1 spike, find corresponding trace value of those spikes and update last peak value
+                        # Value before rise (aka exponential decay)
                     decay = self._elast_pre[:, idx_spike] * np.exp(-self._etssp_pre[:, idx_spike] * self.dt / self.tau_syn) # Shape: [pre_size, num_post_spikes]
-                        # Update last peak
-                    self._elast_pre[:, idx_spike] = pre_trace[:, np.newaxis] + decay
-                        # Update tssp
+                        # Update last peak based on trace of pre-neuron
+                    pre_trace = self.pre_layer.get_trace() # Shape: [pre_size,]
+                    # TODO: Insert ceiling operation here
+                    rise = pre_trace[:, np.newaxis]
+                    self._elast_pre[:, idx_spike] = np.minimum(rise + decay, self.e_max)
+                        # Update tssp for post-neurons that spiked
                     self._etssp_pre[:, idx_spike] = 0
+        # Eligibility trace: post-before-pre
+        # Same with above but with pre and post roles reversed
         if self._use_elig_post:
             if self._step_wise:
                 # self._update_etrace_step(self.pre_layer, self.post_layer, self._etrace_post)
@@ -194,7 +212,7 @@ class SynapseLayer(SynapseLayerProtocol):
                     post_trace = self.post_layer.get_trace()
                     pre_spike, post_trace = self._tile(pre_spike, post_trace)
                     rise = post_trace * pre_spike
-                self._etrace_post = self._etrace_post * self.beta_syn + rise
+                self._etrace_post = np.minimum(self._etrace_post * self.beta_syn + rise, self.e_max)
             elif self._event_driven:
                 # self._update_etrace_event(self.pre_layer, self.post_layer, self._elast_post, self._etssp_post)
                 self._etssp_post += 1
@@ -203,11 +221,12 @@ class SynapseLayer(SynapseLayerProtocol):
                 if len(idx_spike) == 0:
                     pass
                 else:
-                    post_trace = self.post_layer.get_trace() # Shape: [pre_size,]
                         # Value before rise
                     decay = self._elast_post[idx_spike, :] * np.exp(-self._etssp_post[idx_spike, :] * self.dt / self.tau_syn) # Shape: [pre_size, num_post_spikes]
                         # Update last peak
-                    self._elast_post[idx_spike, :] = post_trace[np.newaxis, :] + decay
+                    post_trace = self.post_layer.get_trace() # Shape: [pre_size,]
+                    rise = post_trace[np.newaxis, :]
+                    self._elast_post[idx_spike, :] = np.minimum(rise + decay, self.e_max)
                         # Update tssp
                     self._etssp_post[idx_spike, :] = 0
 
