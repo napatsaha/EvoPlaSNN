@@ -4,3 +4,9 @@ exp09
 - Added detailed comments to synapse.py -> SynapseLayer.update_eligibility
 - Added e_max as way to limit maximum eligibility trace 
 - Added source article for unsupervised STDP_Rule in stdp.py
+
+2026-01-15
+- Added args `erase_recorders` in `SNNSimulator.soft_reset()`
+- Added args `update` and `record` in `SNNSimulator.run()
+- Removed "Starting Evaluation log.." for trial log in `eval.py`
+- Allowed `Reward_Modulator` to accept any kwargs

@@ -8,6 +8,9 @@ class Modulator(abc.ABC):
 
 
 class Reward_Modulator(Modulator):
+    def __init__(self, *args, **kwargs):
+        super().__init__()
+
     def signal(self, locals):
         reward = locals.get("reward")
         return reward

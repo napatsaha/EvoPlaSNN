@@ -189,9 +189,10 @@ class SNNSimulator:
         # Reset decay/exploration
         self._explore = self._should_explore(0)
 
-    def soft_reset(self, deterministic: bool = False):
+    def soft_reset(self, deterministic: bool = False, erase_recorders: bool = False):
         """Reset only for evaluation while keeping learned weights."""
         self.num_steps = 0
+        # Retain network weights but reset membrane and traces
         self.network.soft_reset()
         self.spike_coder.reset()
         self.env.reset()
@@ -199,13 +200,29 @@ class SNNSimulator:
             self.reward_collector.reset()
         if self.trajectory_collector is not None:
             self.trajectory_collector.reset()
+        # Reset other recorders
+        if erase_recorders:
+            if self.record_membrane:
+                self.mem_recorder.reset()
+            if self.record_spikes:
+                self.spike_recorder.reset()
+            if self.record_traces:
+                self.trace_recorder.reset()
+            if self.record_thresholds:
+                self.threshold_recorder.reset()
+            if self.record_weights:
+                self.weight_recorder.reset()
+            if self.record_eligibility_pre:
+                self.eligibility_pre_recorder.reset()
+            if self.record_eligibility_post:
+                self.eligibility_post_recorder.reset()
 
         if deterministic:
             self.network.set_deterministic()
             self._decay = False
             self._explore = False
 
-    def run(self, num_steps: int = None, num_eps: int = None):
+    def run(self, num_steps: int = None, num_eps: int = None, update: bool = True, record: bool = True):
         t_start = self.num_steps
         if num_steps is None and num_eps is None:
             raise ValueError("Either num_steps or num_eps must be specified.")
@@ -249,15 +266,16 @@ class SNNSimulator:
                         done=episode_done,
                         info=info)
                 
-                # Updates at every environment step
-                if self.update_condition == "on-step":
-                    signal = self.modulator.signal(locals=locals()) if self._modulation else reward
-                    self.network.update_synapses(reward=signal)
-                # Update network at the end of each episode
-                elif self.update_condition == "on-end":
-                    if episode_done:
+                if update:
+                    # Updates at every environment step
+                    if self.update_condition == "on-step":
                         signal = self.modulator.signal(locals=locals()) if self._modulation else reward
-                        self.network.update_synapses(reward=reward)
+                        self.network.update_synapses(reward=signal)
+                    # Update network at the end of each episode
+                    elif self.update_condition == "on-end":
+                        if episode_done:
+                            signal = self.modulator.signal(locals=locals()) if self._modulation else reward
+                            self.network.update_synapses(reward=signal)
 
                 # Perform episode reset or proceed to next env step
                 if episode_done:
@@ -300,35 +318,35 @@ class SNNSimulator:
 
 
             # Record membrane potentials
-            if self.record_membrane:
+            if record and self.record_membrane:
                 for i, membrane in enumerate(self.network.membranes):
                     self.mem_recorder.record(i, t, membrane)
 
             # Record spikes
-            if self.record_spikes:
+            if record and self.record_spikes:
                 for i, spikes in enumerate(self.network.spikes):
                     self.spike_recorder.record(i, t, spikes)
 
             # Record traces
-            if self.record_traces:
+            if record and self.record_traces:
                 for i, traces in enumerate(self.network.traces):
                     self.trace_recorder.record(i, t, traces)
 
             # Record thresholds
-            if self.record_thresholds:
+            if record and self.record_thresholds:
                 for i, thresholds in enumerate(self.network.thresholds):
                     self.threshold_recorder.record(i, t, thresholds)
 
             # Record weights
-            if self.record_weights:
+            if record and self.record_weights:
                 for i, weights in enumerate(self.network.weights):
                     self.weight_recorder.record(i, t, weights)
 
             # Record eligibility traces
-            if self.record_eligibility_pre:
+            if record and self.record_eligibility_pre:
                 for i, etraces in enumerate(self.network.eligibility_traces_pre):
                     self.eligibility_pre_recorder.record(i, t, etraces)
-            if self.record_eligibility_post:
+            if record and self.record_eligibility_post:
                 for i, etraces in enumerate(self.network.eligibility_traces_post):
                     self.eligibility_post_recorder.record(i, t, etraces)
             # # Check for start of new sample

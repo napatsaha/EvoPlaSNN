@@ -144,8 +144,8 @@ class RL_Evaluator(Evaluator):
 
         fitnesses = []
         for i in range(num_trials):
-            if self._log_info >= 1:
-                self.logger.info(f"Trial {i+1}/{num_trials}: Starting Evaluation...")
+            # if self._log_info >= 1:
+            #     self.logger.info(f"Trial {i+1}/{num_trials}: Starting Evaluation...")
             # Set up the individual for evaluation
             self.setup_trial(trial_count=i)
             
@@ -165,7 +165,7 @@ class RL_Evaluator(Evaluator):
             fitness = self.reward_collector.get_fitness()
             fitnesses.append(fitness)
             if self._log_info >= 1:
-                self.logger.info(f"Trial {i+1}/{num_trials}: Finished Evaluation. Time taken: {t1 - t0:.4f} seconds.")
+                self.logger.info(f"Trial {i+1}/{num_trials}: Time taken: {t1 - t0:.4f} seconds.")
                 # Get intermediate fitness across samples
                 intermediate_fitness = self.simulator.get_intermediate_fitness(use_cutoff=True) if self.record_inter_fitness else None
                 self.write_trial(self.gen_count, self.inv_count, i, fitness, intermediate_fitness, precision=self.precision)
