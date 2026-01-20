@@ -27,6 +27,7 @@ class SynapseLayer(SynapseLayerProtocol):
     def __init__(self, pre_layer: NeuronLayerProtocol, post_layer: NeuronLayerProtocol, *, 
                  learning_rule: LearningRule = None,
                  eligibility_trace: bool = False, eligibility_pre: bool = False, eligibility_post: bool = False,
+                 eligibility_stdp: bool = False, ltd_coef: float = 1.0,
                  e_max: float = None,
                  tau_syn: float = None, dt: float = 1e-3,
                  synaptic_delay: int = 0,
@@ -71,6 +72,16 @@ class SynapseLayer(SynapseLayerProtocol):
             elif self._event_driven:
                 self._etssp_post = np.full((self.pre_layer.size, self.post_layer.size), np.inf, dtype=np.float32)
                 self._elast_post = np.zeros((self.pre_layer.size, self.post_layer.size), dtype=np.float32)
+        # Combined STDP eligibility trace
+        self._use_elig_stdp = eligibility_stdp
+        self.ltd_coef = ltd_coef
+        if self._use_elig_stdp:
+            if self._step_wise:
+                self._etrace_stdp = np.zeros((self.pre_layer.size, self.post_layer.size), dtype=np.float32)
+            elif self._event_driven:
+                self._elast_stdp = np.zeros((self.pre_layer.size, self.post_layer.size), dtype=np.float32)
+                self._etssp_stdp = np.full((self.pre_layer.size, self.post_layer.size), np.inf, dtype=np.float32)
+        
         # Constants for etraces
         if tau_syn is not None and isinstance(tau_syn, int):
             tau_syn = tau_syn * dt
@@ -142,6 +153,12 @@ class SynapseLayer(SynapseLayerProtocol):
             elif self._event_driven:
                 self._etssp_post.fill(np.inf)
                 self._elast_post.fill(0.0)
+        if self._use_elig_stdp:
+            if self._step_wise:
+                self._etrace_stdp.fill(0.0)
+            elif self._event_driven:
+                self._etssp_stdp.fill(np.inf)
+                self._elast_stdp.fill(0.0)
 
         if self._apply_delay:
             self.current_buffer.reset()
@@ -224,11 +241,49 @@ class SynapseLayer(SynapseLayerProtocol):
                         # Value before rise
                     decay = self._elast_post[idx_spike, :] * np.exp(-self._etssp_post[idx_spike, :] * self.dt / self.tau_syn) # Shape: [pre_size, num_post_spikes]
                         # Update last peak
-                    post_trace = self.post_layer.get_trace() # Shape: [pre_size,]
+                    post_trace = self.post_layer.get_trace() # Shape: [post_size,]
                     rise = post_trace[np.newaxis, :]
                     self._elast_post[idx_spike, :] = np.minimum(rise + decay, self.e_max)
                         # Update tssp
                     self._etssp_post[idx_spike, :] = 0
+        # Eligibility trace: combined STDP
+        if self._use_elig_stdp:
+            if self._step_wise:
+                pre_spike = self.pre_layer.spike
+                post_spike = self.post_layer.spike
+                pre_spike, post_spike = self._tile(pre_spike, post_spike)
+                if pre_spike.sum() == 0 and post_spike.sum() == 0:
+                    rise = 0.0
+                else:
+                    post_trace = self.post_layer.get_trace()
+                    pre_trace = self.pre_layer.get_trace()
+                    pre_trace, post_trace = self._tile(pre_trace, post_trace)
+                    rise = pre_trace * post_spike - self.ltd_coef * post_trace * pre_spike
+                self._etrace_stdp = np.minimum(self._etrace_stdp * self.beta_syn + rise, self.e_max)
+            elif self._event_driven:
+                self._etssp_stdp += 1
+                pre_spike = self.pre_layer.spike
+                post_spike = self.post_layer.spike            
+                comb_spike = pre_spike | post_spike
+                if comb_spike.sum() == 0:
+                    pass
+                else:
+                    idx_spike = comb_spike.nonzero()
+
+                    decay = self._elast_stdp[idx_spike] * np.exp(-self.etssp_stdp[idx_spike] * self.dt / self.tau_syn)
+
+                    post_trace = self.post_layer.get_trace()
+                    pre_trace = self.pre_layer.get_trace()
+
+                    rise_ltp = np.where(post_spike, pre_trace, 0.0)
+                    rise_ltd = np.where(pre_spike, post_trace, 0.0)
+
+                    rise = rise_ltp - self.ltd_coef * rise_ltd
+
+                    self._elast_stdp[idx_spike] = np.minimum(decay + rise[idx_spike], self.e_max)
+
+                    self._etssp_stdp[idx_spike] = 0
+
 
     # def _update_etrace_step(self, spike_layer: NeuronLayerProtocol, trace_layer: NeuronLayerProtocol, etrace):
     #     spike = spike_layer.spike
@@ -309,6 +364,19 @@ class SynapseLayer(SynapseLayerProtocol):
             return None
         
     @property
+    def eligibility_stdp(self):
+        """
+        Calculate and return the combined STDP eligibility trace if it is being used, otherwise return None.
+        """
+        if self._use_elig_stdp:
+            if self._step_wise:
+                return self._etrace_stdp
+            elif self._event_driven:
+                return self._elast_stdp * np.exp(-self._etssp_stdp * self.dt / self.tau_syn)
+        else:
+            return None
+
+    @property
     def learning_rule(self):
         return self._learning_rule
     
@@ -322,6 +390,8 @@ class SynapseLayer(SynapseLayerProtocol):
         return self._use_elig_pre
     def has_elig_post(self):
         return self._use_elig_post
+    def has_elig_stdp(self):
+        return self._use_elig_stdp
 
 
 def safe_norm(array, method, params={}, eps=1e-10):

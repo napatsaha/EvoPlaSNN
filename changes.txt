@@ -10,3 +10,9 @@ exp09
 - Added args `update` and `record` in `SNNSimulator.run()
 - Removed "Starting Evaluation log.." for trial log in `eval.py`
 - Allowed `Reward_Modulator` to accept any kwargs
+
+2026-01-20
+- Added `eligibility_stdp` to synapse for both `step-wise` and `event-driven` calculations -> (real time LTP - LTD)
+- Added necessary properties, flags, recorders etc to `SNN`, `SNNSimulator`, `ANN_Rule` relating to eligibility trace STDP
+- (Far from optimised, the eligibility traces code should be revamped and improved at a later date)
+- Some comments in `ANN_Rule.update` to track order of inputs

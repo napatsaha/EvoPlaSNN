@@ -266,7 +266,7 @@ class ANN_Rule(LearningRule):
     """
     A Learning Rule that represents a black box ANN function that converts synapse-related information to weight updates.
     """
-    INPUT_ORDER = ("trace_pre", "trace_post", "weights", "reward", "eligibility_pre", "eligibility_post")
+    INPUT_ORDER = ("trace_pre", "trace_post", "weights", "reward", "eligibility_pre", "eligibility_post", "eligibility_stdp")
     OUTPUT_ORDER = ("weight", "threshold")
     AGG_DICT = {
                 "max": np.max,
@@ -279,7 +279,7 @@ class ANN_Rule(LearningRule):
                  learning_rate: float = 1.0, learning_rate_thr: float = 0.1, threshold_agg_func: Literal["max", "min", "mean", "sum"] = "mean",
                  delta_weight: bool = True, delta_threshold: bool = False,
                  use_trace_pre: bool = False, use_trace_post: bool = False, use_weights: bool = True, use_reward: bool = False, 
-                 use_eligibility: bool = False, use_eligibility_pre: bool = False, use_eligibility_post: bool = False,
+                 use_eligibility: bool = False, use_eligibility_pre: bool = False, use_eligibility_post: bool = False, use_eligibility_stdp: bool = False,
                  **kwargs):
         super().__init__()
         self.learning_rate = learning_rate
@@ -297,6 +297,7 @@ class ANN_Rule(LearningRule):
         self.use_reward = use_reward
         self.use_eligibility_pre = use_eligibility or use_eligibility_pre
         self.use_eligibility_post = use_eligibility_post
+        self.use_eligibility_stdp = use_eligibility_stdp
 
         self.input_order = [item for item in self.INPUT_ORDER if getattr(self, f"use_{item}")]
         self.input_size = len(self.input_order)
@@ -360,22 +361,30 @@ class ANN_Rule(LearningRule):
 
     def prepare_inputs(self, synapse, reward, w_shape):
         inp = []
+        # 1, 2 = trace pre, post
         if self.use_trace_pre or self.use_trace_post:
             trace_pre, trace_post = tile_array(w_shape, synapse.pre_layer.trace, synapse.post_layer.trace)
             if self.use_trace_pre:
                 inp.append(trace_pre.reshape(-1, 1))
             if self.use_trace_post:
                 inp.append(trace_post.reshape(-1, 1))
+        # 3 = weights
         if self.use_weights:
             inp.append(synapse.weights.reshape(-1, 1))
+        # 4 = reward
         if self.use_reward:
             if reward is None:
                 reward = 0
             inp.append(np.full((np.prod(w_shape), 1), fill_value=reward))
+        # 5 = etrace pre-before-post (LTP)
         if self.use_eligibility_pre:
             inp.append(synapse.eligibility_pre.reshape(-1, 1))
+        # 6 = etrace post-before-pre (LTD)
         if self.use_eligibility_post:
             inp.append(synapse.eligibility_post.reshape(-1, 1))
+        # 7 = etrace STDP
+        if self.use_eligibility_stdp:
+            inp.append(synapse.eligibility_stdp.reshape(-1, 1))
 
         inp = np.concatenate(inp, axis=1)
         return inp
@@ -395,6 +404,7 @@ class ANN_Rule(LearningRule):
                  use_trace_pre=self.use_trace_pre, use_trace_post=self.use_trace_post,
                  use_weights=self.use_weights, use_reward=self.use_reward, 
                  use_eligilibity_pre=self.use_eligibility_pre, use_eligibility_post=self.use_eligibility_post,
+                 use_eligibility_stdp=self.use_eligibility_stdp,
                  hidden_size=self.ann.hidden_sizes, bias=self.ann.bias,
                  hidden_activation=self.ann.hidden_activation.__name__,
                  output_activation=self.ann.output_activation.__name__,)
@@ -414,6 +424,7 @@ class ANN_Rule(LearningRule):
         use_eligibility = data.get('use_eligibility', False).item()  # Optional, defaults to False if not present
         use_eligibility_pre = data.get('use_eligibility_pre', False).item()
         use_eligibility_post = data.get('use_eligibility_post', False).item()
+        use_eligibility_stdp = data.get('use_eligibility_stdp', False).item()
         
         return cls(parameters=parameters,
                    use_trace_pre=use_trace_pre, 
@@ -422,6 +433,7 @@ class ANN_Rule(LearningRule):
                    use_reward=use_reward,
                    use_eligibility_pre=use_eligibility_pre or use_eligibility, 
                    use_eligibility_post=use_eligibility_post,
+                   use_eligibility_stdp=use_eligibility_stdp,
                    hidden_size=data["hidden_size"].tolist(),
                    bias=data["bias"].item(),
                    hidden_activation=data["hidden_activation"].item(),
