@@ -11,8 +11,10 @@ exp09
 - Removed "Starting Evaluation log.." for trial log in `eval.py`
 - Allowed `Reward_Modulator` to accept any kwargs
 
-2026-01-20
+2026-01-20 - 0fe43ce581cf2a75cc847fd3a4a33c58c14aa9f5
 - Added `eligibility_stdp` to synapse for both `step-wise` and `event-driven` calculations -> (real time LTP - LTD)
 - Added necessary properties, flags, recorders etc to `SNN`, `SNNSimulator`, `ANN_Rule` relating to eligibility trace STDP
 - (Far from optimised, the eligibility traces code should be revamped and improved at a later date)
 - Some comments in `ANN_Rule.update` to track order of inputs
+
+- Moved plotting of weight action-values (both greedy and multi-plot versions) to separate functions in `plot.py`

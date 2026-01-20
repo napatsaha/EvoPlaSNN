@@ -248,6 +248,18 @@ def eval(results_path: Path | str = None, *, config_path: str | Path = None, num
         #                                  savepath=Path(results_path, f"{prefix}_weight_heatmap.png") if save_plots else None, show=show_plots)
         # except Exception as e:
         #     print(f"Error plotting weight heatmap: {e}")
+        # Plot environment weights: all actions
+        try:
+            snn_plot.plot_env_weight_actions(simulator,
+                                             savepath=Path(results_path, f"{prefix}_env_weight_actions.png") if save_plots else None, show=show_plots)
+        except Exception as e:
+            print(f"Error plotting environment weight actions: {e}")
+        # Plot environment weights: greedy actions
+        try:
+            snn_plot.plot_env_weight_greedy(simulator,
+                                            savepath=Path(results_path, f"{prefix}_env_weight_greedy.png") if save_plots else None, show=show_plots)
+        except Exception as e:
+            print(f"Error plotting environment weight greedy: {e}")
         # Plot pre-post and post-pre eligibility traces
         if simulator.record_eligibility_pre:
             try:

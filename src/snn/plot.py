@@ -481,6 +481,84 @@ def plot_weight_heatmap(simulator: 'SNNSimulator', *, x_scale: float = 0.2, y_sc
     # plt.close(fig)
 
 
+def plot_env_weight_actions(simulator: 'SNNSimulator', *,
+                            savepath=None, show=True):
+    # Extract objects
+    network = simulator.network
+    env = simulator.env
+
+    fig, axs = plt.subplots(2, 2, figsize=(env.width, env.height))
+    cmap = plt.get_cmap("viridis").with_extremes(bad="white")
+
+    w = network.weights[0]
+
+    for i in range(4):
+        ax = axs.flat[i]
+
+        w_maze = env.maze.copy().astype(float)
+        w_act = w[:, i].copy()
+        emp_maze = np.zeros_like(w_maze)
+
+        for state, pos in env._state_pos_dict.items():
+            emp_maze[*pos] = w_act[state]
+
+        ma_maze = np.ma.array(emp_maze, mask=(w_maze == 0))
+        img = ax.imshow(ma_maze, extent=(0, env.width, 0, env.height), cmap=cmap, vmin=w.min(), vmax=w.max())
+
+        ax.set_xticks(np.arange(0, env.width, 1), labels=[])
+        ax.set_yticks(np.arange(0, env.height, 1), labels=[])
+        ax.grid(visible=True, color='black', linewidth=0.7)
+        ax.set_title(f"Action {env.action_names[i]}")
+    plt.colorbar(img, ax=axs, orientation='horizontal', fraction=0.05, pad=0.1, label="Weights")
+
+    if savepath is not None:
+        plt.savefig(savepath)
+    if show:
+        plt.show()
+
+
+def plot_env_weight_greedy(simulator: 'SNNSimulator', *, tolerance: float = 1e-10,
+                            savepath=None, show=True):
+    # Extract objects
+    network = simulator.network
+    env = simulator.env
+
+    fig, ax = plt.subplots(1, 1, figsize=(env.width, env.height))
+    cmap = plt.get_cmap("viridis").with_extremes(bad="white")
+
+    w = network.weights[0]
+
+    w_maze = env.maze.copy().astype(float)
+    w_act = w.max(axis=1)
+    emp_maze = np.zeros_like(w_maze)
+
+    for state, pos in env._state_pos_dict.items():
+        emp_maze[*pos] = w_act[state]
+
+    ma_maze = np.ma.array(emp_maze, mask=(w_maze == 0))
+    img = ax.imshow(ma_maze, extent=(0, env.width, 0, env.height), cmap=cmap)
+
+    for state, pos in env._state_pos_dict.items():
+        cnt = pos + 0.5
+        act_vals = w[state, :]
+        v_max = act_vals.max()
+        for act, val in enumerate(act_vals):
+            if np.abs(val - v_max) < tolerance:
+                direction = env.action_map[act] * 0.5
+                ax.annotate('', xy=(cnt[1]+direction[1], env.height - (cnt[0]+direction[0])), xytext=(cnt[1], env.height - cnt[0]), arrowprops=dict(arrowstyle="->"))
+
+    ax.set_xticks(np.arange(0, env.width, 1), labels=[])
+    ax.set_yticks(np.arange(0, env.height, 1), labels=[])
+    ax.grid(visible=True, color='black', linewidth=0.7)
+    ax.set_title(f"Max Values Across Actions")
+    plt.colorbar(img, ax=ax, orientation='horizontal', fraction=0.05, pad=0.1, label="Weights")
+
+    if savepath is not None:
+        plt.savefig(savepath)
+    if show:
+        plt.show()
+
+
 def plot_eligibility_traces(simulator: 'SNNSimulator' = None, values: np.ndarray = None, *, 
                             synapse_layer: int = 0, etype: Literal["pre", "post"] = "pre",
                             x_scale: float = 0.2, y_scale: float = 0.8,
