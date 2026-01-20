@@ -27,6 +27,7 @@ class RL_Evaluator(Evaluator):
                  max_steps: int = None,
                  max_episodes: int = None,
                  eval_episodes: int = None,
+                 plastic_on_eval: bool = True,
                  **kwargs
                  ):
         super().__init__()
@@ -35,6 +36,7 @@ class RL_Evaluator(Evaluator):
         self.max_steps = max_steps
         self.max_episodes = max_episodes
         self.eval_episodes = eval_episodes
+        self.plastic_on_eval = plastic_on_eval
         # if self.num_simulation_steps is None:
         #     max_steps_per_eps = params.get("env_params", {}).get("max_steps", 0)
         #     if self.num_episodes is not None:
@@ -159,7 +161,7 @@ class RL_Evaluator(Evaluator):
 
             # Evaluation
             self.simulator.soft_reset(deterministic=True)
-            self.simulator.run(num_eps=self.eval_episodes)
+            self.simulator.run(num_eps=self.eval_episodes, update=self.plastic_on_eval)
 
             # Final Fitness
             fitness = self.reward_collector.get_fitness()

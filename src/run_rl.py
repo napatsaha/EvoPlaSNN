@@ -243,11 +243,11 @@ def eval(results_path: Path | str = None, *, config_path: str | Path = None, num
         except Exception as e:
             print(f"Error plotting weight over time: {e}")
         # Plot weight changes as horizontal heatmap
-        try:
-            snn_plot.plot_weight_heatmap(simulator, log_scale=False, t_range=500, synapse_layer=0,
-                                         savepath=Path(results_path, f"{prefix}_weight_heatmap.png") if save_plots else None, show=show_plots)
-        except Exception as e:
-            print(f"Error plotting weight heatmap: {e}")
+        # try:
+        #     snn_plot.plot_weight_heatmap(simulator, log_scale=False, t_range=500, synapse_layer=0,
+        #                                  savepath=Path(results_path, f"{prefix}_weight_heatmap.png") if save_plots else None, show=show_plots)
+        # except Exception as e:
+        #     print(f"Error plotting weight heatmap: {e}")
         # Plot pre-post and post-pre eligibility traces
         if simulator.record_eligibility_pre:
             try:
