@@ -79,6 +79,7 @@ class RL_Evaluator(Evaluator):
                                       record_thresholds=record_info,
                                       record_eligibility_pre=record_info,
                                       record_eligibility_post=record_info,
+                                      record_eligibility_stdp=record_info,
                                       **params.get("simulator_params", {})
                                       )
         self.logger = None

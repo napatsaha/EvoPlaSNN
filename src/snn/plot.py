@@ -704,7 +704,7 @@ def plot_learning_rule(lrule: 'LearningRule', simulator: 'SNNSimulator' = None, 
                        savepath: str | Path = None, show: bool = True):
 
     if simulator is not None:
-        assert simulator.record_eligibility_pre or simulator.record_eligibility_post, "Eligibility trace recording is not enabled."
+        assert simulator.record_eligibility_pre or simulator.record_eligibility_post or simulator.record_eligibility_stdp, "Eligibility trace recording is not enabled."
         assert simulator.record_weights, "Weight recording is not enabled."
         wmax = max(wmax, simulator.weight_recorder.values[0].max())
         wmin = min(wmin, simulator.weight_recorder.values[0].min())

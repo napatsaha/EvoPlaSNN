@@ -113,7 +113,8 @@ def main(config_file: str | Path | dict, *, config_overrides: dict = None, paren
     # Plot fitness
     if hasattr(evaluator, "_fits_indiv_file"):
         file_path = results_path / evaluator._fits_indiv_file 
-        snn_plot.plot_fitness_generation(file_path, savepath=results_path / "fitness_gen.png", show=False, estimator="median", errorband=("pi", 100))
+        snn_plot.plot_fitness_generation(file_path, savepath=results_path / "fitness_gen.png", show=False, estimator="median", 
+                                         errorband=("pi", 50))
 
     print(f"Evolution run completed. Results saved to {results_path}")
 
