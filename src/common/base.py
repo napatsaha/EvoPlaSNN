@@ -1,0 +1,117 @@
+from abc import ABC, abstractmethod
+import numpy as np
+
+
+from typing import Literal, Protocol
+
+
+class NeuronLayerProtocol(Protocol):
+    """
+    Protocol class for NeuronLayer.
+    Defines the public attributes and methods with their descriptions.
+    """
+
+    size: int
+    dt: float
+    membrane: np.ndarray
+    spike: np.ndarray
+    tssp: np.ndarray
+    _trace: np.ndarray
+
+    def __init__(self, size: int, *, tau_mem: float, tau_trace: float, dt: float, threshold: float,
+                 wta: bool, membrane_start: float, reset_mechanism: Literal["zero", "subtract"],
+                 trace_amp: float, trace_type: Literal["dx1", "dx2", "dx3"]) -> None:
+        """
+        Initialize the neuron layer with the given parameters.
+        """
+        pass
+
+    def reset(self) -> None:
+        """
+        Reset the neuron layer state, including membrane potential, spike status, time since last spike, and trace.
+        """
+        pass
+
+    def forward(self, input_current: np.ndarray) -> np.ndarray:
+        """
+        Update the neuron layer state based on the input current and time step.
+        Returns the spike status as an array.
+        """
+        pass
+
+    def get_trace(self) -> np.ndarray:
+        """
+        Return the trace of the neuron layer, which decays since the last spike.
+        """
+        pass
+
+    def update_thresholds(self, delta_thr: np.ndarray):
+        """
+        Update the firing thresholds of the neurons by adding delta_thr.
+        """
+        pass
+
+
+# from .snn import NeuronLayer
+
+
+class LearningRule(ABC):
+    """
+    Abstract base class for learning rules.
+    """
+    def __init__(self):
+        pass
+
+    @abstractmethod
+    def update(self, always_return_tuple: bool) -> np.ndarray:
+        """
+        Update the synaptic weights based on the learning rule.
+        """
+        raise NotImplementedError()
+
+
+class SynapseLayerProtocol(Protocol):
+    """
+    Protocol abstract class for SynapseLayer.
+    Defines the method and attribute names along with their descriptions.
+    """
+
+    pre_layer: NeuronLayerProtocol
+    post_layer: NeuronLayerProtocol
+    weights: np.ndarray
+    learning_rule: LearningRule
+    eligibility_trace: np.ndarray | None
+
+    def __init__(self, pre_layer: NeuronLayerProtocol, post_layer: NeuronLayerProtocol, *,
+                 learning_rule: LearningRule, eligibility_trace: bool, tau_syn: float, dt: float,
+                 weight_init: str, weight_init_params: dict, weight_min: float, weight_max: float,
+                 clip_weights: bool, normalise_weights: bool, normalise_method: Literal["sum", "L2", "P"],
+                 normalise_params: dict) -> None:
+        """
+        Initialize the SynapseLayer with the given parameters.
+        """
+        pass
+
+    def forward(self, spike_input: np.ndarray) -> np.ndarray:
+        """
+        Compute the output current to the next neuron layer given a spike current input from the previous neuron layer.
+        """
+        pass
+
+    def update(self, reward: float | None) -> None:
+        """
+        Update the synaptic weights based on the learning rule.
+        """
+        pass
+
+    def reset(self) -> None:
+        """
+        Reset the synaptic weights to their initial state.
+        """
+        pass
+
+    def update_eligibility_trace(self) -> None:
+        """
+        Update the eligibility trace based on the pre and post neuron layer spikes.
+        """
+        pass

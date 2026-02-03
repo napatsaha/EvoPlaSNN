@@ -3,7 +3,7 @@ import numpy as np
 from abc import ABC, abstractmethod
 
 # from snn.base import SynapseLayerProtocol
-from .base import LearningRule
+from common.base import LearningRule, SynapseLayerProtocol
 from .utils import tile_array
 
 
@@ -95,7 +95,7 @@ class R_STDP(LearningRule):
         self.use_eligibility_post = use_eligibility_post
         self.delta_weight = True # For synapse.learning_rule.setter to register updating weights
 
-    def update(self, synapse: 'SynapseLayerProtocol', reward=None, always_return_tuple: bool = False) -> np.ndarray:
+    def update(self, synapse: SynapseLayerProtocol, reward=None, always_return_tuple: bool = False) -> np.ndarray:
         if reward is None:
             reward = 1.0
 

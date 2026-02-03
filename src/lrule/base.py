@@ -1,24 +1,5 @@
 from typing import Literal
-import numpy as np
-from abc import ABC, abstractmethod
-# from .snn import NeuronLayer
-
-
-class LearningRule(ABC):
-    """
-    Abstract base class for learning rules.
-    """
-    def __init__(self):
-        pass
-
-    @abstractmethod
-    def update(self, always_return_tuple: bool) -> np.ndarray:
-        """
-        Update the synaptic weights based on the learning rule.
-        """
-        raise NotImplementedError()
-
-
+from common.base import LearningRule
 class Empty_Rule(LearningRule):
     """
     A dummy learning rule that does nothing.

@@ -3,10 +3,11 @@ Simple Network of LIF neurons
 """
 
 from typing import List, Literal
+from common.base import LearningRule
 import numpy as np
 from typing import Union
 from .synapse import SynapseLayer
-from lrule import LearningRule, Empty_Rule
+from lrule import Empty_Rule
 from .neurons import NeuronLayer
 from common.utils import solve_hidden
 

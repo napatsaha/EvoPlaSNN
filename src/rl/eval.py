@@ -3,6 +3,7 @@ import copy
 import time
 from pathlib import Path
 from typing import Dict, Any, List, Union, Tuple
+from common.base import LearningRule
 import numpy as np
 
 from evo.base import Evaluator
@@ -12,7 +13,7 @@ import snn.spikegen as spkgen
 # from snn.spikegen import create_spikegen, create_poisson_class_timing, create_binary_class_timing
 # import snn.spikegen
 
-from lrule import ANN_Rule, LearningRule
+from lrule import ANN_Rule
 from rl import ENV_DICT, StateCoder, RewardCollector, BaseMaze
     
 

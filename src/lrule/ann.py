@@ -2,7 +2,7 @@ from typing import Callable, List, Literal
 
 from common.utils import solve_hidden, calculate_size
 # from snn.base import SynapseLayerProtocol
-from .base import LearningRule
+from common.base import LearningRule, SynapseLayerProtocol
 from .utils import tile_array
 
 import yaml
@@ -314,7 +314,7 @@ class ANN_Rule(LearningRule):
         self.ann = ANN(input_size=self.input_size, output_size=self.output_size, parameters=parameters, **kwargs)
 
 
-    def update(self, synapse: "SynapseLayerProtocol", reward: float = None, always_return_tuple: bool = False) -> np.ndarray: 
+    def update(self, synapse: SynapseLayerProtocol, reward: float = None, always_return_tuple: bool = False) -> np.ndarray: 
         """
         Apply the ANN Rule to an external set of weights.
         """
@@ -359,7 +359,7 @@ class ANN_Rule(LearningRule):
         # else:
         #     return dw
 
-    def prepare_inputs(self, synapse, reward, w_shape):
+    def prepare_inputs(self, synapse: SynapseLayerProtocol, reward: float, w_shape: tuple):
         inp = []
         # 1, 2 = trace pre, post
         if self.use_trace_pre or self.use_trace_post:

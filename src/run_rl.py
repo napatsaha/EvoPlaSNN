@@ -2,7 +2,7 @@ import time
 import argparse
 from typing import Tuple
 from lrule.ann import read_ANN_Rule
-from lrule.base import LearningRule
+from common.base import LearningRule
 import yaml
 from pathlib import Path
 import numpy as np

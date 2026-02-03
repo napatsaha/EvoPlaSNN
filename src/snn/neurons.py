@@ -1,6 +1,6 @@
 import numpy as np
 from typing import List, Literal
-from .base import NeuronLayerProtocol
+from common.base import NeuronLayerProtocol
 
 
 def leaky_integrate_and_fire(membrane, input_current, beta, threshold):
