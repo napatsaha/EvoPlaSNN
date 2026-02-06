@@ -1,3 +1,13 @@
+v1.0.1
+- Add `CGP_Graph` class, including the following functioning methods:
+    - forward
+    - _fill_genom
+    - _check_valid_genome
+    - _find_active_node
+    - coord_to_flat
+    - flat_to_coord
+
+
 exp09
 
 2026-01-09
