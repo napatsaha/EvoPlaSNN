@@ -2,9 +2,11 @@
 Cartesian Genetic Programming: graph program, and learning rule
 """
 
+from lrule.utils import tile_array
 import numpy as np
 from numpy.typing import ArrayLike
-from common.base import LearningRule
+from common.base import LearningRule, SynapseLayerProtocol
+from lrule.base import BaseLearningRule
 from typing import List, Tuple, Literal, Callable
 
 
@@ -20,7 +22,7 @@ class CGP_Graph:
     def __init__(self, 
                  n_inputs: int, n_outputs: int, n_rows: int, n_cols: int, *,
                  genome: list = None, function_list: List[Callable] = None,
-                 arity: int = 2, prev_layer: int = None):
+                 arity: int = 2, prev_layer: int = None, seed: int = None):
         self._ni = n_inputs
         self._no = n_outputs
         self._nr = n_rows
@@ -50,21 +52,46 @@ class CGP_Graph:
             self._check_valid_genome()
         else:
             # TODO
-            self._create_random_genome()
+            self._create_random_genome(seed=seed)
 
         # Find active nodes
         self._find_active_nodes()
 
         # Activation arrays
-        # TODO: Figure out where and whether or not to setup num samples in output
-        self._node_outputs = np.zeros((self._m + self._no), dtype=np.float64)
+        # Starts with empty dimension in axis=1 to allow broadcasting to fit input size if needed
+        self._node_outputs = np.zeros((self._m + self._no, 1), dtype=np.float64)
 
-    def reset(self):
+    def reset(self, ns_in: int = None):
         self._node_outputs.fill(np.nan)
+        # Perform output array reshaping to match input sample size
+        if ns_in is not None: 
+            ns_curr = self._node_outputs.shape[1]
+            in_size = self._node_outputs.shape[0]
+            # Check if current sample size is compatible with new sample size
+            if ns_in == ns_curr:
+                # If both equal, nothing needed
+                pass
+            elif ns_in == 1:
+                # If new size is one, just slice current one
+                self._node_outputs = self._node_outputs[:, :1].copy()
+            # elif ns_in > ns_curr and ns_curr == 1:
+            #     self._node_outputs = np.broadcast_to(self._node_outputs, (in_size, ns_in)).copy()
+            #     # self._node_outputs.setflags(write=True)
+            else:
+                # Broadcasting only works if either one dimension is 1 or they are equal (doesn't work by divisibility)
+                # Hence, every other condition requires stripping previous array to (x, 1) before broadcasting
+                self._node_outputs = np.broadcast_to(self._node_outputs[:, :1], (in_size, ns_in)).copy()
+                # a copy is returned to allow flags (OWNDATA, WRITEABLE) to be True
+            # else:
+            #     raise ValueError(f"Broadcasting not possible between input array: (ni, {ns_in}) and current output array: {self._node_outputs.shape}")
 
-    def forward(self, inp: ArrayLike):
-        self.reset()
-        self._node_outputs[:self._ni] = inp
+
+    def forward(self, inp: ArrayLike, squeeze: bool = False):
+        # inp = np.squeeze(inp) # Remove empty dimension
+        inp = inp.reshape(self._ni, -1) # Remove superfluous dimensions
+        ns = 1 if inp.ndim == 1 else inp.shape[-1] # assume sample is in last dimension after squeezing
+        self.reset(ns_in=ns)
+        self._node_outputs[:self._ni, :] = inp
 
         for node in self._active_nodes:
             # Internal nodes
@@ -73,17 +100,33 @@ class CGP_Graph:
             gene = self._genome_internal[i, j, :]
             func = self.function_list[gene[-1]]
             inp_ix = gene[:self._a].flat
-            inp = np.take(self._node_outputs, inp_ix)
+            inp = np.take(self._node_outputs, inp_ix, axis=0)
             result = func(*inp)
-            self._node_outputs[node] = result
+            self._node_outputs[node, :] = result
         for i, out_node in enumerate(self._genome_output):
             # Output nodes
-            result = self._node_outputs[out_node]
-            self._node_outputs[i + self._m] = result
+            result = np.take(self._node_outputs, out_node, axis=0)
+            self._node_outputs[i + self._m, :] = result
 
-        return self._node_outputs[self._m:]
+        if not squeeze:
+            return self._node_outputs[self._m:, :]
+        else:
+            return np.squeeze(self._node_outputs[self._m:, :])
 
-    def _create_random_genome(self):
+    def _create_random_genome(self, seed: int = None):
+        if seed is not None:
+            np.random.seed(seed)
+        # Randomise connection genes
+        for j in range(self._nc):
+            upper_bound = self._ni + j*self._nr
+            lower_bound = 0 if j < self._l else self._ni + (j - self._l)*self._nr
+            req_shape = self._genome_internal[:, j, :self._a].shape
+            self._genome_internal[:, j, :self._a] = np.random.randint(lower_bound, upper_bound, size=req_shape)
+        # Randomise function genes
+        req_shape = self._genome_internal[:, :, self._a].shape
+        self._genome_internal[:, :, self._a] = np.random.randint(0, self._nf, size=req_shape)
+        # Randomise output genes
+        self._genome_output[:] = np.random.randint(0, self._m, size=self._genome_output.shape)
         pass
 
     def _fill_genome(self, genome: list):
@@ -181,18 +224,68 @@ class CGP_Graph:
         return self._l
     
     @property
+    def size(self):
+        "Complete genome size : (n_outputs + n_nodes * (arity + 1))"
+        return self._lg
+
+    @property
     def genome(self):
-        return np.r_[self._genome_internal.flatten(order="C"), self._genome_output]
+        return np.r_[self._genome_internal.swapaxes(0, 1).flatten(order="C"), self._genome_output]
     
+    @genome.setter
+    def genome(self, value):
+        self._genome_internal.fill(0)
+        self._genome_output.fill(0)
+        self._fill_genome(value)
+        self._check_valid_genome()
+
     @property
     def active_nodes(self):
         return self._active_nodes
 
 
 
-class CGP_Rule(LearningRule):
-    def __init__(self):
-        super().__init__()
+class CGP_Rule(BaseLearningRule):
+    """
+    Learning Rule version of CGP.
+    Contains a CGP graph calibrated to synaptic update
+    """
 
-    def update(self, always_return_tuple):
-        return super().update(always_return_tuple)
+    def __init__(self, parameters = None, *, 
+                 n_rows: int = 1, n_cols: int = 1, 
+                 function_list: List[Callable] = None,
+                 arity: int = 2, prev_layer: int = None, seed: int = None,
+                 learning_rate: float = 1.0, learning_rate_thr: float = 0.1, threshold_agg_func: Literal["max", "min", "mean", "sum"] = "mean",
+                 delta_weight: bool = True, delta_threshold: bool = False,
+                 use_trace_pre: bool = False, use_trace_post: bool = False, use_weights: bool = True, use_reward: bool = False, 
+                 use_eligibility: bool = False, use_eligibility_pre: bool = False, use_eligibility_post: bool = False, use_eligibility_stdp: bool = False,
+                 **kwargs):
+        super().__init__(
+            learning_rate=learning_rate, learning_rate_thr=learning_rate_thr,
+            threshold_agg_func=threshold_agg_func, delta_weight=delta_weight, delta_threshold=delta_threshold,
+            use_trace_pre=use_trace_pre, use_trace_post=use_trace_post,
+            use_weights=use_weights, use_reward=use_reward,
+            use_eligibility=use_eligibility, use_eligibility_pre=use_eligibility_pre, use_eligibility_post=use_eligibility_post,
+            use_eligibility_stdp=use_eligibility_stdp
+        )
+
+        self.graph = CGP_Graph(
+            n_inputs=self.input_size, n_outputs=self.output_size, n_rows=n_rows, n_cols=n_cols,
+            genome=parameters,
+            function_list=function_list, arity=arity, prev_layer=prev_layer, seed=seed
+        )
+
+    def forward(self, inp):
+        return self.graph.forward(inp)
+
+    @property
+    def size(self):
+        return self.graph.size
+    
+    @property
+    def parameters(self):
+        return self.graph.genome
+    
+    @parameters.setter
+    def parameters(self, value):
+        self.graph.genome = value

@@ -716,7 +716,7 @@ def plot_learning_rule(lrule: 'LearningRule', simulator: 'SNNSimulator' = None, 
         emax = emax
         emin = emin
 
-    arule = lrule.ann
+    # arule = lrule.ann
     N = num_mesh
     # Eligibility trace range
     etrace_r = np.linspace(emin, emax, N)
@@ -738,7 +738,7 @@ def plot_learning_rule(lrule: 'LearningRule', simulator: 'SNNSimulator' = None, 
         rr = np.full((N, N), r)
         inp = np.concatenate([ww[..., np.newaxis], rr[..., np.newaxis], ee[..., np.newaxis]], axis=2)
         # inp = np.concatenate([rr[..., np.newaxis], ee[..., np.newaxis]], axis=2)
-        dw = arule.forward(inp)
+        dw = lrule.forward(inp)
         dw_rec[..., i] = dw.reshape(N, N)
     
     # Start plotting
