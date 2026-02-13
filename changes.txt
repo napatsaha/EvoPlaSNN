@@ -1,3 +1,16 @@
+v1.0.3
+- Mutation and various helper functions in `CGP_Graph`:
+    - GENE_TYPE enum
+    - allow_inputs_anywhere
+    - mutate()
+    - flat_to_coord_3d()
+    - _find_permissable_connection_genes()
+    - _get_column_bounds()
+    - _determine_gene_type()
+
+v1.0.2 (2026-02-11)
+- Base Learning Rule parent class and `CGP_Rule` which uses `CGP_Graph
+
 v1.0.1
 - Add `CGP_Graph` class, including the following functioning methods:
     - forward

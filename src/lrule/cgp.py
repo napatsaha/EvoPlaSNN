@@ -9,6 +9,7 @@ from common.base import LearningRule, SynapseLayerProtocol
 from lrule.base import BaseLearningRule
 from typing import List, Tuple, Literal, Callable
 
+from enum import IntEnum
 
 FUNCTION_LIST = [
     np.add,
@@ -19,17 +20,22 @@ FUNCTION_LIST = [
 
 
 class CGP_Graph:
+    GENE_TYPE = IntEnum('GeneType', ["Connection", "Function", "Output"])
+
     def __init__(self, 
                  n_inputs: int, n_outputs: int, n_rows: int, n_cols: int, *,
                  genome: list = None, function_list: List[Callable] = None,
-                 arity: int = 2, prev_layer: int = None, seed: int = None):
+                 arity: int = 2, levels_back: int = None, allow_input_anywhere: bool = False,
+                 mutation_rate: int | float = None,
+                 seed: int = None):
         self._ni = n_inputs
         self._no = n_outputs
         self._nr = n_rows
         self._nc = n_cols
         self._nn = self._nr * self._nc
         self._a = arity
-        self._l = prev_layer if prev_layer is not None else self._nc
+        self._l = levels_back if levels_back is not None else self._nc
+        self._allow_inputs = allow_input_anywhere
 
         # Allele length
         self._al = self._a + 1
@@ -41,6 +47,18 @@ class CGP_Graph:
         # functions
         self.function_list = FUNCTION_LIST if function_list is None else function_list
         self._nf = len(self.function_list)
+
+        # Mutation
+        if mutation_rate is None:
+            mutation_rate = 0.1
+        if isinstance(mutation_rate, float) and (0 <= mutation_rate < 1.0):
+            self._mu_min = int(mutation_rate * self._lg)
+            self._mu_rate = mutation_rate
+        elif isinstance(mutation_rate, int) and (1 <= mutation_rate <= self._lg):
+            self._mu_min = int(mutation_rate)
+            self._mu_rate = mutation_rate / self._lg
+        else:
+            raise ValueError(f"Invalid mutation rate. Must be either fraction [0, 1) or an integer between [0, {self._lg}]")
 
         # Internal arrays
         self._genome_internal = np.zeros((self._nr, self._nc, self._al), dtype=np.int16)
@@ -113,23 +131,85 @@ class CGP_Graph:
         else:
             return np.squeeze(self._node_outputs[self._m:, :])
 
+    def mutate(self) -> np.ndarray[int]:
+        # For now, assume point mutation
+        
+        # Find gene id to mutate based on _mu_min
+        gene_to_mutate = np.random.randint(self._lg, size=(self._mu_min, ))
+
+        for gene in gene_to_mutate:
+            gene_type = self._determine_gene_type(gene)
+            # Output genes
+            if gene_type == self.GENE_TYPE.Output:
+                idx = gene - (self._nn * self._al)
+                self._genome_output[idx] = np.random.randint(self._no)
+            # Function genes
+            elif gene_type == self.GENE_TYPE.Function:
+                idx = self.flat_to_coord_3d(gene)
+                self._genome_internal[idx] = np.random.randint(self._nf)
+            # Connection gene
+            elif gene_type == self.GENE_TYPE.Connection:
+                i, j, k = self.flat_to_coord_3d(gene)
+                valid_genes = self._find_permissable_connection_genes(j)
+                self._genome_internal[i, j, k] = np.random.choice(valid_genes)
+            else:
+                raise ValueError(f"Gene ID {gene} with Type: {gene_type} not valid.")
+            
+        return gene_to_mutate
+
     def _create_random_genome(self, seed: int = None):
         if seed is not None:
             np.random.seed(seed)
         # Randomise connection genes
         for j in range(self._nc):
-            upper_bound = self._ni + j*self._nr
-            lower_bound = 0 if j < self._l else self._ni + (j - self._l)*self._nr
             req_shape = self._genome_internal[:, j, :self._a].shape
-            self._genome_internal[:, j, :self._a] = np.random.randint(lower_bound, upper_bound, size=req_shape)
+            if self._allow_inputs:
+                permissables = self._find_permissable_connection_genes(j)
+                self._genome_internal[:, j, :self._a] = np.random.choice(permissables, size=req_shape)
+            else:
+                upper_bound, lower_bound = self._get_column_bounds(j)
+                self._genome_internal[:, j, :self._a] = np.random.randint(lower_bound, upper_bound, size=req_shape)
         # Randomise function genes
         req_shape = self._genome_internal[:, :, self._a].shape
         self._genome_internal[:, :, self._a] = np.random.randint(0, self._nf, size=req_shape)
         # Randomise output genes
         self._genome_output[:] = np.random.randint(0, self._m, size=self._genome_output.shape)
-        pass
+        
+
+    def _get_column_bounds(self, j) -> tuple:
+        upper_bound = self._ni + j*self._nr
+        lower_bound = 0 if j < self._l else self._ni + (j - self._l)*self._nr
+        return upper_bound, lower_bound
+    
+    def _find_permissable_connection_genes(self, j) -> np.ndarray:
+        """
+        Returns permissable input nodes into connection genes given a column id, *j*.  
+        If `allow_inputs_anywhere = True`, also includes input node id's.
+        """
+        upper_bound, lower_bound = self._get_column_bounds(j)
+        permissables = np.arange(lower_bound, upper_bound)
+        if self._allow_inputs and j >= self._l:
+            # Appends input nodes to permissable genes
+            permissables = np.concatenate([np.arange(self._ni), permissables])
+        return permissables
+        
+    def _determine_gene_type(self, gene: int) -> int:
+        """
+        Determine whether gene is a connection (0), function (1) or output (2) gene.
+        """
+        assert 0 <= gene <= self._lg, f"Gene id: {gene} is outside of valid range [0, {self._lg}]"
+        # Output gene
+        if gene >= (self._nn * self._al):
+            return self.GENE_TYPE.Output
+        elif gene % self._al == self._a:
+            return self.GENE_TYPE.Function
+        else:
+            return self.GENE_TYPE.Connection
 
     def _fill_genome(self, genome: list):
+        """
+        When a genome is given, fill it into `_genome_internal` and `_genome_output` properly
+        """
         # Check if genome is in tuple form or flat
         if len(genome) == (self._nn + self._no):
             # allele genome
@@ -164,13 +244,14 @@ class CGP_Graph:
         for g in range(self._a):
             c = self._genome_internal[:, :, g]
             for j in range(self._nc):
-                upper_bound = self._ni + j*self._nr
-                if j >= self._l:
-                    lower_bound = self._ni + (j - self._l)*self._nr
-                    # assert np.all((self._ni + (j - self._l)*self._nr) <= c[:, j]) & np.all(c[:, j] < (self._ni + j*self._nr)), f"Connection gene invalid at column {j}"
-                else:
-                    lower_bound = 0
-                    # assert np.all(0 <= c[:, j]) & np.all(c[:, j] < (self._ni + j*self._nr)), f"Connection gene invalid at column {j}"
+                upper_bound, lower_bound = self._get_column_bounds(j)
+                # upper_bound = self._ni + j*self._nr
+                # if j >= self._l:
+                #     lower_bound = self._ni + (j - self._l)*self._nr
+                #     # assert np.all((self._ni + (j - self._l)*self._nr) <= c[:, j]) & np.all(c[:, j] < (self._ni + j*self._nr)), f"Connection gene invalid at column {j}"
+                # else:
+                #     lower_bound = 0
+                #     # assert np.all(0 <= c[:, j]) & np.all(c[:, j] < (self._ni + j*self._nr)), f"Connection gene invalid at column {j}"
                 assert np.all(lower_bound <= c[:, j]) & np.all(c[:, j] < upper_bound), f"Connection gene invalid at column {j}"
 
     def _find_active_nodes(self):
@@ -190,6 +271,16 @@ class CGP_Graph:
         i = idx % self._nr
         j = idx // self._nr
         return i, j
+    
+    def flat_to_coord_3d(self, idx: int) -> tuple:
+        """
+        Convert single genome index to 3-dim 
+        """
+        k = idx % self._al
+        id2d = idx // self._al
+        i = id2d % self._nr
+        j = id2d // self._nr
+        return i, j, k
 
     def coord_to_flat(self, i: int, j: int) -> int:
         return j * self._nr + i
@@ -254,7 +345,7 @@ class CGP_Rule(BaseLearningRule):
     def __init__(self, parameters = None, *, 
                  n_rows: int = 1, n_cols: int = 1, 
                  function_list: List[Callable] = None,
-                 arity: int = 2, prev_layer: int = None, seed: int = None,
+                 arity: int = 2, levels_back: int = None, seed: int = None,
                  learning_rate: float = 1.0, learning_rate_thr: float = 0.1, threshold_agg_func: Literal["max", "min", "mean", "sum"] = "mean",
                  delta_weight: bool = True, delta_threshold: bool = False,
                  use_trace_pre: bool = False, use_trace_post: bool = False, use_weights: bool = True, use_reward: bool = False, 
@@ -272,7 +363,7 @@ class CGP_Rule(BaseLearningRule):
         self.graph = CGP_Graph(
             n_inputs=self.input_size, n_outputs=self.output_size, n_rows=n_rows, n_cols=n_cols,
             genome=parameters,
-            function_list=function_list, arity=arity, prev_layer=prev_layer, seed=seed
+            function_list=function_list, arity=arity, levels_back=levels_back, seed=seed
         )
 
     def forward(self, inp):
