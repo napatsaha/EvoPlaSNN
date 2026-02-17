@@ -8,6 +8,7 @@ from numpy.typing import ArrayLike
 from common.base import LearningRule, SynapseLayerProtocol
 from lrule.base import BaseLearningRule
 from typing import List, Tuple, Literal, Callable
+import copy
 
 from enum import IntEnum
 
@@ -26,7 +27,8 @@ class CGP_Graph:
                  n_inputs: int, n_outputs: int, n_rows: int, n_cols: int, *,
                  genome: list = None, function_list: List[Callable] = None,
                  arity: int = 2, levels_back: int = None, allow_input_anywhere: bool = False,
-                 mutation_rate: int | float = None,
+                 mutation_rate: int | float = 0.1, mu_c: float = None, mu_f: float = None, mu_o: float = None,
+                 mutation_method: Literal["point", "prob"] = "point",
                  seed: int = None):
         self._ni = n_inputs
         self._no = n_outputs
@@ -49,17 +51,19 @@ class CGP_Graph:
         self._nf = len(self.function_list)
 
         # Mutation
-        if mutation_rate is None:
-            mutation_rate = 0.1
-        if isinstance(mutation_rate, float) and (0 <= mutation_rate < 1.0):
-            self._mu_min = int(mutation_rate * self._lg)
-            self._mu_rate = mutation_rate
-        elif isinstance(mutation_rate, int) and (1 <= mutation_rate <= self._lg):
-            self._mu_min = int(mutation_rate)
-            self._mu_rate = mutation_rate / self._lg
-        else:
-            raise ValueError(f"Invalid mutation rate. Must be either fraction [0, 1) or an integer between [0, {self._lg}]")
-
+        self.mutation_method = mutation_method
+        if mutation_method == "point":
+            if isinstance(mutation_rate, float) and (0 <= mutation_rate < 1.0):
+                self._mu_min = int(mutation_rate * self._lg)
+                self._mu_rate = mutation_rate
+            elif isinstance(mutation_rate, int) and (1 <= mutation_rate <= self._lg):
+                self._mu_min = int(mutation_rate)
+                self._mu_rate = mutation_rate / self._lg
+            else:
+                raise ValueError(f"Invalid mutation rate. Must be either fraction [0, 1) or an integer between [0, {self._lg}]")
+        # TODO: Add probabilistic mutation
+        elif mutation_method == "prob":
+            raise NotImplementedError("Probabilistic mutation not yet implemented")
         # Internal arrays
         self._genome_internal = np.zeros((self._nr, self._nc, self._al), dtype=np.int16)
         self._genome_output = np.zeros((self._no), dtype=np.int16)
@@ -131,7 +135,8 @@ class CGP_Graph:
         else:
             return np.squeeze(self._node_outputs[self._m:, :])
 
-    def mutate(self) -> np.ndarray[int]:
+    def _mutate(self) -> np.ndarray[int]:
+        # TODO: Add probabilistic mutation
         # For now, assume point mutation
         
         # Find gene id to mutate based on _mu_min
@@ -156,6 +161,15 @@ class CGP_Graph:
                 raise ValueError(f"Gene ID {gene} with Type: {gene_type} not valid.")
             
         return gene_to_mutate
+
+    def mutate(self) -> "CGP_Graph":
+        """
+        Mutate current graph and produce a new copy of an offspring.
+        """
+        offspring = copy.deepcopy(self)
+        offspring._mutate()
+        offspring._find_active_nodes()
+        return offspring
 
     def _create_random_genome(self, seed: int = None):
         if seed is not None:
@@ -256,18 +270,30 @@ class CGP_Graph:
 
     def _find_active_nodes(self):
         self._active_nodes = []
-        self._active_nodes.extend(self._genome_output)
-        for oi in self._active_nodes:
-            i, j = self.flat_to_coord(oi - self._ni)
-            gene = self._genome_internal[i, j, :]
-            for node in gene[:-1]:
-                if (node - self._ni) < 0:
-                    continue
-                if node not in self._active_nodes:
-                    self._active_nodes.append(node)
+        nodes_to_test = [] # Create a separate array to test to avoid including input nodes in final array
+        nodes_to_test.extend(self._genome_output)
+        for oi in nodes_to_test:
+            if (oi - self._ni) < 0:
+                # Ignore if input node
+                continue
+            else:
+                if oi not in self._active_nodes: # Avoid double counting
+                    self._active_nodes.append(oi)
+                i, j = self.flat_to_coord(oi - self._ni)
+                gene = self._genome_internal[i, j, :]
+                # Check each connection genes in this node
+                for conn_gene in gene[:-1]:
+                    if (conn_gene - self._ni) < 0:
+                        # Ignore if input node
+                        continue
+                    if conn_gene not in nodes_to_test:
+                        self._active_nodes.append(conn_gene)
+                        nodes_to_test.append(conn_gene)
         self._active_nodes = np.sort(np.array(self._active_nodes))
         
     def flat_to_coord(self, idx: int) -> tuple:
+        if idx < 0:
+            raise Warning(f"Flat index {idx} should be non-negative integer")
         i = idx % self._nr
         j = idx // self._nr
         return i, j
@@ -276,6 +302,8 @@ class CGP_Graph:
         """
         Convert single genome index to 3-dim 
         """
+        if idx < 0:
+            raise Warning(f"Flat index {idx} should be non-negative integer")
         k = idx % self._al
         id2d = idx // self._al
         i = id2d % self._nr
@@ -341,11 +369,15 @@ class CGP_Rule(BaseLearningRule):
     Learning Rule version of CGP.
     Contains a CGP graph calibrated to synaptic update
     """
+    graph: CGP_Graph
 
     def __init__(self, parameters = None, *, 
                  n_rows: int = 1, n_cols: int = 1, 
                  function_list: List[Callable] = None,
-                 arity: int = 2, levels_back: int = None, seed: int = None,
+                 arity: int = 2, levels_back: int = None, allow_input_anywhere: bool = False,
+                 mutation_rate: int | float = 0.1, mu_c: float = None, mu_f: float = None, mu_o: float = None,
+                 mutation_method: Literal["point", "prob"] = "point",
+                 seed: int = None,
                  learning_rate: float = 1.0, learning_rate_thr: float = 0.1, threshold_agg_func: Literal["max", "min", "mean", "sum"] = "mean",
                  delta_weight: bool = True, delta_threshold: bool = False,
                  use_trace_pre: bool = False, use_trace_post: bool = False, use_weights: bool = True, use_reward: bool = False, 
@@ -363,11 +395,17 @@ class CGP_Rule(BaseLearningRule):
         self.graph = CGP_Graph(
             n_inputs=self.input_size, n_outputs=self.output_size, n_rows=n_rows, n_cols=n_cols,
             genome=parameters,
-            function_list=function_list, arity=arity, levels_back=levels_back, seed=seed
+            function_list=function_list, arity=arity, 
+            levels_back=levels_back, allow_input_anywhere=allow_input_anywhere,
+            mutation_method=mutation_method, mutation_rate=mutation_rate, mu_c=mu_c, mu_f=mu_f, mu_o=mu_o,
+            seed=seed,
+            **kwargs
         )
 
     def forward(self, inp):
         return self.graph.forward(inp)
+
+
 
     @property
     def size(self):
