@@ -1,3 +1,10 @@
+v1.0.4
+- Add `mutate()` to CGP_Graph (previously `mutate_new()`)
+- Add mutation parameters from `CGP_Graph` to `CGP_Rule`
+- Fixed the inputs in active nodes issue within `_find_active_nodes()`
+    - Made a separate array `node_to_test` during walkthrough to keep track of all nodes to check (inputs and internal), starting from output connections. Meanwhile, the `_active_nodes` array (final product) on only allow non-input nodes to be stored
+- Added a check to `flat_to_coord()` to prevent negative flat index from being passed inside
+
 v1.0.3
 - Mutation and various helper functions in `CGP_Graph`:
     - GENE_TYPE enum
