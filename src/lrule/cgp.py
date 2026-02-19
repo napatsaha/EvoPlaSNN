@@ -7,6 +7,7 @@ import numpy as np
 from numpy.typing import ArrayLike
 from common.base import LearningRule, SynapseLayerProtocol
 from lrule.base import BaseLearningRule
+from evo.base import Genome
 from typing import List, Tuple, Literal, Callable
 import copy
 
@@ -364,7 +365,7 @@ class CGP_Graph:
 
 
 
-class CGP_Rule(BaseLearningRule):
+class CGP_Rule(BaseLearningRule, Genome):
     """
     Learning Rule version of CGP.
     Contains a CGP graph calibrated to synaptic update
@@ -405,7 +406,11 @@ class CGP_Rule(BaseLearningRule):
     def forward(self, inp):
         return self.graph.forward(inp)
 
-
+    def mutate(self) -> 'CGP_Rule':
+        new_graph = self.graph.mutate()
+        new_rule = copy.copy(self)
+        new_rule.graph = new_graph
+        return new_rule
 
     @property
     def size(self):
@@ -418,3 +423,6 @@ class CGP_Rule(BaseLearningRule):
     @parameters.setter
     def parameters(self, value):
         self.graph.genome = value
+
+    # Alias
+    genome = parameters

@@ -1,3 +1,4 @@
+from abc import ABC
 from typing import List, Tuple, Protocol, override
 from pathlib import Path
 import numpy as np
@@ -84,6 +85,8 @@ class Evaluator(Protocol):
         pass
 
 class BaseSolver(Solver):
+    solutions: List['Genome']
+
     def __init__(self, ndim: int = 2, popsize: int = None, minimise: bool = True):
         self.solutions: List | np.ndarray = []
         self.ndim = ndim
@@ -122,3 +125,28 @@ class BaseSolver(Solver):
     def result(self) -> Tuple[np.ndarray, float]:
         """Return the best solution and its fitness."""
         return self.best_solution, self.best_fitness
+    
+
+class Genome(ABC):
+    """
+    Base class to allow for genetic-related operations in evolutionary Solver.
+    """
+    def mutate(self) -> 'Genome':
+        """
+        Create a modified copy of itself
+        """
+        pass
+
+    @property
+    def parameters(self) -> np.ndarray:
+        """
+        Returns a 1D genetic blueprint of the genome
+        """
+        pass
+
+    @property
+    def size(self) -> int:
+        """
+        Returns the number of parameters that exists in the genome
+        """
+        pass

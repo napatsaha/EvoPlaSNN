@@ -1,3 +1,13 @@
+v1.0.5 (2026-02-19)
+- `MuPlusLambda` class in module `evo.mu_plus_lambda`
+- `Genome` base class in `evo.base`
+- Generic factory function `create_learning_rule` and `TYPE_DICT` reference dictionary in `lrule.utils` for use within Solver (only `MuPlusLambda` for now)
+- `cgp.CGP_Rule` class 
+    - became multi-class child of `Genome` and `BaseLearningRule`
+    - Its own `mutate()` function that returns shallow copy of self with only `graph` changed
+    - Alias `genome = parameters`
+
+
 v1.0.4
 - Add `mutate()` to CGP_Graph (previously `mutate_new()`)
 - Add mutation parameters from `CGP_Graph` to `CGP_Rule`

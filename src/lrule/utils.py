@@ -1,5 +1,14 @@
 from typing import Tuple
 import numpy as np
+from importlib import import_module
+
+TYPE_DICT = {
+    "ann" : ("lrule.ann", "ANN_Rule"),
+    "cgp" : ("lrule.cgp", "CGP_Rule"),
+    "graph" : ("lrule.cgp", "CGP_Graph"),
+    "stdp" : ("lrule.stdp", "STDP_Rule"),
+    "rstdp" : ("lrule.stdp", "R_STDP")
+}
 
 
 
@@ -17,3 +26,11 @@ def tile_array(target_shape: Tuple[int, int], vec_in: np.ndarray, vec_out: np.nd
     vec_in = np.tile(vec_in, (target_shape[1], 1)).T
     vec_out = np.tile(vec_out, (target_shape[0], 1))
     return vec_in, vec_out
+
+
+def create_learning_rule(type_: str, **kwargs):
+    module_name, class_name = TYPE_DICT.get(type_)
+    module = import_module(module_name)
+    rule_cls = getattr(module, class_name)
+    instance = rule_cls(**kwargs)
+    return instance
