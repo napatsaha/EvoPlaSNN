@@ -26,18 +26,27 @@ class MuPlusLambda(BaseSolver):
     def __init__(self, mu, lambd, *, ndim = 2, popsize = None, minimise = True,
                  lrule_type: str = None,
                  **kwargs):
-        super().__init__(ndim, popsize, minimise)
+        # super().__init__(ndim, popsize, minimise)
+        self.minimise = minimise
         self.mu = mu
         self.lambd = lambd
         self.popsize = self.mu + self.lambd
 
+        self._lrule_type = lrule_type
+        self._lrule_kwargs = kwargs
+        self._generate_new_population()
+        self.ndim = self.solutions[0].size
+
+    def _generate_new_population(self, ):
         self.solutions = []
         for p in range(self.popsize):
             # Generalise solution creation to any type of genome
-            indiv = create_learning_rule(lrule_type, **kwargs)
+            indiv = create_learning_rule(self._lrule_type, **self._lrule_kwargs)
             self.solutions.append(indiv)
-
         self.parents = []
+
+    # def reset(self):
+    #     self._generate_new_population()
 
     def ask(self):
         return self.solutions

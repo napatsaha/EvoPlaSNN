@@ -46,6 +46,8 @@ class CGP_Graph:
         self._lg = self._nn * self._al + self._no
         # Maximum nodes (inputs + internal)
         self._m = self._ni + self._nn
+        # Maxmimum nodes (inputs + internal + outputs)
+        self._mo = self._ni + self._nn + self._no
 
         # functions
         self.function_list = FUNCTION_LIST if function_list is None else function_list
@@ -82,7 +84,7 @@ class CGP_Graph:
 
         # Activation arrays
         # Starts with empty dimension in axis=1 to allow broadcasting to fit input size if needed
-        self._node_outputs = np.zeros((self._m + self._no, 1), dtype=np.float64)
+        self._node_outputs = np.zeros((self._mo, 1), dtype=np.float64)
 
     def reset(self, ns_in: int = None):
         self._node_outputs.fill(np.nan)
@@ -301,7 +303,7 @@ class CGP_Graph:
     
     def flat_to_coord_3d(self, idx: int) -> tuple:
         """
-        Convert single genome index to 3-dim 
+        Convert single genome index to 3-dim indices
         """
         if idx < 0:
             raise Warning(f"Flat index {idx} should be non-negative integer")
@@ -363,6 +365,37 @@ class CGP_Graph:
     def active_nodes(self):
         return self._active_nodes
 
+    def _tuplify_genome(self) -> str:
+        internals = self._genome_internal.swapaxes(0, 1).reshape(-1, self._al).tolist()
+        outputs = self._genome_output.tolist()
+        return str(internals + outputs)
+
+    def __getitem__(self, index):
+        if not index >= self._ni:
+            raise IndexError(f"Index values must be >= number of inputs {self._ni}. Got {index}")
+        if not index < self._mo:
+            raise IndexError(f"Index value must be < total number of nodes {self._mo}. Got {index}")
+        if index < self._m:
+            i, j = self.flat_to_coord(index - self._ni)
+            return self._genome_internal[i, j, :]
+        elif index >= self._m:
+            return self._genome_output[index - self._m]
+        else:
+            raise IndexError(f"Invalid index {index}")
+
+    def __str__(self):
+        s = "CGP Graph (active nodes only)" + "\n"
+        s += "Input Nodes: " + str([*range(self._ni)]) + "\n"
+        for node in self.active_nodes:
+            s += f"Node {node}: " + str(self[node]) + "\n"
+        for oi, o in enumerate(self._genome_output):
+            s+= f"Output {oi}: Node " + str(o) + "\n"
+        s = s.rstrip("\n")
+        return s
+
+
+    def __repr__(self):
+        return f"CGP_Graph({self._tuplify_genome()}, n_inputs={self.n_inputs}, n_rows={self.n_rows}, n_cols={self.n_cols}, n_outputs={self.n_outputs})"
 
 
 class CGP_Rule(BaseLearningRule, Genome):

@@ -1,3 +1,8 @@
+v1.0.6 (2026-02-20)
+- __str__ and __repr__ in CGP_Graph
+- added `_mo` attribute to CGP_Graph
+- _generate_new_population in MuPlusLambda
+
 v1.0.5 (2026-02-19)
 - `MuPlusLambda` class in module `evo.mu_plus_lambda`
 - `Genome` base class in `evo.base`
