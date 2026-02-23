@@ -50,7 +50,23 @@ class CGP_Graph:
         self._mo = self._ni + self._nn + self._no
 
         # functions
-        self.function_list = FUNCTION_LIST if function_list is None else function_list
+        self.function_list = []
+        if function_list is None:
+            self.function_list = FUNCTION_LIST
+        else:
+            # Check if passed in function is a callable
+            for f in function_list:
+                if isinstance(f, Callable):
+                    self.function_list.append(f)
+                elif isinstance(f, str):
+                    # Try getting function from numpy
+                    try:
+                        f = getattr(np, f)
+                    except:
+                        raise Exception(f"Could not find function \'{f}\' from numpy")
+                    self.function_list.append(f)
+
+        # self.function_list = FUNCTION_LIST if function_list is None else function_list
         self._nf = len(self.function_list)
 
         # Mutation

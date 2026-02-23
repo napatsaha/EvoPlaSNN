@@ -24,7 +24,7 @@ class MuPlusLambda(BaseSolver):
     # solutions: List[Genome]
 
     def __init__(self, mu, lambd, *, ndim = 2, popsize = None, minimise = True,
-                 lrule_type: str = None,
+                 lrule_type: str = None, lrule_params: dict = None,
                  **kwargs):
         # super().__init__(ndim, popsize, minimise)
         self.minimise = minimise
@@ -32,8 +32,12 @@ class MuPlusLambda(BaseSolver):
         self.lambd = lambd
         self.popsize = self.mu + self.lambd
 
-        self._lrule_type = lrule_type
-        self._lrule_kwargs = kwargs
+        self._lrule_params = kwargs if lrule_params is None else lrule_params
+        if lrule_type is not None:
+            self._lrule_type = lrule_type
+        else:
+            if "type" in self._lrule_params:
+                self._lrule_type = self._lrule_params.pop("type")
         self._generate_new_population()
         self.ndim = self.solutions[0].size
 
@@ -41,7 +45,7 @@ class MuPlusLambda(BaseSolver):
         self.solutions = []
         for p in range(self.popsize):
             # Generalise solution creation to any type of genome
-            indiv = create_learning_rule(self._lrule_type, **self._lrule_kwargs)
+            indiv = create_learning_rule(self._lrule_type, **self._lrule_params)
             self.solutions.append(indiv)
         self.parents = []
 
@@ -53,6 +57,7 @@ class MuPlusLambda(BaseSolver):
 
     def tell(self, fitnesses):
         assert len(fitnesses) == len(self.solutions)
+        self.fitnesses = fitnesses
         if not self.minimise:
             fitnesses = -fitnesses
         idx_best = np.argsort(fitnesses)[:self.mu]

@@ -6,14 +6,14 @@ from typing import Dict, Any, List, Union, Tuple
 from common.base import LearningRule
 import numpy as np
 
-from evo.base import Evaluator
+from evo.base import Evaluator, Genome
 from snn import SNN, SNNSimulator
 # from snn.spikegen import BinaryClassGenerator
 import snn.spikegen as spkgen
 # from snn.spikegen import create_spikegen, create_poisson_class_timing, create_binary_class_timing
 # import snn.spikegen
 
-from lrule import ANN_Rule
+from lrule import ANN_Rule, Empty_Rule
 from rl import ENV_DICT, StateCoder, RewardCollector, BaseMaze
     
 
@@ -64,9 +64,10 @@ class RL_Evaluator(Evaluator):
         # num_states = self.env.observation_space.n
         # num_actions = self.env.action_space.n
         self.spike_coder = StateCoder(self.env.observation_space, self.env.action_space, **params["spike_coder_params"])
-        self.arule = ANN_Rule(**params["arule_params"]) if learning_rule is None else learning_rule
+        # self.learning_rule = ANN_Rule(**params["arule_params"]) if learning_rule is None else learning_rule
+        self.learning_rule = learning_rule
         self.snn = SNN(input_size=self.spike_coder.input_size, output_size=self.spike_coder.output_size, 
-                       learning_rule=self.arule, **params["snn_params"])
+                       learning_rule=self.learning_rule, **params["snn_params"])
         self.reward_collector = RewardCollector(**params["collector_params"])
         # Update min and max fitness from environment
         self.reward_collector.min_fitness = self.env.get_min_reward()
@@ -89,7 +90,7 @@ class RL_Evaluator(Evaluator):
         """
         Returns the number of parameters in the genome required to build an Evolutionary Algorithm.
         """
-        return self.arule.size
+        return self.learning_rule.size if self.learning_rule is not None else None
     
     def is_minimise(self):
         """
@@ -136,10 +137,20 @@ class RL_Evaluator(Evaluator):
                 f.write("gen,indiv,genome\n")
 
 
-    def evaluate(self, genome: np.ndarray = None, num_trials=1, gen_count: int = None, indiv_count: int = None,
+    def evaluate(self, genome: np.ndarray | LearningRule | Genome = None, num_trials=1, gen_count: int = None, indiv_count: int = None,
                  return_std: bool = False, return_fitness_list: bool = False) -> Union[float, Tuple[float, float], List[float]]:
         if genome is not None:
-            self.arule.parameters = genome
+            if isinstance(genome, LearningRule) or isinstance(genome, Genome):
+                self.learning_rule = genome
+                self.snn.learning_rule = genome
+                genome = genome.parameters
+            elif isinstance(genome, np.ndarray):
+                if self.learning_rule is not None:
+                    self.learning_rule.parameters = genome
+                else:
+                    raise ValueError("Learning Rule must not be empty if array-like genome is passed as input. Otherwise a full LearningRule object must be passed in.")
+            else:
+                raise ValueError("Parameters passed into evaluate must be either 'LearningRule' or an 'ArrayLike` object.")
 
         if self._log_info >= 1:
             t00 = time.time()

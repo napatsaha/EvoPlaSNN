@@ -108,16 +108,20 @@ class BaseSolver(Solver):
         self.best_solution = self.solutions[best_idx]
 
     def save_best(self, save_dir: str | Path, n: int = 1, precision: int = 6):
-        top_indices = np.argsort(self.fitnesses) # Will arrange from lowest to highest fitness
-        if self.minimise:
-            # First n lowest fitness
-            top_indices = top_indices[:n]
-        else:
-            # Last n fitness in descending order
-            top_indices = top_indices[-n:][::-1]
-        top_solutions = self.solutions[top_indices]
+        top_indices = np.argsort(self.fitnesses if self.minimise else -self.fitnesses) # Will arrange from lowest to highest fitness
+        top_indices = top_indices[:n]
+        # if self.minimise:
+        #     # First n lowest fitness
+        #     top_indices = top_indices[:n]
+        # else:
+        #     # Last n fitness in descending order
+        #     top_indices = top_indices[-n:][::-1]
+        print(top_indices)
+        top_solutions = np.take(self.solutions, top_indices)
         for i in range(n):
             sol = top_solutions[i]
+            if isinstance(sol, Genome):
+                sol = sol.parameters
             i = str(i + 1).zfill(2)  # Ensure two-digit index
             np.savetxt(Path(save_dir) / f"best_rule_{i}.txt", sol, fmt=f'%.{precision}f')
 

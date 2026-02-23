@@ -87,11 +87,13 @@ def main(config_file: str | Path | dict, *, config_overrides: dict = None, paren
     )
 
     # Configure Evolution Solver object
-    config["evo_params"]["solver"]["ndim"] = evaluator.get_parameter_size()
+    # config["evo_params"]["solver"]["ndim"] = evaluator.get_parameter_size()
     config["evo_params"]["solver"]["minimise"] = evaluator.is_minimise()
-    solver = create_solver(config["evo_params"]["solver"])
+    solver = create_solver(config["evo_params"]["solver"], **config["lrule_params"])
     if "popsize" not in config["evo_params"]["solver"]:
         config["evo_params"]["solver"]["popsize"] = solver.popsize
+    if "ndim" not in config["evo_params"]["solver"]:
+        config["evo_params"]["solver"]["ndim"] = solver.ndim
     
     # use_target_fitness = config["evo_params"]["manager"].get("use_target_fitness", False)
     # if use_target_fitness:

@@ -1,44 +1,63 @@
 
-
+from importlib import import_module
 import copy
 from evo.base import BaseSolver
 
 
+ALGO_DICT = {
+    "cma_es": ("evo.cma_es", "CMA_ES"),
+    "es": ("evo.es", "EvolutionStrategy"),
+    "simple": ("evo.es", "EvolutionStrategy"),
+    "mu_plus_lambda": ("evo.mu_lambda", "MuPlusLambda")
+}
+
 algorithm_dict = {
     "cma_es": "CMA_ES",
     "es": "EvolutionStrategy",
-    "simple": "EvolutionStrategy"
+    "simple": "EvolutionStrategy",
+    "mu_plus_lambda": "MuPlusLambda"
 }
 
 module_dict = {
     "cma_es": ["CMA_ES"],
-    "es": ["EvolutionStrategy"]
+    "es": ["EvolutionStrategy"],
+    "mu_lambda": ["MuPlusLambda"]
 }
 
+def create_solver(params: dict, **kwargs) -> BaseSolver:
+    if "type" in params:
+        solver_type = params.pop("type")
+    else:
+        raise Warning("Solver type not provided. Using \'Simple ES\'")
+    module_name, class_name = ALGO_DICT.get(solver_type)
+    module = import_module(module_name)
+    obj_class = getattr(module, class_name)
+    return obj_class(**params, **kwargs)
 
-def create_solver(params: dict) -> BaseSolver:
-    """
-    Create an instance of a solver based on the provided parameters.
+
+# def create_solver(params: dict, **kwargs) -> BaseSolver:
+#     """
+#     Create an instance of a solver based on the provided parameters.
     
-    Args:
-        params (dict): Parameters for the solver, including 'type' and other necessary attributes.
+#     Args:
+#         params (dict): Parameters for the solver, including 'type' and other necessary attributes.
     
-    Returns:
-        BaseSolver: An instance of the specified solver.
-    """
-    params = copy.deepcopy(params)
-    solver_type = params.pop("type", "simple").lower().replace("-", "_")
-    if solver_type not in algorithm_dict:
-        raise ValueError(f"Unknown solver type: {solver_type}")
-    solver_class_name = algorithm_dict[solver_type]
+#     Returns:
+#         BaseSolver: An instance of the specified solver.
+#     """
+#     params = copy.deepcopy(params)
+#     solver_type = params.pop("type", "simple").lower().replace("-", "_")
+#     if solver_type not in algorithm_dict:
+#         raise ValueError(f"Unknown solver type: {solver_type}")
+#     solver_class_name = algorithm_dict[solver_type]
     
-    # Dynamically import the class
-    module_name = [name for name in module_dict if solver_class_name in module_dict[name]][0]
-    module_name = f"evo.{module_name}"
-    module = __import__(module_name, fromlist=[algorithm_dict[solver_type]])
+#     # Dynamically import the class
+#     module_name = [name for name in module_dict if solver_class_name in module_dict[name]][0]
+#     module_name = f"evo.{module_name}"
+#     module = __import__(module_name, fromlist=[algorithm_dict[solver_type]])
     
-    solver_class = getattr(module, solver_class_name)
-    return solver_class(**params)  # Pass the parameters to the solver's constructor
+#     solver_class = getattr(module, solver_class_name)
+#     return solver_class(**params)  # Pass the parameters to the solver's constructor
 
 
 if __name__ == "__main__":

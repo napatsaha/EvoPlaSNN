@@ -1,3 +1,15 @@
+v1.0.7 (2026-02-23)
+- Changes to `evo.utils.create_solver` 
+- CGP_Graph check function_list is Callable
+- Flexible lrule_type inputs (standalone or inside lrule_params) for `lrule.utils.create_learning_rule` and `MuPlusLambda.init()`
+- RL_Evaluator: 
+    - Remove creation of ANN_Rule on absence of explicit learning rule (temporary fix; will not work on previous arule)
+    - `.evaluate()` now take in Genome or LearningRule as inputs in addition to np.array
+- run_rl.py
+    - Changed order in which solver is created
+    - `create_solver()` now require passing in `lrule_params`
+    - renamed `arule_params` to `lrule_params`
+
 v1.0.6 (2026-02-20)
 - __str__ and __repr__ in CGP_Graph
 - added `_mo` attribute to CGP_Graph

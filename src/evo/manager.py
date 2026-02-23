@@ -139,7 +139,7 @@ class EvoManager:
 
 
         self.logger.info("Terminating Evolutionary optimisation.")
-        self.logger.info(f"Best solution: {best_solution.round(4)}")
+        self.logger.info(f"Best solution: {best_solution.parameters.round(4)}")
         self.logger.info(f"Best fitness: {best_fitness:.3f}")
         self.logger.info(f"Total time taken: {dt // 3600} hours, {(dt % 3600) // 60} minutes, {dt % 60:.2f} seconds")
         self.logger.info(f"Total generations: {gen_count}")

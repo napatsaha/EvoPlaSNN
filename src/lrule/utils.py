@@ -28,7 +28,12 @@ def tile_array(target_shape: Tuple[int, int], vec_in: np.ndarray, vec_out: np.nd
     return vec_in, vec_out
 
 
-def create_learning_rule(type_: str, **kwargs):
+def create_learning_rule(type_: str = None, **kwargs):
+    if type_ is None:
+        if "type" in kwargs:
+            type_ = kwargs.pop("type")
+        else:
+            raise KeyError("\'type\' must be provided in params")
     module_name, class_name = TYPE_DICT.get(type_)
     module = import_module(module_name)
     rule_cls = getattr(module, class_name)
