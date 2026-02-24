@@ -1,18 +1,20 @@
 import time
 import argparse
 from typing import Tuple
-from lrule.ann import read_ANN_Rule
-from common.base import LearningRule
+# from lrule.ann import read_ANN_Rule
+
 import yaml
 from pathlib import Path
 import numpy as np
 
 # from snn.eval import SNN_Evaluator
+from common.base import LearningRule
 from rl.eval import RL_Evaluator
 # from evo.es import EvolutionStrategy
 from evo.utils import create_solver
 from evo.manager import EvoManager
 from evo.base import Evaluator
+from lrule.utils import read_learning_rule
 
 # from snn.plot import plot_weight_over_time, plot_weights, plot_spikes, plot_membranes
 import snn.plot as snn_plot
@@ -153,7 +155,7 @@ def eval(results_path: Path | str = None, *, config_path: str | Path = None, num
             raise FileNotFoundError(f"Rule file {rule_id_name} not found in {results_path}. Please run the evolution first.")
         
         # Load the best ANN learning rule
-        lrule = read_ANN_Rule(results_path / rule_id_name, config_path=results_path / "config.yaml")
+        lrule = read_learning_rule(results_path / rule_id_name, config_path=results_path / "config.yaml")
         prefix = f"eval_rule_{rule_id:02d}"
     else:
         assert isinstance(learning_rule, LearningRule), f"{type(learning_rule)} is not a LearningRule object."

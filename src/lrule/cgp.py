@@ -96,6 +96,7 @@ class CGP_Graph:
             self._create_random_genome(seed=seed)
 
         # Find active nodes
+        self._active_nodes: List[int] = []
         self._find_active_nodes()
 
         # Activation arrays
@@ -154,6 +155,15 @@ class CGP_Graph:
         else:
             return np.squeeze(self._node_outputs[self._m:, :])
 
+    def mutate(self) -> "CGP_Graph":
+        """
+        Mutate current graph and produce a new copy of an offspring.
+        """
+        offspring = copy.deepcopy(self)
+        offspring._mutate()
+        offspring._find_active_nodes()
+        return offspring
+
     def _mutate(self) -> np.ndarray[int]:
         # TODO: Add probabilistic mutation
         # For now, assume point mutation
@@ -180,15 +190,6 @@ class CGP_Graph:
                 raise ValueError(f"Gene ID {gene} with Type: {gene_type} not valid.")
             
         return gene_to_mutate
-
-    def mutate(self) -> "CGP_Graph":
-        """
-        Mutate current graph and produce a new copy of an offspring.
-        """
-        offspring = copy.deepcopy(self)
-        offspring._mutate()
-        offspring._find_active_nodes()
-        return offspring
 
     def _create_random_genome(self, seed: int = None):
         if seed is not None:
@@ -275,17 +276,28 @@ class CGP_Graph:
             # raise ValueError(f"Invalid output gene at: {idx}")
         # Check connection genes
         for g in range(self._a):
-            c = self._genome_internal[:, :, g]
+            # c = self._genome_internal[:, :, g]
             for j in range(self._nc):
+                # TODO: Support for "allow_input_anywhere"
                 upper_bound, lower_bound = self._get_column_bounds(j)
-                # upper_bound = self._ni + j*self._nr
-                # if j >= self._l:
-                #     lower_bound = self._ni + (j - self._l)*self._nr
-                #     # assert np.all((self._ni + (j - self._l)*self._nr) <= c[:, j]) & np.all(c[:, j] < (self._ni + j*self._nr)), f"Connection gene invalid at column {j}"
+                for i in range(self._nr):
+                    v = self._genome_internal[i, j, g]
+                    if lower_bound <= v < upper_bound:
+                        # Check if valid for column
+                        continue
+                    elif self._allow_inputs and (0 <= v < self._ni):
+                        # Check if in input
+                        continue
+                    else:
+                        p = self.coord_to_flat_3d(i, j, g)
+                        raise AssertionError(f"Invalid connection gene at position {p} (Row: {i}, Column: {j}, Gene: {g}). " +
+                                             f"Valid range is [{lower_bound}, {upper_bound})" +
+                                             (f" or [0, {self._ni}). " if self._allow_inputs else ". ") +
+                                             f"Got value: {v}")
+                # if not self._allow_inputs:
+                #     assert np.all(lower_bound <= c[:, j]) & np.all(c[:, j] < upper_bound), f"Connection gene invalid at column {j}"
                 # else:
-                #     lower_bound = 0
-                #     # assert np.all(0 <= c[:, j]) & np.all(c[:, j] < (self._ni + j*self._nr)), f"Connection gene invalid at column {j}"
-                assert np.all(lower_bound <= c[:, j]) & np.all(c[:, j] < upper_bound), f"Connection gene invalid at column {j}"
+
 
     def _find_active_nodes(self):
         self._active_nodes = []
@@ -310,6 +322,8 @@ class CGP_Graph:
                         nodes_to_test.append(conn_gene)
         self._active_nodes = np.sort(np.array(self._active_nodes))
         
+    ## HELPER FUNCTIONs
+
     def flat_to_coord(self, idx: int) -> tuple:
         if idx < 0:
             raise Warning(f"Flat index {idx} should be non-negative integer")
@@ -332,6 +346,9 @@ class CGP_Graph:
     def coord_to_flat(self, i: int, j: int) -> int:
         return j * self._nr + i
 
+    def coord_to_flat_3d(self, i: int, j: int, k: int) -> int:
+        n = self.coord_to_flat(i, j)
+        return n * self._al + k
 
     def __equal__(self, other: 'CGP_Graph') -> bool:
         pass
@@ -358,7 +375,7 @@ class CGP_Graph:
     def arity(self):
         return self._a
     @property
-    def prev_layer(self):
+    def levels_back(self):
         return self._l
     
     @property

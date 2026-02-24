@@ -1,6 +1,10 @@
+from pathlib import Path
 from typing import Tuple
 import numpy as np
 from importlib import import_module
+from common.base import LearningRule
+
+import yaml
 
 TYPE_DICT = {
     "ann" : ("lrule.ann", "ANN_Rule"),
@@ -34,8 +38,39 @@ def create_learning_rule(type_: str = None, **kwargs):
             type_ = kwargs.pop("type")
         else:
             raise KeyError("\'type\' must be provided in params")
-    module_name, class_name = TYPE_DICT.get(type_)
-    module = import_module(module_name)
-    rule_cls = getattr(module, class_name)
+    rule_cls = _get_lrule_class(type_)
     instance = rule_cls(**kwargs)
     return instance
+
+def _get_lrule_class(lrule_type):
+    module_name, class_name = TYPE_DICT.get(lrule_type)
+    module = import_module(module_name)
+    rule_cls = getattr(module, class_name)
+    return rule_cls
+
+def read_learning_rule(parameter_path: str | Path, config_path: str | Path) -> LearningRule:
+    """
+    Construct learning rule from a parameter ".txt" file and config ".yaml" file.
+
+    The type is determined by the "type" key within "lrule_params" (default: ANN_Rule)
+    """
+    with open(config_path, 'r') as f:
+        config: dict = yaml.safe_load(f)
+
+    if "arule_params" in config:
+        lrule_params = config.get("arule_params")
+        lrule_type = "ann"
+    elif "lrule_params" in config:
+        lrule_params = config.get("lrule_params")
+        lrule_type = lrule_params.pop("type")
+        if lrule_type is None:
+            raise ValueError("\'type\' not given in \'lrule_params\' of config file")
+    else:
+        raise ValueError("Either \'lrule_params\' or \'arule_params\' sub-dictionary must exist within config file.")
+    
+    parameters = np.loadtxt(parameter_path, delimiter=',')
+    lrule_class = _get_lrule_class(lrule_type)
+
+    return lrule_class(parameters=parameters, **lrule_params)
+
+    

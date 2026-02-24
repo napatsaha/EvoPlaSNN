@@ -1,3 +1,12 @@
+v1.0.8
+- `run_rl.eval()` now uses `read_learning_rule` instead of `read_ANN_rule`
+- Created a generalised `read_learning_rule` which can handle any kind of rules supported by lrule module:
+    - First by getting `lrule_class` similar to `create_learning_rule` based on `type` field in `config` dictionary (default: ann_rule)
+    - Then reading from parameters as numpy array. (Would it cause problem in the future?)
+    - Then passing this as `parameters=` along with `lrule_params` in config
+- FIXED `_check_valid_genome` to allow `allow_inputs_anywhere` as well as more detailed error output
+- ADDED `coord_to_flat_3d` in `CGP_Graph`
+
 v1.0.7 (2026-02-23)
 - Changes to `evo.utils.create_solver` 
 - CGP_Graph check function_list is Callable
