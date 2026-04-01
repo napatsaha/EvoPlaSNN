@@ -1,10 +1,8 @@
 from typing import Literal
 
-from common.base import LearningRule
-from common.base import SynapseLayerProtocol
+from common.base import LearningRule, NeuronLayerProtocol, SynapseLayerProtocol
 import numpy as np
 # from .neurons import NeuronLayer
-from common.base import NeuronLayerProtocol
 from lrule import ANN_Rule, Empty_Rule, STDP_Rule
 # from .utils import tile
 from .utils import Array_FIFO
@@ -273,7 +271,7 @@ class SynapseLayer(SynapseLayerProtocol):
                 else:
                     idx_spike = comb_spike.nonzero()
 
-                    decay = self._elast_stdp[idx_spike] * np.exp(-self.etssp_stdp[idx_spike] * self.dt / self.tau_syn)
+                    decay = self._elast_stdp[idx_spike] * np.exp(-self._etssp_stdp[idx_spike] * self.dt / self.tau_syn)
 
                     post_trace = self.post_layer.get_trace()
                     pre_trace = self.pre_layer.get_trace()

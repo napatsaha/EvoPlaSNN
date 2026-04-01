@@ -768,7 +768,8 @@ def plot_learning_rule(lrule: 'LearningRule', simulator: 'SNNSimulator' = None, 
 
 def plot_fitness_generation(file_path: str | Path, *, estimator: str = "mean", errorband: str | tuple = ("pi", 100),
                             linecolor_best: str = "black", linecolor_est: str = "blue", pointcolor: str = "gray",
-                            sns_style: str = "whitegrid", sns_palette: str = "muted",
+                            sns_style: str = "whitegrid", sns_palette: str = "muted", figsize: tuple = None,
+                            title: str = None, subtitle: str = None, comment: str = None,
                             x_eps: int = 2, x_scale: float = 0.3, y_scale: float = 1.3, y_size: float = 10,
                             savepath: str | Path = None, show: bool = True):
     assert os.path.exists(file_path), f"File {file_path} does not exist."
@@ -784,7 +785,7 @@ def plot_fitness_generation(file_path: str | Path, *, estimator: str = "mean", e
     best_fts = res["best_fitness"].max()
     fts_range = res["avg_fitness"].max() - res["avg_fitness"].min()
 
-    fig, ax = plt.subplots(1, 1, figsize=(num_gens * x_scale, y_size))
+    fig, ax = plt.subplots(1, 1, figsize=(num_gens * x_scale, y_size) if figsize is None else figsize)
     # sns.set_theme(palette=sns_palette, style=sns_style)
     # Fitness per individual
     sns.stripplot(data=res, x="gen", y="avg_fitness",  size=5, ax=ax, alpha=0.5, color=pointcolor)
@@ -800,14 +801,15 @@ def plot_fitness_generation(file_path: str | Path, *, estimator: str = "mean", e
     ax.grid(True, which='both', linestyle='--', linewidth=0.5, alpha=0.5)
 
     ax.text(num_gens - 1, best_fts, f"{best_fts:.2f}", ha='right', va="bottom", fontsize=16, transform=ax.transData, color=linecolor_best)
-    title_main = f"Fitness Over Generations"
-    subtitle = f"({estimator.title()} Fitness +/- {errorband[1]} {errorband[0].upper()})"
+    title_main = f"Fitness Over Generations" if title is None else title
+    subtitle = f"({estimator.title()} Fitness +/- {errorband[1]} {errorband[0].upper()})" if subtitle is None else subtitle
+    comment = f"Run: {run_name}" if comment is None else comment
     fig.text(0.5, 0.95, title_main, ha='center', fontsize=24)
     fig.text(0.5, 0.90, subtitle, ha='center', fontsize=16)
-    ax.text(1.00, 1.05, f"Run: {run_name}", ha='right', fontsize=16, transform=ax.transAxes)
+    ax.text(1.00, 1.05, comment, ha='right', fontsize=16, transform=ax.transAxes)
 
     if savepath is not None:
-        plt.savefig(savepath)
+        plt.savefig(savepath, bbox_inches='tight')
     if show:
         plt.show()
     # plt.close(fig)

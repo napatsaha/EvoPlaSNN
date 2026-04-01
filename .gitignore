@@ -1,6 +1,7 @@
 jupyter/
 *.ipynb
 
+info/
 old/
 media/
 misc/

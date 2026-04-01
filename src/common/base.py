@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 import numpy as np
 
 
-from typing import Literal, Protocol
+from typing import Any, Literal, Protocol, List, Tuple, Dict
 
 
 class NeuronLayerProtocol(Protocol):
@@ -115,3 +115,20 @@ class SynapseLayerProtocol(Protocol):
         Update the eligibility trace based on the pre and post neuron layer spikes.
         """
         pass
+
+
+class SNNProtocol(Protocol):
+    """
+    Spiking Neural Network Protocol
+    """
+
+
+class SimulatorProtocol(Protocol):
+    """
+    SNN Simulator Protocol
+
+    Contains SNN, environment, etc
+    """
+
+    network: Any # Will fix later
+    environment: Any # Will fix later
