@@ -1,3 +1,9 @@
+v1.0.9
+- `rl.env.BaseMaze`
+    - `terminate_on_crash` -- enable episode termination when crashing into walls
+- `rl.maze.AdvTMaze`
+    - Version of T-Maze with adjustable corridor size (upper and central) + agent shifted starting position
+
 v1.0.8
 - `run_rl.eval()` now uses `read_learning_rule` instead of `read_ANN_rule`
 - Created a generalised `read_learning_rule` which can handle any kind of rules supported by lrule module:

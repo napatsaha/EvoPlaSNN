@@ -23,6 +23,38 @@ class TMaze(BaseMaze):
         self.maze[0, 0] = self.BAD
 
 
+class AdvTMaze(BaseMaze):
+    """
+    Advanced T-Maze with corridor size adjustment.
+    """
+    def __init__(self, size=None, width=None, height=None, pad=1, *, 
+                 corridor_size: int = 1, agent_start_shift: int = 0,
+                 corridor_size_upper: int = None, corridor_size_central: int = None,
+                 max_steps=50, randomise_start = False, random_min_dist = 0, obs_type = "state", include_agent_pos = False, reward_step_closer = False, terminate_on_crash = False, penalty = -0.1, reward_inter = 0.1, reward_bad = -1, reward_good = 1, reward_trunc = -1):
+        self.corridor_size = corridor_size
+        self._corridor_size_upper = corridor_size_upper if corridor_size_upper is not None else corridor_size
+        self._corridor_size_central = corridor_size_central if corridor_size_central is not None else corridor_size
+        self.agent_start_shift = agent_start_shift
+        super().__init__(size, width, height, pad, max_steps=max_steps, randomise_start=randomise_start, random_min_dist=random_min_dist, obs_type=obs_type, include_agent_pos=include_agent_pos, reward_step_closer=reward_step_closer, terminate_on_crash=terminate_on_crash, penalty=penalty, reward_inter=reward_inter, reward_bad=reward_bad, reward_good=reward_good, reward_trunc=reward_trunc)
+
+
+    @override
+    def _create_maze(self):
+        # Create empty array (filled with walls, as 1's)
+        self.maze = np.full((self.height, self.width), dtype=np.int8, fill_value=self.WALL)
+        # Central Corridor
+        mid_width = (self.width - self._corridor_size_central) // 2
+        self.maze[:, mid_width:(mid_width+self._corridor_size_central)] = self.EMPTY
+        # Upper Corridor
+        self.maze[0:self._corridor_size_upper, :] = self.EMPTY
+        # Set agent starting position
+        self.maze[-(1 + self.agent_start_shift), mid_width + self._corridor_size_upper//2] = self.AGENT
+        # Set good position at right wing of T
+        self.maze[0, -1] = self.GOOD
+        # Set bad position at left wing of T
+        self.maze[0, 0] = self.BAD
+
+
 class InvertedTMaze(BaseMaze):
     """
     T-Maze environment but with the T on the bottom.

@@ -80,6 +80,7 @@ class BaseMaze(gym.Env):
                  obs_type: Literal["state", "position", "surroundings"] = "state",
                  include_agent_pos: bool = False,
                  reward_step_closer: bool = False,
+                 terminate_on_crash: bool = False,
                  penalty: float = -0.1, reward_inter: float = 0.1,
                  reward_bad: float = -1.0, reward_good: float = 1.0, reward_trunc: float = -1.0):
         """
@@ -128,9 +129,11 @@ class BaseMaze(gym.Env):
         self.reward_good = reward_good
         self.reward_trunc = reward_trunc
         # Intermediate reward
-        self._check_closest_distance = reward_step_closer
         self.penalty = penalty
         self.reward_inter = reward_inter
+        # Controls for reward function
+        self._check_closest_distance = reward_step_closer
+        self.terminate_on_crash = terminate_on_crash
 
         # Observation type
         if obs_type not in ["state", "position", "surroundings"]:
@@ -261,6 +264,8 @@ class BaseMaze(gym.Env):
         if displaced_item == self.WALL:
             # Bumping into wall
             reward = self.penalty
+            if self.terminate_on_crash:
+                terminated = True
         elif displaced_item == self.AGENT:
             # Stationary case
             reward = 0.0
