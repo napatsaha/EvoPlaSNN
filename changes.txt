@@ -1,3 +1,6 @@
+v1.0.10
+- `rl.maze.DonutMaze` -- Programmable Donut Maze (previously read from maze_file), with customisable size and offsets
+
 v1.0.9
 - `rl.env.BaseMaze`
     - `terminate_on_crash` -- enable episode termination when crashing into walls

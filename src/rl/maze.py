@@ -55,6 +55,44 @@ class AdvTMaze(BaseMaze):
         self.maze[0, 0] = self.BAD
 
 
+class DonutMaze(BaseMaze):
+    """
+    Square Maze with diamond-shaped hole as obstacle in the middle
+    """
+    def __init__(self, size=None, width=None, height=None, pad=1, *, 
+                 hole_radius: int = 1, hole_offset_x: int = 0, hole_offset_y: int = 0,
+                 max_steps=50, randomise_start = False, random_min_dist = 0, obs_type = "state", include_agent_pos = False, reward_step_closer = False, terminate_on_crash = False, penalty = -0.1, reward_inter = 0.1, reward_bad = -1, reward_good = 1, reward_trunc = -1):
+        self.hole_radius = max(0, hole_radius)
+        self.hole_offset_x = hole_offset_x
+        self.hole_offset_y = hole_offset_y
+        super().__init__(size, width, height, pad, max_steps=max_steps, randomise_start=randomise_start, random_min_dist=random_min_dist, obs_type=obs_type, include_agent_pos=include_agent_pos, reward_step_closer=reward_step_closer, terminate_on_crash=terminate_on_crash, penalty=penalty, reward_inter=reward_inter, reward_bad=reward_bad, reward_good=reward_good, reward_trunc=reward_trunc)
+
+    def _create_maze(self):
+        # Start with rectangle empty maze
+        self.maze = np.full((self.height, self.width), dtype=np.int8, fill_value=self.EMPTY)
+        # Add diamond-shaped obstacle
+        hole_x = self.width // 2 + self.hole_offset_x
+        hole_y = self.height // 2 + self.hole_offset_y
+        for j in range(self.width):
+            for i in range(self.height):
+                if np.abs(j - hole_x) + np.abs(i - hole_y) <= self.hole_radius:
+                    self.maze[i, j] = self.WALL
+        # Put good and bad food
+        self.maze[0, 0] = self.GOOD
+        self.maze[0, -1] = self.BAD
+        # Put agent
+        j = self.width // 2
+        i = self.height - 1
+        while j >= 0 or i >= 0:
+            if self.maze[i, j] == self.EMPTY:
+                self.maze[i, j] = self.AGENT
+                break
+            if j > 0:
+                j -= 1
+            else:
+                i -= 1
+
+
 class InvertedTMaze(BaseMaze):
     """
     T-Maze environment but with the T on the bottom.
