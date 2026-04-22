@@ -498,6 +498,8 @@ class SNNSimulator:
             elif self.decay_method == "constant":
                 # Decay by multiplying with a constant
                 new_rate = self.network.get_exploration_rate(simplify=True) * self.decay_rate
+            else:
+                new_rate = None
             self.network.set_exploration_rate(new_rate)
         else:
             # Cease exploration and make deterministic

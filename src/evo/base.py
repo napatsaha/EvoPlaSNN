@@ -84,11 +84,12 @@ class Evaluator(Protocol):
         """
         pass
 
+
 class BaseSolver(Solver):
     solutions: List['Genome']
 
     def __init__(self, ndim: int = 2, popsize: int = None, minimise: bool = True):
-        self.solutions: List | np.ndarray = []
+        self._solutions = []
         self.ndim = ndim
         self.popsize = popsize if popsize is not None else int(4 + np.floor(3 + np.log(self.ndim)))
         self.minimise = minimise
@@ -96,7 +97,7 @@ class BaseSolver(Solver):
 
     def reset(self):
         self.fitnesses = np.zeros(self.popsize)
-        self.solutions = []
+        self._solutions = []
         self.best_fitness = None
         self.best_solution = None
 
@@ -117,7 +118,7 @@ class BaseSolver(Solver):
         #     # Last n fitness in descending order
         #     top_indices = top_indices[-n:][::-1]
         print(top_indices)
-        top_solutions = np.take(self.solutions, top_indices)
+        top_solutions = self.take_solutions(top_indices, return_array=False)
         for i in range(n):
             sol = top_solutions[i]
             if isinstance(sol, Genome):
@@ -126,15 +127,61 @@ class BaseSolver(Solver):
             np.savetxt(Path(save_dir) / f"best_rule_{i}.txt", sol, fmt=f'%.{precision}f')
 
     @override
-    def result(self) -> Tuple[np.ndarray, float]:
+    def result(self) -> Tuple['Genome', float]:
         """Return the best solution and its fitness."""
         return self.best_solution, self.best_fitness
     
+    def take_solutions(self, indices: int | List | np.ndarray, return_array: bool = False):
+        """
+        A safe method for bulk indexing Genome objects within `solutions` list.
+
+        If `return_array=True`, returns a concatenated 2D array of Genome parameters.
+        If `return_arrray=False`, returns a list of Genome objects.
+        """
+        if isinstance(indices, int):
+            indices = [indices]
+        if return_array: # Return a 2D array of concatenated solutions
+            return np.c_[[sol.parameters for i, sol in enumerate(self.solutions) if i in indices]]
+        else:
+            return [sol for i, sol in enumerate(self.solutions) if i in indices]
+
+    @property
+    def solutions(self):
+        return self._solutions
+    @solutions.setter
+    def solutions(self, values: List):
+        if len(values) == 0:
+            self._solutions = []
+        elif isinstance(values, List):
+            self._solutions = []
+            for val in values:
+                if isinstance(val, Genome):
+                    self._solutions.append(val)
+                else:
+                    try:
+                        sol = Genome(val)
+                        self._solutions.append(sol)
+                    except:
+                        raise ValueError("Cannot convert solutions into Genome")
+        elif isinstance(values, np.ndarray):
+            self._solutions = []
+            for ind in range(self.popsize):
+                sol = values[ind]
+                try:
+                    self._solutions.append(Genome(sol))
+                except:
+                    raise ValueError("Cannot convert solutions into Genome")
+
+
 
 class Genome(ABC):
     """
     Base class to allow for genetic-related operations in evolutionary Solver.
     """
+    def __init__(self, parameters = None, **kwargs):
+        super().__init__()
+        self._parameters = parameters
+
     def mutate(self) -> 'Genome':
         """
         Create a modified copy of itself
@@ -146,11 +193,14 @@ class Genome(ABC):
         """
         Returns a 1D genetic blueprint of the genome
         """
-        pass
+        return self._parameters
 
     @property
     def size(self) -> int:
         """
         Returns the number of parameters that exists in the genome
         """
-        pass
+        return len(self._parameters)
+
+    def __repr__(self) -> str:
+        return f"Genome({self.parameters})"

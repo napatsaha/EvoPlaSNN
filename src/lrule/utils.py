@@ -33,9 +33,14 @@ def tile_array(target_shape: Tuple[int, int], vec_in: np.ndarray, vec_out: np.nd
 
 
 def create_learning_rule(type_: str = None, **kwargs):
+    """
+    Factory method for creating instance of a Learning Rule object, based on `type`
+    """
     if type_ is None:
         if "type" in kwargs:
             type_ = kwargs.pop("type")
+        elif "name" in kwargs:
+            type_ = kwargs.pop("name")
         else:
             raise KeyError("\'type\' must be provided in params")
     rule_cls = _get_lrule_class(type_)

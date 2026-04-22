@@ -94,14 +94,29 @@ class BaseMaze(gym.Env):
 
             height (int, optional): The height of the environment. Defaults to None.
 
-            pad (int, optional): The padding around the environment. Defaults to 1.
+            pad (int, optional): The outer padding of Walls around the maze. Defaults to 1.
 
-            max_steps (int, optional): The maximum number of steps allowed in the environment. Defaults to 50.
+            max_steps (int, optional): The maximum number of environment steps before truncation. Defaults to 50.
+
+            randomise_start (bool, optional): Whether or not to allow agent to spawn at random position at beginning of each episode. Defaults to False.
+
+            random_min_dist (int, optional): If `randomise_start=True`, this variable controls which cells are allowed for random agent spawn position. If
+                the Euclidean distance between a cell and either of the good or bad reward is greater than or equal to `random_min_dist`, then that cell is included.
+                Defaults to 0.
+
+            obs_type (str, optional): Determines what type of observation to be returned:
+                - `state` returns a single integer scalar denoting the cell index of the maze the agent is in.
+                - `position` returns a i-j indexing tuple of the position of the agent
+                - `surrounding` returns 8-length array showing the type of objects (0-4) in the 8 adjacent cells of the agent.
+                Defaults to `state`.
 
             reward_step_closer (bool, optional): Whether to reward the agent for stepping closer to the goal 
                 (by comparing whether the Manhattan distance between agent and goal is closer than has ever been in this episode). Defaults to False.
 
-            penalty (float, optional): The intermediate penalty for agent bumping into walls. Defaults to -0.1.
+            terminate_on_crash (bool, optional): Controls whether the episode will terminate when agent moves into a Wall cell. If True, the end-of-episode reward
+                will use the `penalty` parameter. Defaults to False.
+
+            penalty (float, optional): The returned reward when an agent bumps into a Wall cell. Defaults to -0.1.
 
             reward_inter (float, optional): The intermediate reward for either stepping into empty cell (if `reward_step_closer=False`)
                 or getting closer to goal (if `reward_step_closer=True`). Defaults to 0.1.
@@ -185,7 +200,7 @@ class BaseMaze(gym.Env):
         self.min_steps = man_dist(self._agent_pos, self._good_pos).item()
 
     def _create_maze(self):
-        raise NotImplementedError("Subclasses must implement _create_maze() method.")
+        raise NotImplementedError("Subclasses must implement the `_create_maze()` method.")
         # # Create empty array (filled with walls, as 1's)
         # self.maze = np.full((self.height, self.width), dtype=np.int8, fill_value=self.WALL)
         # # Add traversing paths (as 0's)

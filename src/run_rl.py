@@ -80,6 +80,10 @@ def main(config_file: str | Path | dict, *, config_overrides: dict = None, paren
     results_path.mkdir(parents=True, exist_ok=True)
 
     # manager_type = config["evo_params"]["manager"].pop("type", "original")
+    # Rename config["arule_params"] to config["lrule_params"] if exist
+    if "arule_params" in config:
+        config["lrule_params"] = config.get("lrule_params", {}).update(config["arule_params"])
+        del config["arule_params"]
 
     # Configure SNN Evaluator object
     evaluator: Evaluator = RL_Evaluator(
@@ -89,7 +93,8 @@ def main(config_file: str | Path | dict, *, config_overrides: dict = None, paren
     )
 
     # Configure Evolution Solver object
-    # config["evo_params"]["solver"]["ndim"] = evaluator.get_parameter_size()
+    if config["lrule_params"]["type"] == "ann":
+        config["evo_params"]["solver"]["ndim"] = evaluator.get_parameter_size()
     config["evo_params"]["solver"]["minimise"] = evaluator.is_minimise()
     solver = create_solver(config["evo_params"]["solver"], **config["lrule_params"])
     if "popsize" not in config["evo_params"]["solver"]:

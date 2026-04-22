@@ -31,6 +31,17 @@ class AdvTMaze(BaseMaze):
                  corridor_size: int = 1, agent_start_shift: int = 0,
                  corridor_size_upper: int = None, corridor_size_central: int = None,
                  max_steps=50, randomise_start = False, random_min_dist = 0, obs_type = "state", include_agent_pos = False, reward_step_closer = False, terminate_on_crash = False, penalty = -0.1, reward_inter = 0.1, reward_bad = -1, reward_good = 1, reward_trunc = -1):
+        """
+        Args:
+            corridor_size (int, optional): Width of the T-Maze corridor. Controls both vertical and horizontal arm. Defaults to 1.
+
+            corridor_size_upper (int, optional): Width of the horizontal corridor of the T-Maze. Defaults to `corridor_size` if None.
+
+            corridor_size_central (int, optional): Width of the vertical, central corridor of the T-Maze. Defaults to `corridor_size` if None.
+
+            agent_start_shift (int, optional): Controls how far up from the bottom of the T-Maze the agent should start from. 
+                Useful for when corridor is wide and agent needs to start equidistant from any wall. Defaults to 0.
+        """
         self.corridor_size = corridor_size
         self._corridor_size_upper = corridor_size_upper if corridor_size_upper is not None else corridor_size
         self._corridor_size_central = corridor_size_central if corridor_size_central is not None else corridor_size
@@ -62,6 +73,12 @@ class DonutMaze(BaseMaze):
     def __init__(self, size=None, width=None, height=None, pad=1, *, 
                  hole_radius: int = 1, hole_offset_x: int = 0, hole_offset_y: int = 0,
                  max_steps=50, randomise_start = False, random_min_dist = 0, obs_type = "state", include_agent_pos = False, reward_step_closer = False, terminate_on_crash = False, penalty = -0.1, reward_inter = 0.1, reward_bad = -1, reward_good = 1, reward_trunc = -1):
+        """
+        Args:
+            hole_radius (int): Radius of the diamond-shaped central obstacle (including the center cell). Which means when `hole_radius = 1`, there is still a single cell of obstacle
+            hole_offset_x (int): X-Axis transpose of hole center
+            hole_offset_y (int): Y-Axis transpose of hole center
+        """
         self.hole_radius = max(0, hole_radius)
         self.hole_offset_x = hole_offset_x
         self.hole_offset_y = hole_offset_y

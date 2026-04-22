@@ -15,7 +15,7 @@ class CMA_ES(BaseSolver):
     This version neglects Step-Size Control (`sigma`) in the full implementation, and only applies Rank-$$\mu$$ and Rank-one updates to the covariance matrix.
     Equivalent to Section 3.4, Equation (30) of the tutorial paper.
     """
-    def __init__(self, ndim: int = 2, popsize: int = None, minimise: bool = True, *, n_best: int = None, sigma: float = 1.0, seed: int = None):
+    def __init__(self, ndim: int = 2, popsize: int = None, minimise: bool = True, *, n_best: int = None, sigma: float = 1.0, seed: int = None, **kwargs):
         super().__init__(ndim, popsize, minimise)
         # Random generation
         self.rng = np.random.default_rng(seed)
@@ -44,7 +44,7 @@ class CMA_ES(BaseSolver):
     def ask(self):
         solutions = self.rng.multivariate_normal(self.mean, self.cov, size=(self.popsize, ))
         self.solutions = solutions
-        return solutions
+        return self.solutions
     
     @override
     def tell(self, fitnesses):
@@ -53,7 +53,7 @@ class CMA_ES(BaseSolver):
 
         # Select parents
         best_indices = np.argsort(fitnesses)[:self.n_best] if self.minimise else np.argsort(fitnesses)[:-self.n_best-1:-1]
-        x_best = self.solutions[best_indices]
+        x_best = self.take_solutions(best_indices, return_array=True)
 
         # Find new mean
         mean_old = self.mean.copy()

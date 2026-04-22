@@ -131,9 +131,10 @@ class SNN:
                 return values[0]
         return np.asarray(values)
 
-    def set_exploration_rate(self, value):
-        for neuron_layer in self.neuron_layers[1:]:
-            neuron_layer.softmax_temp = value
+    def set_exploration_rate(self, value: float = None):
+        if value is not None:
+            for neuron_layer in self.neuron_layers[1:]:
+                neuron_layer.softmax_temp = value
 
     def set_deterministic(self):
         for neuron_layer in self.neuron_layers[1:]:

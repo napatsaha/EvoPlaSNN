@@ -59,6 +59,8 @@ class LearningRule(ABC):
     """
     Abstract base class for learning rules.
     """
+    parameters: np.ndarray | List
+    
     def __init__(self):
         pass
 

@@ -29,6 +29,7 @@ def create_solver(params: dict, **kwargs) -> BaseSolver:
         solver_type = params.pop("type")
     else:
         raise Warning("Solver type not provided. Using \'Simple ES\'")
+    solver_type = solver_type.lower().replace("-", "_")
     module_name, class_name = ALGO_DICT.get(solver_type)
     module = import_module(module_name)
     obj_class = getattr(module, class_name)

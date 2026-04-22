@@ -1,3 +1,26 @@
+v1.0.11
+- Various changes to prepare for training again, and reconciling ANN_Rule and CGP_Rule
+- `run_rl.py`:
+    - A boolean check to `get_parameter_size()` before creating solver, if the learning rule is "ann". 
+      Otherwise, `ndim` will be pulled from solver into config
+    - Properly renaming of "arule_params" to "lrule_params" in config
+- `eval.py`:
+    - use `create_learning_rule` factory method for initiating LearningRule
+    - in `.evaluate()`, handles `LearningRule` (meant for `CGP_Rule`) and `Genome` (meant for other rules) objects differently
+- Refactor `ANN_Rule` to be a subclass of `BaseLearningRule` (similar to `CGP_Rule`)
+- `evo.base.BaseSolver` and `evo.cma_es.CMA_ES`:
+    - `solutions` property is a list of `Genome` objects
+    - A helper `take_solutions` function to handle multi-dimensional array from `solutions`
+    - Ensured `ask` and `tell` methods of CMA-ES treat solutions properly
+    - This is to reconcile `ANN_Rule` and `CGP_Rule`
+- Misc:
+    - Ensure `evo.utils.create_solver` treat "CMA-ES" the same as "cma_es" after using new factory method from before
+    - `SNN.set_exploration_rate(value)` -- value is optional
+    - `BaseMaze` and `AdvTMaze` -- Documentation
+
+
+
+
 v1.0.10
 - `rl.maze.DonutMaze` -- Programmable Donut Maze (previously read from maze_file), with customisable size and offsets
 
