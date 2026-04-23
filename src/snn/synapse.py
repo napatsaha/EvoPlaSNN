@@ -3,7 +3,7 @@ from typing import Literal
 from common.base import LearningRule, NeuronLayerProtocol, SynapseLayerProtocol
 import numpy as np
 # from .neurons import NeuronLayer
-from lrule import ANN_Rule, Empty_Rule, STDP_Rule
+from lrule import Empty_Rule
 # from .utils import tile
 from .utils import Array_FIFO
 

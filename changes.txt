@@ -1,3 +1,11 @@
+v1.0.12
+- Minor changes:
+    - `mu_lambda.py` -- Apply `take_solutions` method to operations in this solver
+    - `ann.py` -- update `read_ANN_Rule` to reflect new changes
+    - *** `cgp.py` -- important changes to how CGP_Graph transform inputs inside `forward()`
+    - `stdp.py` -- replaces other STDP with a simple multiplication R-STDP rule
+    - `rl/eval.py` -- log_level 1 now omits recording intermediate fitness at each trial
+
 v1.0.11
 - Various changes to prepare for training again, and reconciling ANN_Rule and CGP_Rule
 - `run_rl.py`:

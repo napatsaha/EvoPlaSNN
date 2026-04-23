@@ -108,7 +108,7 @@ class RL_Evaluator(Evaluator):
 
     def setup_logger(self, results_path: Path = None):
         self.results_path = results_path
-        self._log_info = max(1, self._log_info)
+        self._log_info = max(0, self._log_info)
         # Set up logging to record runtime information
         self._logfile_name = "log_trials.log"
         handler = logging.StreamHandler() if results_path is None else logging.FileHandler(results_path / self._logfile_name)
@@ -129,6 +129,7 @@ class RL_Evaluator(Evaluator):
             self._fits_trial_file = "fitness_per_trial.csv"
             with open(self.results_path / self._fits_trial_file, "w") as f:
                 f.write("gen,indiv,trial,fitness,intermediate\n")
+        if self._log_info >= 1:
             self._fits_indiv_file = "fitness_per_indiv.csv"
             with open(self.results_path / self._fits_indiv_file, "w") as f:
                 f.write("gen,indiv,avg_fitness,std_fitness\n")
@@ -185,7 +186,7 @@ class RL_Evaluator(Evaluator):
             # Final Fitness
             fitness = self.reward_collector.get_fitness()
             fitnesses.append(fitness)
-            if self._log_info >= 1:
+            if self._log_info >= 2:
                 self.logger.info(f"Trial {i+1}/{num_trials}: Time taken: {t1 - t0:.4f} seconds.")
                 # Get intermediate fitness across samples
                 intermediate_fitness = self.simulator.get_intermediate_fitness(use_cutoff=True) if self.record_inter_fitness else None
@@ -250,7 +251,7 @@ class RL_Evaluator(Evaluator):
         """
         Records generation number, individual number, trial number, final fitness, and intermediate fitness at the end of each trial.
         """
-        if self.results_path is not None and self._log_info >= 2:
+        if self.results_path is not None and self._fits_trial_file is not None:
             with open(self.results_path / self._fits_trial_file, "a") as f:
                 if inter_fitness is not None:
                     inter_fitness_str = ','.join([f"{fit:.{precision}f}" for fit in inter_fitness])
@@ -262,7 +263,7 @@ class RL_Evaluator(Evaluator):
         """
         Records generation number, individual number, average fitness, and standard deviation of fitness for each individual.
         """
-        if self.results_path is not None and self._log_info >= 2:
+        if self.results_path is not None and self._fits_indiv_file is not None:
             with open(self.results_path / self._fits_indiv_file, "a") as f:
                 f.write(f"{gen},{indiv},{avg_fitness:.{precision}f},{std_fitness:.{precision}f}\n")
 
@@ -270,7 +271,17 @@ class RL_Evaluator(Evaluator):
         """
         Records generation number, individual number, and genome for each individual.
         """
-        if self.results_path is not None and self._log_info >= 2:
+        if self.results_path is not None and self._genome_file is not None:
             with open(self.results_path / self._genome_file, "a") as f:
                 genome_str = ','.join([f"{param:.{precision}f}" for param in genome])
                 f.write(f"{gen},{indiv},{genome_str}\n")
+
+    @property
+    def log_level(self) -> int:
+        """
+        How detailed to record things:  
+        Level 0: No files recorded
+        Level 1: Genome and Individual average fitness recorded
+        Level 2: Trial intermediate fitness recorded
+        """
+        return self._log_info

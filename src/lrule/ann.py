@@ -491,4 +491,10 @@ def read_ANN_Rule(parameter_path: str, config_path: str) -> ANN_Rule:
         config = yaml.safe_load(f)
     
     parameters = np.loadtxt(parameter_path, delimiter=',')
-    return ANN_Rule(parameters=parameters, **config["arule_params"])
+    if "arule_params" in config:
+        config["lrule_params"] = config["arule_params"]
+    if "type" in config["lrule_params"]:
+        lrule_type = config["lrule_params"].pop("type")
+        if lrule_type != "ann":
+            raise ValueError("Only lrule_params with type='ann' can be used to construct an ANN Rule.")
+    return ANN_Rule(parameters=parameters, **config["lrule_params"])

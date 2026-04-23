@@ -10,8 +10,8 @@ TYPE_DICT = {
     "ann" : ("lrule.ann", "ANN_Rule"),
     "cgp" : ("lrule.cgp", "CGP_Rule"),
     "graph" : ("lrule.cgp", "CGP_Graph"),
-    "stdp" : ("lrule.stdp", "STDP_Rule"),
-    "rstdp" : ("lrule.stdp", "R_STDP")
+    # "stdp" : ("lrule.stdp", "STDP_Rule"),
+    "rstdp" : ("lrule.stdp", "R_STDP_Rule")
 }
 
 

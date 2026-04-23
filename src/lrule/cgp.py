@@ -130,8 +130,8 @@ class CGP_Graph:
 
     def forward(self, inp: ArrayLike, squeeze: bool = False):
         # inp = np.squeeze(inp) # Remove empty dimension
-        inp = inp.reshape(self._ni, -1) # Remove superfluous dimensions
-        ns = 1 if inp.ndim == 1 else inp.shape[-1] # assume sample is in last dimension after squeezing
+        ns = 1 if inp.ndim == 1 else inp.shape[0] # assume sample is in first dimension 
+        inp = inp.T # Reshape for putting into output storage
         self.reset(ns_in=ns)
         self._node_outputs[:self._ni, :] = inp
 
