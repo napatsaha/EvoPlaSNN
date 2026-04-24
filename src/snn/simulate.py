@@ -201,7 +201,7 @@ class SNNSimulator:
         self.spike_coder.reset()
         self.env.reset()
         if self.reward_collector is not None:
-            self.reward_collector.reset()
+            self.reward_collector.soft_reset()
         if self.trajectory_collector is not None:
             self.trajectory_collector.reset()
         # Reset other recorders
@@ -405,7 +405,7 @@ class SNNSimulator:
         if self.reward_collector is None:
             Warning("Reward collector is not set. Intermediate fitness cannot be calculated.")
             return None
-        return self.reward_collector.get_rewards(cutoff=self.decay_cutoff if use_cutoff else None)
+        return self.reward_collector.get_intermediate_fitness(cutoff=self.decay_cutoff if use_cutoff else None)
 
     def get_episode_timestamps(self, use_cutoff: bool = False) -> np.ndarray[int] | None:
         if self.reward_collector is None:

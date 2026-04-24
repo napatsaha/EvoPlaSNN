@@ -669,7 +669,7 @@ def plot_intermediate_fitness(simulator: 'SNN_Simulator' = None, values: np.ndar
         ax.xaxis.set_major_locator(plt.MultipleLocator(100))
     ax.set_xlim(t_min - x_eps, t_max + x_eps)
     ax.set_xlabel("Time (steps)")
-    ax.set_ylabel("Fitness")
+    ax.set_ylabel("Episode " + simulator.reward_collector.fitness_type.title())
     if plot_exploration:
         ax = axs[1, 0]
         expl = simulator.reward_collector.get_explorations()
@@ -686,7 +686,8 @@ def plot_intermediate_fitness(simulator: 'SNN_Simulator' = None, values: np.ndar
         ax.set_xlabel("Time (steps)")
         ax.set_ylabel("Exploration Rate")
     fig.text(0.5, 1.07, "Intermediate Fitness Over Time", ha='center', fontsize=20)
-    fig.text(0.5, 1.02, f"Average Fitness: {ft:.2f}", ha='center', fontsize=14)
+    agg_func = simulator.reward_collector.fitness_agg_func
+    fig.text(0.5, 1.02, f"{agg_func.title()} Fitness: {ft:.2f}", ha='center', fontsize=14)
     if savepath is not None:
         plt.savefig(savepath)
     if show:
