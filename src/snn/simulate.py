@@ -295,7 +295,7 @@ class SNNSimulator:
                             exploration=self.network.get_exploration_rate(simplify=True),
                             terminated=terminated,
                             truncated=truncated)
-                    self.env.reset()
+                    # self.env.reset()
                     state, info = self.env.reset()
                     starting_state = self.env.get_agent_state()
                     episode_count += 1

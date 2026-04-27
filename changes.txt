@@ -1,3 +1,8 @@
+v1.0.14
+- Fix Genome.parameter issue in `MuPlusLambda`
+- Added `simplify` argument to `BaseSolver.take_solutions()`
+- Allow 'type' to persist within `evo_params.solver` config after creation. Edited `evo.utils.create_solver()`
+
 v1.0.13
 - Adds new customisation to fitness function of `RewardCollector`:
     - `fitness_type`

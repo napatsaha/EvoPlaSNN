@@ -56,15 +56,19 @@ class MuPlusLambda(BaseSolver):
         return self.solutions
 
     def tell(self, fitnesses):
-        assert len(fitnesses) == len(self.solutions)
-        self.fitnesses = fitnesses
+        # assert len(fitnesses) == len(self.solutions)
+        # self.fitnesses = fitnesses
+        # if not self.minimise:
+        #     fitnesses = -fitnesses
+        # idx_best = np.argsort(fitnesses)[:self.mu]
+        # self.best_fitness = fitnesses[idx_best[0]]
+        # self.best_solution = self.take_solutions(idx_best[0])
+        super().tell(fitnesses)
+
+        # TODO: Deal with fitness ties between parent and offspring (choose offspring)
         if not self.minimise:
             fitnesses = -fitnesses
         idx_best = np.argsort(fitnesses)[:self.mu]
-        self.best_fitness = fitnesses[idx_best[0]]
-        self.best_solution = self.take_solutions(idx_best[0])
-
-        # TODO: Deal with fitness ties between parent and offspring (choose offspring)
         self.parents = self.take_solutions(idx_best)
 
         self._generate_offspring()

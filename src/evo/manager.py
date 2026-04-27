@@ -6,7 +6,7 @@ from tqdm import tqdm
 import numpy as np
 
 
-from .base import BaseSolver, Evaluator
+from .base import BaseSolver, Evaluator, Genome
 
 
 class EvoManager:
@@ -137,9 +137,10 @@ class EvoManager:
             t1 = time.time()
             dt = t1 - t0
 
-
+        if isinstance(best_solution, Genome):
+            best_solution = best_solution.parameters.round(4)
         self.logger.info("Terminating Evolutionary optimisation.")
-        self.logger.info(f"Best solution: {best_solution.parameters.round(4)}")
+        self.logger.info(f"Best solution: {best_solution}")
         self.logger.info(f"Best fitness: {best_fitness:.3f}")
         self.logger.info(f"Total time taken: {dt // 3600} hours, {(dt % 3600) // 60} minutes, {dt % 60:.2f} seconds")
         self.logger.info(f"Total generations: {gen_count}")

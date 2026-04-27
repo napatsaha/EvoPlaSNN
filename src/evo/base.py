@@ -131,19 +131,27 @@ class BaseSolver(Solver):
         """Return the best solution and its fitness."""
         return self.best_solution, self.best_fitness
     
-    def take_solutions(self, indices: int | List | np.ndarray, return_array: bool = False):
+    def take_solutions(self, indices: int | List | np.ndarray, return_array: bool = False, simplify: bool = True):
         """
         A safe method for bulk indexing Genome objects within `solutions` list.
 
         If `return_array=True`, returns a concatenated 2D array of Genome parameters.
         If `return_arrray=False`, returns a list of Genome objects.
         """
-        if isinstance(indices, int):
+        if isinstance(indices, int) or isinstance(indices, np.int_):
             indices = [indices]
         if return_array: # Return a 2D array of concatenated solutions
-            return np.c_[[sol.parameters for i, sol in enumerate(self.solutions) if i in indices]]
+            sols = np.c_[[sol.parameters for i, sol in enumerate(self.solutions) if i in indices]]
+            if simplify:
+                return np.squeeze(sols)
+            else:
+                return sols
         else:
-            return [sol for i, sol in enumerate(self.solutions) if i in indices]
+            sols = [sol for i, sol in enumerate(self.solutions) if i in indices]
+            if simplify and len(sols) == 1:
+                return sols[0]
+            else:
+                return sols
 
     @property
     def solutions(self):

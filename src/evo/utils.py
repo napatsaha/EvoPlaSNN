@@ -25,6 +25,7 @@ module_dict = {
 }
 
 def create_solver(params: dict, **kwargs) -> BaseSolver:
+    params = params.copy()
     if "type" in params:
         solver_type = params.pop("type")
     else:
