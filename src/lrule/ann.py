@@ -3,6 +3,7 @@ from typing import Callable, List, Literal
 from common.utils import solve_hidden, calculate_size
 # from snn.base import SynapseLayerProtocol
 from common.base import LearningRule, SynapseLayerProtocol
+from common.base import Genome
 from .utils import tile_array
 from .base import BaseLearningRule
 
@@ -263,7 +264,7 @@ class ANN:
         return s
 
 
-class ANN_Rule(BaseLearningRule):
+class ANN_Rule(BaseLearningRule, Genome):
     """
     A Learning Rule that represents a black box ANN function that converts synapse-related information to weight updates.
     """
@@ -277,6 +278,9 @@ class ANN_Rule(BaseLearningRule):
                 }
 
     def __init__(self, parameters=None, *, 
+                 hidden_size: List | int = None, bias: bool = True,
+                 hidden_activation: str = None, output_activation: str = None,
+                 weight_dist: Literal["uniform", "normal"] = "uniform",
                  learning_rate: float = 1.0, learning_rate_thr: float = 0.1, threshold_agg_func: Literal["max", "min", "mean", "sum"] = "mean",
                  delta_weight: bool = True, delta_threshold: bool = False,
                  use_trace_pre: bool = False, use_trace_post: bool = False, use_weights: bool = True, use_reward: bool = False, 
@@ -289,8 +293,12 @@ class ANN_Rule(BaseLearningRule):
                         **kwargs)
 
         # Construct an ANN
-        self.ann = ANN(input_size=self.input_size, output_size=self.output_size, parameters=parameters, **kwargs)
+        self.ann = ANN(input_size=self.input_size, output_size=self.output_size, parameters=parameters, 
+                       hidden_size=hidden_size, hidden_activation=hidden_activation, output_activation=output_activation,
+                       bias=bias, weight_dist=weight_dist,
+                       **kwargs)
 
+        # self.weight_dist = self.ann.weight_dist
 
     # def __init__(self, parameters = None, *, 
     #              learning_rate: float = 1.0, learning_rate_thr: float = 0.1, threshold_agg_func: Literal["max", "min", "mean", "sum"] = "mean",
@@ -328,6 +336,18 @@ class ANN_Rule(BaseLearningRule):
 
     def forward(self, inp):
         return self.ann.forward(inp)
+
+    def mutate(self, rate: float) -> 'ANN_Rule':
+        genome = self.parameters.copy()
+        rate = np.clip(rate, 0, 1, dtype=np.float32)
+        gene_to_mutate = np.random.randint(self.size, size=(int(rate*self.size), ))
+        for gene_id in gene_to_mutate:
+            if self.ann.weight_dist == "uniform":
+                genome[gene_id] = np.random.rand()
+            elif self.ann.weight_dist == "normal":
+                genome[gene_id] = np.random.randn()
+        return genome
+        # return self.__class__(parameters=genome, **self.__dict__)
 
     # def update(self, synapse: SynapseLayerProtocol, reward: float = None, always_return_tuple: bool = False) -> np.ndarray: 
     #     """
@@ -469,7 +489,7 @@ class ANN_Rule(BaseLearningRule):
     def __repr__(self):
         # return f"ANN_Rule(parameters_size={self.size}, use_trace_pre={self.use_trace_pre}, use_trace_post={self.use_trace_post}, use_weights={self.use_weights}, use_reward={self.use_reward}, " + \
         # f"hidden_size={self.ann.hidden_sizes}, bias={self.ann.bias})"
-        return f"ANN_Rule(size={self.size}, inputs={self.input_order}, outputs={self.output_order}, " + \
+        return f"ANN_Rule(parameters={self.parameters.round(2)}, size={self.size}, inputs={self.input_order}, outputs={self.output_order}, " + \
             f"learning_rate={[self.learning_rate, self.learning_rate_thr]})"
     
     def __str__(self):

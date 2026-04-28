@@ -1,5 +1,7 @@
 from typing import Tuple, override
 from pathlib import Path
+from common.base import Genome
+from common.utils import create_learning_rule
 import numpy as np
 
 from .base import BaseSolver
@@ -15,8 +17,13 @@ class CMA_ES(BaseSolver):
     This version neglects Step-Size Control (`sigma`) in the full implementation, and only applies Rank-$$\mu$$ and Rank-one updates to the covariance matrix.
     Equivalent to Section 3.4, Equation (30) of the tutorial paper.
     """
-    def __init__(self, ndim: int = 2, popsize: int = None, minimise: bool = True, *, n_best: int = None, sigma: float = 1.0, seed: int = None, **kwargs):
-        super().__init__(ndim, popsize, minimise)
+    def __init__(self, ndim: int = 2, popsize: int = None, minimise: bool = True, *, n_best: int = None, sigma: float = 1.0, seed: int = None,
+                 mu_eff:float = None, c_c: float = None, c_1: float = None, c_mu: float = None,
+                  **kwargs):
+        super().__init__(ndim, popsize, minimise, **kwargs)
+        self._generate_new_population()
+        self.ndim = self.solutions[0].size
+
         # Random generation
         self.rng = np.random.default_rng(seed)
 
@@ -26,24 +33,32 @@ class CMA_ES(BaseSolver):
         # Sizes and weights
         self.weights = np.log((self.n_best + 1) / 2) - np.log(np.arange(1, self.n_best + 1))
         self.weights /= np.sum(self.weights)
-        self.mu_eff = 1 / np.sum(self.weights ** 2) # Variance effective selection mass 
+        # Variance effective selection mass 
+        self.mu_eff = 1 / np.sum(self.weights ** 2) if mu_eff is None else mu_eff
 
         # Distribution parameters
-        self.mean = np.zeros(ndim)
-        self.cov = np.eye(ndim)
+        self.mean = np.zeros(self.ndim)
+        self.cov = np.eye(self.ndim)
         self.sigma = sigma
         # Evolution path
-        self.pc = np.zeros(ndim)
+        self.pc = np.zeros(self.ndim)
 
         # Cov Adaptation parameters
-        self.c_c = (4 + self.mu_eff / self.ndim) / (self.ndim + 4 + 2 * self.mu_eff / self.ndim)
-        self.c_1 = 2 / ((self.ndim + 1.3)**2 + self.mu_eff)
-        self.c_mu = min(1 - self.c_1, 2 * (self.mu_eff + 1/self.mu_eff - 2) / ((self.ndim+2)**2 + self.mu_eff))
+        self.c_c = (4 + self.mu_eff / self.ndim) / (self.ndim + 4 + 2 * self.mu_eff / self.ndim) if c_c is None else c_c
+        self.c_1 = 2 / ((self.ndim + 1.3)**2 + self.mu_eff) if c_1 is None else c_1
+        self.c_mu = min(1 - self.c_1, 2 * (self.mu_eff + 1/self.mu_eff - 2) / ((self.ndim+2)**2 + self.mu_eff)) if c_mu is None else c_mu
         
     @override
     def ask(self):
-        solutions = self.rng.multivariate_normal(self.mean, self.cov, size=(self.popsize, ))
-        self.solutions = solutions
+        samples = self.rng.multivariate_normal(self.mean, self.cov, size=(self.popsize, ))
+        self.solutions = []
+        for p in range(self.popsize):
+            gene = samples[p, :]
+            if self._genome_type is not None:
+                sol = create_learning_rule(self._genome_type, parameters=gene, **self._genome_params)
+            else:
+                sol = Genome(parameters=gene)
+            self.solutions.append(sol)
         return self.solutions
     
     @override
@@ -75,5 +90,5 @@ class CMA_ES(BaseSolver):
             self.c_mu * rank_mu_cov
 
     def __repr__(self):
-        return f"CMA-ES(ndim={self.ndim}, popsize={self.popsize}, minimise={self.minimise}, n_best={self.n_best}, sigma={self.sigma}, \
-            mu_eff={self.mu_eff}, c_c={self.c_c}, c_1={self.c_1}, c_mu={self.c_mu})"
+        return f"CMA_ES(ndim={self.ndim}, popsize={self.popsize}, minimise={self.minimise}, n_best={self.n_best}, sigma={self.sigma}, " + \
+            f"mu_eff={self.mu_eff:.3f}, c_c={self.c_c:.2f}, c_1={self.c_1:.2f}, c_mu={self.c_mu:.2f})"

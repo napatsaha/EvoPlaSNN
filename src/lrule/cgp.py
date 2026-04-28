@@ -7,7 +7,7 @@ import numpy as np
 from numpy.typing import ArrayLike
 from common.base import LearningRule, SynapseLayerProtocol
 from lrule.base import BaseLearningRule
-from evo.base import Genome
+from common.base import Genome
 from typing import List, Tuple, Literal, Callable
 import copy
 
@@ -155,21 +155,23 @@ class CGP_Graph:
         else:
             return np.squeeze(self._node_outputs[self._m:, :])
 
-    def mutate(self) -> "CGP_Graph":
+    def mutate(self, mutation_rate: float) -> "CGP_Graph":
         """
         Mutate current graph and produce a new copy of an offspring.
         """
         offspring = copy.deepcopy(self)
-        offspring._mutate()
+        offspring._mutate(mutation_rate)
         offspring._find_active_nodes()
         return offspring
 
-    def _mutate(self) -> np.ndarray[int]:
+    def _mutate(self, rate: float) -> np.ndarray[int]:
         # TODO: Add probabilistic mutation
         # For now, assume point mutation
         
         # Find gene id to mutate based on _mu_min
-        gene_to_mutate = np.random.randint(self._lg, size=(self._mu_min, ))
+        rate = np.clip(rate, 0, 1, dtype=np.float32)
+        # min_gene_to_mutate = rate * self.size
+        gene_to_mutate = np.random.randint(self.size, size=(int(rate * self.size), ))
 
         for gene in gene_to_mutate:
             gene_type = self._determine_gene_type(gene)
@@ -472,8 +474,8 @@ class CGP_Rule(BaseLearningRule, Genome):
     def forward(self, inp):
         return self.graph.forward(inp)
 
-    def mutate(self) -> 'CGP_Rule':
-        new_graph = self.graph.mutate()
+    def mutate(self, rate) -> 'CGP_Rule':
+        new_graph = self.graph.mutate(mutation_rate=rate)
         new_rule = copy.copy(self)
         new_rule.graph = new_graph
         return new_rule
@@ -492,3 +494,9 @@ class CGP_Rule(BaseLearningRule, Genome):
 
     # Alias
     genome = parameters
+
+    def __repr__(self):
+        return f"CGP_Rule(parameters={self.graph._tuplify_genome()}, size={self.size}, input_order={self.input_order}, outputs={self.output_order}, learning_rate={self.learning_rate})"
+    
+    def __str__(self):
+        return str(self.graph)

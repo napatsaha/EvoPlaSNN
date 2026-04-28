@@ -134,3 +134,64 @@ class SimulatorProtocol(Protocol):
 
     network: Any # Will fix later
     environment: Any # Will fix later
+
+
+class Solver(Protocol):
+    """
+    Base solver for all Evolutionary Algorithms.
+    """
+    def __init__(self, popsize: int):
+        pass
+
+    def ask(self) -> List:
+        """
+        Returns and records (internally) a set of solutions.
+        """
+        raise NotImplementedError("ask method must be implemented by subclasses.")
+
+    def tell(self, fitnesses: List):
+        """
+        Informs current solutions with evaluted fitnesses.
+        """
+        raise NotImplementedError("tell method must be implemented by subclasses.")
+
+    def result(self) -> Tuple[object, float]:
+        """
+        Returns the best solutions and their fitnesses.
+        """
+        raise NotImplementedError("result method must be implemented by subclasses.")
+
+
+class Genome(ABC):
+    """
+    Base class to allow for genetic-related operations in evolutionary Solver.
+    """
+    def __init__(self, parameters = None, **kwargs):
+        super().__init__()
+        self._parameters = parameters
+
+    def mutate(self, rate: float) -> 'Genome':
+        """
+        Create a modified copy of itself
+
+        Args:
+            rate (float): mutation rate
+        """
+        pass
+
+    @property
+    def parameters(self) -> np.ndarray:
+        """
+        Returns a 1D genetic blueprint of the genome
+        """
+        return self._parameters
+
+    @property
+    def size(self) -> int:
+        """
+        Returns the number of parameters that exists in the genome
+        """
+        return len(self._parameters)
+
+    def __repr__(self) -> str:
+        return f"Genome({self.parameters})"

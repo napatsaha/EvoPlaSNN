@@ -1,12 +1,13 @@
 from pathlib import Path
 import logging
 import time
+from common.base import Genome
 from tqdm import tqdm
 
 import numpy as np
 
 
-from .base import BaseSolver, Evaluator, Genome
+from .base import BaseSolver, Evaluator
 
 
 class EvoManager:

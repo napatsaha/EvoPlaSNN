@@ -1,3 +1,5 @@
+from common.base import Solver, LearningRule
+from importlib import import_module
 import numpy as np
 
 
@@ -48,3 +50,56 @@ def check_max_ties(array, axis=0):
     Returns True if there are ties, False otherwise.
     """
     return np.sum(np.equal(array, np.max(array, axis=0)), axis=0) > 1
+
+
+ALGO_DICT = {
+    "cma_es": ("evo.cma_es", "CMA_ES"),
+    "es": ("evo.es", "EvolutionStrategy"),
+    "simple": ("evo.es", "EvolutionStrategy"),
+    "mu_plus_lambda": ("evo.mu_lambda", "MuPlusLambda")
+}
+
+
+def create_solver(params: dict, **kwargs) -> Solver:
+    params = params.copy()
+    if "type" in params:
+        solver_type = params.pop("type")
+    else:
+        raise Warning("Solver type not provided. Using \'Simple ES\'")
+    solver_type = solver_type.lower().replace("-", "_")
+    module_name, class_name = ALGO_DICT.get(solver_type)
+    module = import_module(module_name)
+    obj_class = getattr(module, class_name)
+    return obj_class(**params, **kwargs)
+
+
+TYPE_DICT = {
+    "ann" : ("lrule.ann", "ANN_Rule"),
+    "cgp" : ("lrule.cgp", "CGP_Rule"),
+    "graph" : ("lrule.cgp", "CGP_Graph"),
+    # "stdp" : ("lrule.stdp", "STDP_Rule"),
+    "rstdp" : ("lrule.stdp", "R_STDP_Rule")
+}
+
+
+def _get_lrule_class(lrule_type):
+    module_name, class_name = TYPE_DICT.get(lrule_type)
+    module = import_module(module_name)
+    rule_cls = getattr(module, class_name)
+    return rule_cls
+
+
+def create_learning_rule(type_: str = None, **kwargs) -> LearningRule:
+    """
+    Factory method for creating instance of a Learning Rule object, based on `type`
+    """
+    if type_ is None:
+        if "type" in kwargs:
+            type_ = kwargs.pop("type")
+        elif "name" in kwargs:
+            type_ = kwargs.pop("name")
+        else:
+            raise KeyError("\'type\' must be provided in params")
+    rule_cls = _get_lrule_class(type_)
+    instance = rule_cls(**kwargs)
+    return instance

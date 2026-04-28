@@ -1,15 +1,6 @@
 
-from importlib import import_module
-import copy
-from evo.base import BaseSolver
+from common.utils import create_solver
 
-
-ALGO_DICT = {
-    "cma_es": ("evo.cma_es", "CMA_ES"),
-    "es": ("evo.es", "EvolutionStrategy"),
-    "simple": ("evo.es", "EvolutionStrategy"),
-    "mu_plus_lambda": ("evo.mu_lambda", "MuPlusLambda")
-}
 
 algorithm_dict = {
     "cma_es": "CMA_ES",
@@ -23,19 +14,6 @@ module_dict = {
     "es": ["EvolutionStrategy"],
     "mu_lambda": ["MuPlusLambda"]
 }
-
-def create_solver(params: dict, **kwargs) -> BaseSolver:
-    params = params.copy()
-    if "type" in params:
-        solver_type = params.pop("type")
-    else:
-        raise Warning("Solver type not provided. Using \'Simple ES\'")
-    solver_type = solver_type.lower().replace("-", "_")
-    module_name, class_name = ALGO_DICT.get(solver_type)
-    module = import_module(module_name)
-    obj_class = getattr(module, class_name)
-    return obj_class(**params, **kwargs)
-
 
 # def create_solver(params: dict, **kwargs) -> BaseSolver:
 #     """

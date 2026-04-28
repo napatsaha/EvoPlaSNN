@@ -1,3 +1,28 @@
+v1.1.0
+- Major refactoring changes + Standardisation of Solver
+- `Genome` and `Solver` moved to `common.base`
+- `create_learning_rule` and `create_solver` moved to `common.utils`
+- `run_rl.py`:
+    - `ndim` is not required in config prior to creating solver, even if rule type is 'ann'
+- `BaseSolver`:
+    - Genome creation (i.e. LearningRule) is handled by Solver instead of Evaluator, regardless of algorithm or rule type
+    - `BaseSolver` accepts `genome_type` and `genome_params` to create learning rule when needed
+- `CMA_ES`:
+    - `ndim` is enquired within `__init__` (similar to MuPlusLambda)
+    - `ask()` now generates solutions as List of LearningRule if `genome_type` known
+- `MuPlusLambda`:
+    - When mutating offspring during `_generate_offspring()`, if result is array, will turn into LearningRule if `genome_type` is known
+    - `mutation_rate` is now the responsibility of this Solver instead of Genome
+- `ANN_Rule`:
+    - is now a child of `Genome`
+    - now has `mutate()` method that returns an array via point mutation (depends on `weight_dist` of its `ann` attribute)
+- `CGP_Rule` and `CGP_Graph`:
+    - `mutate()` now requires rate as positional argument
+- `Genome`:
+    - `mutate()` now requires rate as positional argument
+- Improved `str` and `repr` methods of the two rules -> shows the parameter array in `repr`
+
+
 v1.0.14
 - Fix Genome.parameter issue in `MuPlusLambda`
 - Added `simplify` argument to `BaseSolver.take_solutions()`

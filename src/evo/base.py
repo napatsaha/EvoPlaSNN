@@ -1,34 +1,10 @@
-from abc import ABC
-from typing import List, Tuple, Protocol, override
+from typing import List, Tuple, Protocol, Union, override
 from pathlib import Path
+from common.base import Solver
+from common.base import Genome
+from common.utils import create_learning_rule
 import numpy as np
 
-
-class Solver(Protocol):
-    """
-    Base solver for all Evolutionary Algorithms.
-    """
-    def __init__(self, popsize: int):
-        pass
-
-    def ask(self) -> List:
-        """
-        Returns and records (internally) a set of solutions.
-        """
-        raise NotImplementedError("ask method must be implemented by subclasses.")
-    
-    def tell(self, fitnesses: List):
-        """
-        Informs current solutions with evaluted fitnesses.
-        """
-        raise NotImplementedError("tell method must be implemented by subclasses.")
-    
-    def result(self) -> Tuple[object, float]:
-        """
-        Returns the best solutions and their fitnesses.
-        """
-        raise NotImplementedError("result method must be implemented by subclasses.")
-    
 
 class Evaluator(Protocol):
     """
@@ -88,12 +64,34 @@ class Evaluator(Protocol):
 class BaseSolver(Solver):
     solutions: List['Genome']
 
-    def __init__(self, ndim: int = 2, popsize: int = None, minimise: bool = True):
+    def __init__(self, ndim: int = 2, popsize: int = None, minimise: bool = True, *,
+                 genome_type: str = None, genome_params: dict = None,):
         self._solutions = []
         self.ndim = ndim
         self.popsize = popsize if popsize is not None else int(4 + np.floor(3 + np.log(self.ndim)))
         self.minimise = minimise
+        # Genome Info
+        self._genome_params = genome_params if genome_params is not None else {}
+        if genome_type is not None:
+            self._genome_type = genome_type
+        else:
+            self._genome_type = None
+            if self._genome_params is not None and "type" in self._genome_params:
+                self._genome_type = self._genome_params.pop("type")
         self.reset()
+
+    def _generate_new_population(self, ):
+        self.solutions = []
+        for p in range(self.popsize):
+            # Generalise solution creation to any type of genome
+            if self._genome_type is not None:
+                indiv = create_learning_rule(self._genome_type, **self._genome_params)
+            else:
+                indiv = Genome(ndim=self.ndim)
+            self.solutions.append(indiv)
+
+    def ask(self) -> List['Genome']:
+        return self.solutions
 
     def reset(self):
         self.fitnesses = np.zeros(self.popsize)
@@ -131,7 +129,7 @@ class BaseSolver(Solver):
         """Return the best solution and its fitness."""
         return self.best_solution, self.best_fitness
     
-    def take_solutions(self, indices: int | List | np.ndarray, return_array: bool = False, simplify: bool = True):
+    def take_solutions(self, indices: int | List | np.ndarray, return_array: bool = False, simplify: bool = True) -> Union['Genome' | List['Genome'] | np.ndarray]:
         """
         A safe method for bulk indexing Genome objects within `solutions` list.
 
@@ -182,33 +180,3 @@ class BaseSolver(Solver):
 
 
 
-class Genome(ABC):
-    """
-    Base class to allow for genetic-related operations in evolutionary Solver.
-    """
-    def __init__(self, parameters = None, **kwargs):
-        super().__init__()
-        self._parameters = parameters
-
-    def mutate(self) -> 'Genome':
-        """
-        Create a modified copy of itself
-        """
-        pass
-
-    @property
-    def parameters(self) -> np.ndarray:
-        """
-        Returns a 1D genetic blueprint of the genome
-        """
-        return self._parameters
-
-    @property
-    def size(self) -> int:
-        """
-        Returns the number of parameters that exists in the genome
-        """
-        return len(self._parameters)
-
-    def __repr__(self) -> str:
-        return f"Genome({self.parameters})"

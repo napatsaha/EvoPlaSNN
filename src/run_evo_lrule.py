@@ -9,7 +9,7 @@ import numpy as np
 
 from snn.eval import SNN_Evaluator
 # from evo.es import EvolutionStrategy
-from evo.utils import create_solver
+from common.utils import create_solver
 
 # from snn.plot import plot_weight_over_time, plot_weights, plot_spikes, plot_membranes
 import snn.plot as snn_plot

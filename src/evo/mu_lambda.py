@@ -1,6 +1,7 @@
 # from lrule.cgp import CGP_Graph, CGP_Rule
-from lrule.utils import create_learning_rule
-from .base import BaseSolver, Genome
+from common.base import Genome
+from common.utils import create_learning_rule
+from .base import BaseSolver
 from typing import List
 
 import numpy as np
@@ -23,37 +24,51 @@ class MuPlusLambda(BaseSolver):
     parents: List[Genome]
     # solutions: List[Genome]
 
-    def __init__(self, mu, lambd, *, ndim = 2, popsize = None, minimise = True,
-                 lrule_type: str = None, lrule_params: dict = None,
+    def __init__(self, mu, lambd, *, minimise = True,
+                 mutation_rate: float = 0.1,
+                #  lrule_type: str = None, lrule_params: dict = None,
                  **kwargs):
-        # super().__init__(ndim, popsize, minimise)
-        self.minimise = minimise
+        """
+        Mu + Lambda Algorithm
+
+        Args:
+            mu (int): Number of parents
+            lambd (int): Number of offsprings
+            minimise (bool, optional): Optimisation direction. Defaults to True.
+            mutation_rate (float, optional): Probability of mutating each gene. Defaults to 0.1.
+        """
+        # self.minimise = minimise
         self.mu = mu
         self.lambd = lambd
-        self.popsize = self.mu + self.lambd
+        popsize = self.mu + self.lambd
+        self.mutation_rate = np.clip(0, 1, mutation_rate)
 
-        self._lrule_params = kwargs if lrule_params is None else lrule_params
-        if lrule_type is not None:
-            self._lrule_type = lrule_type
-        else:
-            if "type" in self._lrule_params:
-                self._lrule_type = self._lrule_params.pop("type")
+        super().__init__(ndim=None, popsize=popsize, minimise=minimise, **kwargs)
+
+
+        # self._lrule_params = kwargs if lrule_params is None else lrule_params
+        # if lrule_type is not None:
+        #     self._lrule_type = lrule_type
+        # else:
+        #     if "type" in self._lrule_params:
+        #         self._lrule_type = self._lrule_params.pop("type")
         self._generate_new_population()
+        self.parents: List[Genome] = []
+
         self.ndim = self.solutions[0].size
 
     def _generate_new_population(self, ):
         self.solutions = []
         for p in range(self.popsize):
             # Generalise solution creation to any type of genome
-            indiv = create_learning_rule(self._lrule_type, **self._lrule_params)
+            indiv = create_learning_rule(self._genome_type, **self._genome_params)
             self.solutions.append(indiv)
-        self.parents = []
 
     # def reset(self):
     #     self._generate_new_population()
 
-    def ask(self):
-        return self.solutions
+    # def ask(self):
+    #     return self.solutions
 
     def tell(self, fitnesses):
         # assert len(fitnesses) == len(self.solutions)
@@ -83,5 +98,13 @@ class MuPlusLambda(BaseSolver):
                 idx = np.random.randint(0, self.mu)
             else:
                 idx = 0
-            offspring = self.parents[idx].mutate()
+            offspring = self.parents[idx].mutate(self.mutation_rate)
+            if not isinstance(offspring, Genome):
+                if self._genome_type is not None:
+                    offspring = create_learning_rule(self._genome_type, parameters=offspring, **self._genome_params)
+                else:
+                    offspring = Genome(parameters=offspring)
             self.solutions.append(offspring)
+
+    def __repr__(self):
+        return f"MuPlusLambda(ndim={self.ndim}, mu={self.mu}, lambd={self.lambd}, minimise={self.minimise})"

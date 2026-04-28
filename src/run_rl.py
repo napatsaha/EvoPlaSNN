@@ -11,7 +11,7 @@ import numpy as np
 from common.base import LearningRule
 from rl.eval import RL_Evaluator
 # from evo.es import EvolutionStrategy
-from evo.utils import create_solver
+from common.utils import create_solver
 from evo.manager import EvoManager
 from evo.base import Evaluator
 from lrule.utils import read_learning_rule
@@ -93,10 +93,10 @@ def main(config_file: str | Path | dict, *, config_overrides: dict = None, paren
     )
 
     # Configure Evolution Solver object
-    if config["lrule_params"]["type"] == "ann":
-        config["evo_params"]["solver"]["ndim"] = evaluator.get_parameter_size()
+    # if config["lrule_params"]["type"] == "ann":
+    #     config["evo_params"]["solver"]["ndim"] = evaluator.get_parameter_size()
     config["evo_params"]["solver"]["minimise"] = evaluator.is_minimise()
-    solver = create_solver(config["evo_params"]["solver"], **config["lrule_params"])
+    solver = create_solver(config["evo_params"]["solver"], genome_params=config.get("lrule_params").copy())
     if "popsize" not in config["evo_params"]["solver"]:
         config["evo_params"]["solver"]["popsize"] = solver.popsize
     if "ndim" not in config["evo_params"]["solver"]:
