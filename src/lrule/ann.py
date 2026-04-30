@@ -41,7 +41,8 @@ _activation_functions = {
     "relu": relu,
     "sigmoid": sigmoid,
     "tanh": tanh,
-    "linear": linear
+    "linear": linear,
+    "none": linear
 }
 
 
@@ -160,7 +161,7 @@ class ANN:
         self.input_size = int(input_size)
         self.hidden_sizes = solve_hidden(hidden_size)
         self.output_size = int(output_size)
-        self.hidden_activation = _activation_functions.get(hidden_activation, relu)
+        self.hidden_activation = _activation_functions.get(hidden_activation, linear)
         self.output_activation = _activation_functions.get(output_activation, linear)
         self.weight_dist = weight_dist
         self.bias = bias

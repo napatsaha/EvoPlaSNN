@@ -82,7 +82,8 @@ class BaseMaze(gym.Env):
                  reward_step_closer: bool = False,
                  terminate_on_crash: bool = False,
                  penalty: float = -0.1, reward_inter: float = 0.1,
-                 reward_bad: float = -1.0, reward_good: float = 1.0, reward_trunc: float = -1.0):
+                 reward_bad: float = -1.0, reward_good: float = 1.0, reward_trunc: float = -1.0,
+                 **kwargs):
         """
         Initializes the environment with the given parameters.
 

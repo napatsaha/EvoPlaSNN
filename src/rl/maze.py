@@ -30,7 +30,9 @@ class AdvTMaze(BaseMaze):
     def __init__(self, size=None, width=None, height=None, pad=1, *, 
                  corridor_size: int = 1, agent_start_shift: int = 0,
                  corridor_size_upper: int = None, corridor_size_central: int = None,
-                 max_steps=50, randomise_start = False, random_min_dist = 0, obs_type = "state", include_agent_pos = False, reward_step_closer = False, terminate_on_crash = False, penalty = -0.1, reward_inter = 0.1, reward_bad = -1, reward_good = 1, reward_trunc = -1):
+                 max_steps=50, randomise_start = False, random_min_dist = 0, obs_type = "state", include_agent_pos = False, 
+                 reward_step_closer = False, terminate_on_crash = False, penalty = -0.1, reward_inter = 0.1, reward_bad = -1, reward_good = 1, reward_trunc = -1,
+                 **kwargs):
         """
         Args:
             corridor_size (int, optional): Width of the T-Maze corridor. Controls both vertical and horizontal arm. Defaults to 1.

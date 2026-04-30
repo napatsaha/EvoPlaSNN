@@ -1,7 +1,9 @@
 from common.base import Solver, LearningRule
 from importlib import import_module
 import numpy as np
+import warnings
 
+## HELPER FUNCTIONS
 
 def solve_hidden(hidden_size):
     if isinstance(hidden_size, list | np.ndarray | tuple):
@@ -51,6 +53,62 @@ def check_max_ties(array, axis=0):
     """
     return np.sum(np.equal(array, np.max(array, axis=0)), axis=0) > 1
 
+
+def compare_deep_dict(d1: dict, d2: dict, warn_missing_keys: bool = True):
+    """
+    Compare differences between two deep dictionaries. Fields which exist in one
+    dict but not the other will be included but the value for that field left as None.
+    Returns a nested dictionary with a tuple of values from each dictionary which are
+    different.
+
+    Args:
+        d1 (dict): First nested dictionary
+        d2 (dict): Second nested dictionary
+        warn_missing_keys (bool, optional): Whether or not to issue a warning when
+        encountering a field that exist in only one dict but not the other. Defaults to True.
+
+    Raises:
+        Warning: When a mismatched field between two dicts is encountered, if 
+        warn_missing_keys is enabled
+
+    Returns:
+        Dict[str: Tuple]: A nested dictionary of differences
+    """
+    diffs = {}
+    unique_keys = set([*d1.keys(), *d2.keys()])
+    for key in unique_keys:
+        item1 = d1.get(key, None)
+        item2 = d2.get(key, None)
+        if (key in d1.keys()) and (key in d2.keys()):
+            # item1 = d1.get(key)
+            # item2 = d2.get(key)
+            is_dict1 = isinstance(item1, dict)
+            is_dict2 = isinstance(item2, dict)
+            if is_dict1 and is_dict2:
+                is_diff = compare_deep_dict(item1, item2, warn_missing_keys=warn_missing_keys)
+                if is_diff:
+                    diffs[key] = is_diff
+            elif (is_dict1 and not is_dict2) or (is_dict2 and not is_dict1):
+                warnings.warn(f"Found key {key} common between two dictionaries, but Dict1 {is_dict1} while Dict2 {is_dict2}. Cannot handle such case.")
+            else:
+                if item1 == item2:
+                    continue
+                else:
+                    diffs[key] = (item1, item2)
+        elif (key in d1.keys()) and (key not in d2.keys()):
+            if warn_missing_keys:
+                warnings.warn(f"Found key: {key} in Dict1 but not in Dict2")
+            diffs[key] = (item1, item2)
+        elif (key not in d1.keys()) and (key in d2.keys()):
+            if warn_missing_keys:
+                warnings.warn(f"Found key: {key} in Dict2 but not in Dict1")
+            diffs[key] = (item1, item2)
+        else:
+            raise Warning("Reached unsupported case where key not in either Dict1 or Dict2")
+    return diffs
+
+
+## Factory Methods
 
 ALGO_DICT = {
     "cma_es": ("evo.cma_es", "CMA_ES"),

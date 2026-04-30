@@ -1,3 +1,9 @@
+v1.1.1
+- Added helper function `common.utils.compare_deep_dict()` for comparing differences between two dictionaries.
+    (Useful for comparing `config.yaml` files between different runs)
+- A few minor fixes: Putting `**kwargs` in `BaseMaze` and `AdvTMaze`
+- Changed default hidden_activation to `linear` in `lrule.ann.ANN`
+
 v1.1.0
 - Major refactoring changes + Standardisation of Solver
 - `Genome` and `Solver` moved to `common.base`
