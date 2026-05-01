@@ -23,7 +23,7 @@ class BaseGenome(Genome):
         pass
 
     @property
-    def parameters(self) -> np.ndarray | List[Parameter]:
+    def parameters(self) -> np.ndarray:
         """
         Returns a 1D genetic blueprint of the genome
         """
@@ -38,3 +38,33 @@ class BaseGenome(Genome):
 
     def __repr__(self) -> str:
         return f"Genome({self.parameters})"
+    
+
+class CompositeGenome(Genome):
+    """
+    A Genome which consists of a collection of genes of varying sizes. Each gene is a parameter.
+    The entire genome is constructed from concatenating each gene's parameters together.
+    """
+    genes: List[Parameter]
+
+    def __init__(self, genes: List[Parameter], **kwargs):
+        super().__init__(**kwargs)
+        self.genes = genes
+        param = [g.value for g in self.genes]
+        self._parameters = np.r_[*param]
+
+    @property
+    def parameters(self) -> np.ndarray:
+        return self._parameters
+    
+    @parameters.setter
+    def parameters(self, value):
+        raise NotImplementedError(f"Parameter setter for {self.__class__.__name__} not yet implemented")
+
+    @property
+    def size(self) -> int:
+        return len(self.parameters)
+    
+    def __repr__(self):
+        return "CompositeGenome(" + ', '.join([repr(g) for g in self.genes]) + ")"
+    

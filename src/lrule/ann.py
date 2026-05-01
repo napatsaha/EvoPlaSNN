@@ -1,16 +1,16 @@
 from typing import Callable, List, Literal
-
-from common.utils import solve_hidden, calculate_size
-# from snn.base import SynapseLayerProtocol
-from common.base import LearningRule, SynapseLayerProtocol
-from common.base import Genome
-from genome.genome import BaseGenome
-from .utils import tile_array
-from .base import BaseLearningRule
-
 import yaml
 
 import numpy as np
+
+from common.utils import solve_hidden, calculate_size
+from common.base import Genome
+from genome.genome import BaseGenome, CompositeGenome
+from .utils import tile_array
+from .base import BaseLearningRule
+from genome import parameter as param
+
+
 
 
 
@@ -266,7 +266,7 @@ class ANN:
         return s
 
 
-class ANN_Rule(BaseLearningRule, BaseGenome):
+class ANN_Rule(BaseLearningRule):
     """
     A Learning Rule that represents a black box ANN function that converts synapse-related information to weight updates.
     """
@@ -279,8 +279,12 @@ class ANN_Rule(BaseLearningRule, BaseGenome):
                 "sum": np.sum
                 }
 
+    genome: Genome
+
     def __init__(self, parameters=None, *, 
-                 encode_learning_rate: bool = True,
+                 encode_learning_rate: bool = False,
+                 encode_hidden_activation: bool = False, 
+                 encode_output_activation: bool = False,
                  # ANN params
                  hidden_size: List | int = None, bias: bool = True,
                  hidden_activation: str = None, output_activation: str = None,
@@ -291,18 +295,36 @@ class ANN_Rule(BaseLearningRule, BaseGenome):
                  use_trace_pre: bool = False, use_trace_post: bool = False, use_weights: bool = True, use_reward: bool = False, 
                  use_eligibility: bool = False, use_eligibility_pre: bool = False, use_eligibility_post: bool = False, use_eligibility_stdp: bool = False,
                  **kwargs):
-        # Allocate genome and ann parameters properly
-        if encode_learning_rate:
-            if parameters is not None:
-                learning_rate = parameters[-1]
-                ann_parameters = parameters[:-1]
-            else:
-                # ann_parameters = param.UniformBoundedArray(parameters, size=len(parameters), low=-1, high=1).value
-                ann_parameters = None
-                # learning_rate = param.UniformBounded(low=0, high=1).value
-                learning_rate = np.random.uniform(0, 1)
+        # If there is parameters, need to figure out which values belong to which gene first
+        _later = False # Tag to tell whether to do something later after constructing BaseLearningRule and ANN
+        if parameters is not None:
+            _later = True
+            i = 0 # Counting index from the back of parameters array for each gene to be encoded
+            # Assuming a gene order of [weight, learning rate]
+            if encode_learning_rate:
+                i += 1
+                val = parameters[-1]
+                learning_rate_gene = param.UniformBounded(val, low=0, high=1) # Placeholder type
+                learning_rate = learning_rate_gene.value # Overwrite init argument
+            # Finally, access weight values from parameters
+            val = parameters[:-i] if i > 0 else parameters
+            weights_gene = param.UniformBoundedArray(val, low=0, high=1) # Again placeholder type
+            weights = weights_gene.value
         else:
-            ann_parameters = parameters
+            weights = None
+
+        # # Allocate genome and ann parameters properly
+        # if encode_learning_rate:
+        #     if parameters is not None:
+        #         learning_rate = parameters[-1]
+        #         ann_parameters = parameters[:-1]
+        #     else:
+        #         # ann_parameters = param.UniformBoundedArray(parameters, size=len(parameters), low=-1, high=1).value
+        #         ann_parameters = None
+        #         # learning_rate = param.UniformBounded(low=0, high=1).value
+        #         learning_rate = np.random.uniform(0, 1)
+        # else:
+        #     ann_parameters = parameters
 
         BaseLearningRule.__init__(self, learning_rate=learning_rate, learning_rate_thr=learning_rate_thr, threshold_agg_func=threshold_agg_func, 
                         delta_weight=delta_weight, delta_threshold=delta_threshold, 
@@ -311,54 +333,37 @@ class ANN_Rule(BaseLearningRule, BaseGenome):
                         **kwargs)
 
         # Construct an ANN
-        self.ann = ANN(input_size=self.input_size, output_size=self.output_size, parameters=ann_parameters, 
+        self.ann = ANN(input_size=self.input_size, output_size=self.output_size, parameters=weights, 
                        hidden_size=hidden_size, hidden_activation=hidden_activation, output_activation=output_activation,
                        bias=bias, weight_dist=weight_dist,
                        **kwargs)
         
-        genome_parameters = np.r_[self.ann.parameters, self.learning_rate] if encode_learning_rate else self.ann.parameters
-        BaseGenome.__init__(self, parameters=genome_parameters)
+        if _later:
+            genes = []
+            genes.append(weights_gene)
+            if encode_learning_rate:
+                genes.append(learning_rate_gene)
+        else: # If not constructing genes earlier because no parameter is passed through
+            genes = []
+            val = self.ann.parameters
+            weights_gene = param.UniformBoundedArray(val, low=0, high=1) # Placeholder type
+            genes.append(weights_gene)
+            if encode_learning_rate:
+                val = self.learning_rate
+                learning_rate_gene = param.UniformBounded(val, low=0, high=1)
+                genes.append(learning_rate_gene)
+
+
+        # genome_parameters = np.r_[self.ann.parameters, self.learning_rate] if encode_learning_rate else self.ann.parameters
+        self.genome = CompositeGenome(genes=genes)
 
         # self.weight_dist = self.ann.weight_dist
 
-    # def __init__(self, parameters = None, *, 
-    #              learning_rate: float = 1.0, learning_rate_thr: float = 0.1, threshold_agg_func: Literal["max", "min", "mean", "sum"] = "mean",
-    #              delta_weight: bool = True, delta_threshold: bool = False,
-    #              use_trace_pre: bool = False, use_trace_post: bool = False, use_weights: bool = True, use_reward: bool = False, 
-    #              use_eligibility: bool = False, use_eligibility_pre: bool = False, use_eligibility_post: bool = False, use_eligibility_stdp: bool = False,
-    #              **kwargs):
-        # self.learning_rate = learning_rate
-        # self.learning_rate_thr = learning_rate_thr
-        # if threshold_agg_func not in ("max", "min", "mean", "sum"):
-        #     raise ValueError("threshold_agg_func must be one of 'max', 'min', 'mean', 'sum'")
-        # else:
-        #     self.threshold_agg_func = threshold_agg_func
-        #     self._thr_agg = self.AGG_DICT.get(threshold_agg_func)
-
-        # # Inputs to learning rule
-        # self.use_trace_pre = use_trace_pre
-        # self.use_trace_post = use_trace_post
-        # self.use_weights = use_weights
-        # self.use_reward = use_reward
-        # self.use_eligibility_pre = use_eligibility or use_eligibility_pre
-        # self.use_eligibility_post = use_eligibility_post
-        # self.use_eligibility_stdp = use_eligibility_stdp
-
-        # self.input_order = [item for item in self.INPUT_ORDER if getattr(self, f"use_{item}")]
-        # self.input_size = len(self.input_order)
-
-        # # Learning rule outputs
-        # self.delta_weight = delta_weight
-        # self.delta_threshold = delta_threshold
-        # if not (self.delta_weight or self.delta_threshold):
-        #     raise ValueError("At least one of delta_weight or delta_threshold must be True.")
-        # self.output_size = int(self.delta_weight) + int(self.delta_threshold)
-        # self.output_order = [item for item in self.OUTPUT_ORDER if getattr(self, f"delta_{item}")]
 
     def forward(self, inp):
         return self.ann.forward(inp)
 
-    def mutate(self, rate: float) -> 'ANN_Rule':
+    def mutate(self, rate: float) -> np.ndarray:
         genome = self.parameters.copy()
         rate = np.clip(rate, 0, 1, dtype=np.float32)
         gene_to_mutate = np.random.randint(self.size, size=(int(rate*self.size), ))
@@ -370,81 +375,7 @@ class ANN_Rule(BaseLearningRule, BaseGenome):
         return genome
         # return self.__class__(parameters=genome, **self.__dict__)
 
-    # def update(self, synapse: SynapseLayerProtocol, reward: float = None, always_return_tuple: bool = False) -> np.ndarray: 
-    #     """
-    #     Apply the ANN Rule to an external set of weights.
-    #     """
-    #     w_shape = synapse.weights.shape
 
-    #     inp = self.prepare_inputs(synapse, reward, w_shape)
-    #     out = self.ann.forward(inp)
-    #     out = out.reshape(*w_shape, -1)
-
-    #     if self.delta_weight:
-    #         idx = 0
-    #         dw = out[..., idx]
-    #         dw *= self.learning_rate
-    #     if self.delta_threshold:
-    #         idx = 1 if self.delta_weight else 0
-    #         dth = out[..., idx]
-    #         dth = self._thr_agg(dth, axis=0) # Aggregate threshold deltas for each post-synaptic neuron
-    #         dth *= self.learning_rate_thr
-
-    #     # Return values
-    #     if self.delta_weight and self.delta_threshold:
-    #         return dw, dth
-    #     elif self.delta_weight and not self.delta_threshold:
-    #         if always_return_tuple:
-    #             return dw, None
-    #         else:
-    #             return dw
-    #     elif self.delta_threshold and not self.delta_weight:
-    #         if always_return_tuple:
-    #             return None, dth
-    #         else:
-    #             return dth
-    #     else:
-    #         raise RuntimeError("At least one of delta_weight or delta_threshold must be True.")
-
-    #     # dw = self.ann.forward(inp)
-    #     # dw = dw.reshape(w_shape)
-    #     # dw *= self.learning_rate
-
-    #     # if return_inputs:
-    #     #     return dw, inp
-    #     # else:
-    #     #     return dw
-
-    # def prepare_inputs(self, synapse: SynapseLayerProtocol, reward: float, w_shape: tuple):
-    #     inp = []
-    #     # 1, 2 = trace pre, post
-    #     if self.use_trace_pre or self.use_trace_post:
-    #         trace_pre, trace_post = tile_array(w_shape, synapse.pre_layer.trace, synapse.post_layer.trace)
-    #         if self.use_trace_pre:
-    #             inp.append(trace_pre.reshape(-1, 1))
-    #         if self.use_trace_post:
-    #             inp.append(trace_post.reshape(-1, 1))
-    #     # 3 = weights
-    #     if self.use_weights:
-    #         inp.append(synapse.weights.reshape(-1, 1))
-    #     # 4 = reward
-    #     if self.use_reward:
-    #         if reward is None:
-    #             reward = 0
-    #         inp.append(np.full((np.prod(w_shape), 1), fill_value=reward))
-    #     # 5 = etrace pre-before-post (LTP)
-    #     if self.use_eligibility_pre:
-    #         inp.append(synapse.eligibility_pre.reshape(-1, 1))
-    #     # 6 = etrace post-before-pre (LTD)
-    #     if self.use_eligibility_post:
-    #         inp.append(synapse.eligibility_post.reshape(-1, 1))
-    #     # 7 = etrace STDP
-    #     if self.use_eligibility_stdp:
-    #         inp.append(synapse.eligibility_stdp.reshape(-1, 1))
-
-    #     inp = np.concatenate(inp, axis=1)
-    #     return inp
-        
     def save_parameters(self, file_path: str, precision: int = 6):
         """
         Save only flattened parameters of the ANN Rule to a file. (Intended to use with `lrule.ann.read_ANN_Rule()` function)
@@ -497,15 +428,17 @@ class ANN_Rule(BaseLearningRule, BaseGenome):
 
     @property
     def size(self):
-        return self.ann.size
+        return self.genome.size
     
     @property
     def parameters(self):
-        return self.ann.parameters
+        return self.genome.parameters
     
     @parameters.setter
     def parameters(self, value):
+        # TODO: Edit for multiple gene types
         self.ann.parameters = value
+        self.genome.parameters = value
 
     def __repr__(self):
         # return f"ANN_Rule(parameters_size={self.size}, use_trace_pre={self.use_trace_pre}, use_trace_post={self.use_trace_post}, use_weights={self.use_weights}, use_reward={self.use_reward}, " + \

@@ -1,17 +1,18 @@
 """
 Cartesian Genetic Programming: graph program, and learning rule
 """
+import copy
+from typing import List, Tuple, Literal, Callable
+from enum import IntEnum
 
-from lrule.utils import tile_array
 import numpy as np
 from numpy.typing import ArrayLike
-from common.base import LearningRule, SynapseLayerProtocol
+
 from lrule.base import BaseLearningRule
 from common.base import Genome
-from typing import List, Tuple, Literal, Callable
-import copy
+from genome.genome import BaseGenome
 
-from enum import IntEnum
+
 
 FUNCTION_LIST = [
     np.add,
@@ -433,7 +434,7 @@ class CGP_Graph:
         return f"CGP_Graph({self._tuplify_genome()}, n_inputs={self.n_inputs}, n_rows={self.n_rows}, n_cols={self.n_cols}, n_outputs={self.n_outputs})"
 
 
-class CGP_Rule(BaseLearningRule, Genome):
+class CGP_Rule(BaseLearningRule, BaseGenome):
     """
     Learning Rule version of CGP.
     Contains a CGP graph calibrated to synaptic update
@@ -470,6 +471,8 @@ class CGP_Rule(BaseLearningRule, Genome):
             seed=seed,
             **kwargs
         )
+
+        BaseGenome.__init__(self, parameters=self.parameters)
 
     def forward(self, inp):
         return self.graph.forward(inp)

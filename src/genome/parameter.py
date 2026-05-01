@@ -4,6 +4,9 @@ import numpy as np
 
 
 class BaseParameter(Parameter):
+    length: int
+    value: np.typing.ArrayLike
+
     def __init__(self, value):
         super().__init__()
         self._value = value
