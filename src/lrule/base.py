@@ -25,7 +25,7 @@ class BaseLearningRule(LearningRule):
                 "mean": np.mean,
                 "sum": np.sum
                 }
-    def __init__(self, parameters = None, *, 
+    def __init__(self, *, 
                 learning_rate: float = 1.0, learning_rate_thr: float = 0.1, threshold_agg_func: Literal["max", "min", "mean", "sum"] = "mean",
                 delta_weight: bool = True, delta_threshold: bool = False,
                 use_trace_pre: bool = False, use_trace_post: bool = False, use_weights: bool = True, use_reward: bool = False, 
@@ -132,11 +132,11 @@ class BaseLearningRule(LearningRule):
     def forward(self, inp: np.ndarray) -> np.ndarray:
         raise NotImplementedError("Each Learning Rule needs to implement its own forward method")
     
-    @property
-    def size(self):
-        raise NotImplementedError("Subclasses should implement method to return genome size")
+    # @property
+    # def size(self):
+    #     raise NotImplementedError("Subclasses should implement method to return genome size")
     
-    @property
-    def parameters(self):
-        raise NotImplementedError("Subclasses should implement getter and setter for internal parameters")
+    # @property
+    # def parameters(self):
+    #     raise NotImplementedError("Subclasses should implement getter and setter for internal parameters")
     

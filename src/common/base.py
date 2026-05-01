@@ -166,9 +166,9 @@ class Genome(ABC):
     """
     Base class to allow for genetic-related operations in evolutionary Solver.
     """
-    def __init__(self, parameters = None, **kwargs):
+    def __init__(self, **kwargs):
         super().__init__()
-        self._parameters = parameters
+        # self._parameters = parameters
 
     def mutate(self, rate: float) -> 'Genome':
         """
@@ -184,14 +184,33 @@ class Genome(ABC):
         """
         Returns a 1D genetic blueprint of the genome
         """
-        return self._parameters
+        # return self._parameters
+        pass
 
     @property
     def size(self) -> int:
         """
         Returns the number of parameters that exists in the genome
         """
-        return len(self._parameters)
+        # return len(self._parameters)
+        pass
 
-    def __repr__(self) -> str:
-        return f"Genome({self.parameters})"
+    # def __repr__(self) -> str:
+        # return f"Genome({self.parameters})"
+
+    
+
+class Parameter(ABC):
+    value: np.typing.ArrayLike
+    shape: tuple
+
+    def sample(self):
+        pass
+
+    def contains(self):
+        pass
+
+    @classmethod
+    def create(cls, **kwargs):
+        pass
+

@@ -2,6 +2,7 @@ from typing import Tuple, override
 from pathlib import Path
 from common.base import Genome
 from common.utils import create_learning_rule
+from genome.genome import BaseGenome
 import numpy as np
 
 from .base import BaseSolver
@@ -57,7 +58,7 @@ class CMA_ES(BaseSolver):
             if self._genome_type is not None:
                 sol = create_learning_rule(self._genome_type, parameters=gene, **self._genome_params)
             else:
-                sol = Genome(parameters=gene)
+                sol = BaseGenome(parameters=gene)
             self.solutions.append(sol)
         return self.solutions
     

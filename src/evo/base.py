@@ -1,9 +1,11 @@
 from typing import List, Tuple, Protocol, Union, override
 from pathlib import Path
+import numpy as np
+
 from common.base import Solver
 from common.base import Genome
 from common.utils import create_learning_rule
-import numpy as np
+from genome.genome import BaseGenome
 
 
 class Evaluator(Protocol):
@@ -87,7 +89,7 @@ class BaseSolver(Solver):
             if self._genome_type is not None:
                 indiv = create_learning_rule(self._genome_type, **self._genome_params)
             else:
-                indiv = Genome(ndim=self.ndim)
+                indiv = BaseGenome(ndim=self.ndim)
             self.solutions.append(indiv)
 
     def ask(self) -> List['Genome']:
@@ -165,7 +167,7 @@ class BaseSolver(Solver):
                     self._solutions.append(val)
                 else:
                     try:
-                        sol = Genome(val)
+                        sol = BaseGenome(val)
                         self._solutions.append(sol)
                     except:
                         raise ValueError("Cannot convert solutions into Genome")
@@ -174,7 +176,7 @@ class BaseSolver(Solver):
             for ind in range(self.popsize):
                 sol = values[ind]
                 try:
-                    self._solutions.append(Genome(sol))
+                    self._solutions.append(BaseGenome(sol))
                 except:
                     raise ValueError("Cannot convert solutions into Genome")
 

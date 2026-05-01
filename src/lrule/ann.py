@@ -4,6 +4,7 @@ from common.utils import solve_hidden, calculate_size
 # from snn.base import SynapseLayerProtocol
 from common.base import LearningRule, SynapseLayerProtocol
 from common.base import Genome
+from genome.genome import BaseGenome
 from .utils import tile_array
 from .base import BaseLearningRule
 
@@ -265,7 +266,7 @@ class ANN:
         return s
 
 
-class ANN_Rule(BaseLearningRule, Genome):
+class ANN_Rule(BaseLearningRule, BaseGenome):
     """
     A Learning Rule that represents a black box ANN function that converts synapse-related information to weight updates.
     """
@@ -279,25 +280,44 @@ class ANN_Rule(BaseLearningRule, Genome):
                 }
 
     def __init__(self, parameters=None, *, 
+                 encode_learning_rate: bool = True,
+                 # ANN params
                  hidden_size: List | int = None, bias: bool = True,
                  hidden_activation: str = None, output_activation: str = None,
                  weight_dist: Literal["uniform", "normal"] = "uniform",
+                 # LearningRule params
                  learning_rate: float = 1.0, learning_rate_thr: float = 0.1, threshold_agg_func: Literal["max", "min", "mean", "sum"] = "mean",
                  delta_weight: bool = True, delta_threshold: bool = False,
                  use_trace_pre: bool = False, use_trace_post: bool = False, use_weights: bool = True, use_reward: bool = False, 
                  use_eligibility: bool = False, use_eligibility_pre: bool = False, use_eligibility_post: bool = False, use_eligibility_stdp: bool = False,
                  **kwargs):
-        super().__init__(parameters, learning_rate=learning_rate, learning_rate_thr=learning_rate_thr, threshold_agg_func=threshold_agg_func, 
+        # Allocate genome and ann parameters properly
+        if encode_learning_rate:
+            if parameters is not None:
+                learning_rate = parameters[-1]
+                ann_parameters = parameters[:-1]
+            else:
+                # ann_parameters = param.UniformBoundedArray(parameters, size=len(parameters), low=-1, high=1).value
+                ann_parameters = None
+                # learning_rate = param.UniformBounded(low=0, high=1).value
+                learning_rate = np.random.uniform(0, 1)
+        else:
+            ann_parameters = parameters
+
+        BaseLearningRule.__init__(self, learning_rate=learning_rate, learning_rate_thr=learning_rate_thr, threshold_agg_func=threshold_agg_func, 
                         delta_weight=delta_weight, delta_threshold=delta_threshold, 
                         use_trace_pre=use_trace_pre, use_trace_post=use_trace_post, use_weights=use_weights, use_reward=use_reward, 
                         use_eligibility=use_eligibility, use_eligibility_pre=use_eligibility_pre, use_eligibility_post=use_eligibility_post, use_eligibility_stdp=use_eligibility_stdp, 
                         **kwargs)
 
         # Construct an ANN
-        self.ann = ANN(input_size=self.input_size, output_size=self.output_size, parameters=parameters, 
+        self.ann = ANN(input_size=self.input_size, output_size=self.output_size, parameters=ann_parameters, 
                        hidden_size=hidden_size, hidden_activation=hidden_activation, output_activation=output_activation,
                        bias=bias, weight_dist=weight_dist,
                        **kwargs)
+        
+        genome_parameters = np.r_[self.ann.parameters, self.learning_rate] if encode_learning_rate else self.ann.parameters
+        BaseGenome.__init__(self, parameters=genome_parameters)
 
         # self.weight_dist = self.ann.weight_dist
 
