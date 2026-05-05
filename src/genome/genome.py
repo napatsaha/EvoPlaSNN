@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Literal
 
 import numpy as np
 
@@ -13,14 +13,24 @@ class BaseGenome(Genome):
         super().__init__()
         self._parameters = parameters
 
-    def mutate(self, rate: float) -> 'Genome':
+    def mutate(self, rate: float, dist: Literal["normal", "uniform"], **kwargs) -> 'Genome':
         """
         Create a modified copy of itself
 
         Args:
             rate (float): mutation rate
         """
-        pass
+        params = self.parameters.copy()
+        rate = np.clip(rate, 0, 1, dtype=np.float32)
+        gene_to_mutate = np.random.randint(self.size, size=(int(rate*self.size), ))
+        for gene_id in gene_to_mutate:
+            if dist == "uniform":
+                params[gene_id] = np.random.rand()
+            elif dist == "normal":
+                params[gene_id] = np.random.randn()
+            else:
+                raise ValueError(f"Distribution {dist} not supported")
+        return self.__class__(params)
 
     @property
     def parameters(self) -> np.ndarray:
@@ -52,6 +62,24 @@ class CompositeGenome(Genome):
         self.genes = genes
         param = [g.value for g in self.genes]
         self._parameters = np.r_[*param]
+
+    # @classmethod
+    # def from_gene(cls, genes, **kwargs) -> 'CompositeGenome':
+
+
+    def mutate(self, rate):
+        new_genes = []
+        rate = np.clip(rate, 0, 1, dtype=np.float32)
+        to_mutate_flag = np.random.binomial(1, rate, size=self.size)
+        idx = 0
+        for gene in self.genes:
+            l = gene.length
+            flags = to_mutate_flag[idx:(idx+l)]
+            new_gene = gene.mutate(flags)
+            new_genes.append(new_gene)
+            idx += l
+
+        return self.__class__(new_genes)
 
     @property
     def parameters(self) -> np.ndarray:

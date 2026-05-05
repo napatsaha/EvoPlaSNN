@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 import numpy as np
-
+from numpy.typing import ArrayLike
 
 from typing import Any, Literal, Protocol, List, Tuple, Dict
 
@@ -166,26 +166,25 @@ class Genome(ABC):
     """
     Base class to allow for genetic-related operations in evolutionary Solver.
     """
-    def __init__(self, **kwargs):
-        super().__init__()
+    # def __init__(self, **kwargs):
+    #     super().__init__()
         # self._parameters = parameters
 
-    def mutate(self, rate: float) -> 'Genome':
+    @abstractmethod
+    def mutate(self, rate: float, **kwargs) -> 'Genome':
         """
         Create a modified copy of itself
 
         Args:
             rate (float): mutation rate
         """
-        pass
 
     @property
     def parameters(self) -> np.ndarray:
         """
         Returns a 1D genetic blueprint of the genome
         """
-        # return self._parameters
-        pass
+        # return self._parameters 
 
     @property
     def size(self) -> int:
@@ -193,7 +192,6 @@ class Genome(ABC):
         Returns the number of parameters that exists in the genome
         """
         # return len(self._parameters)
-        pass
 
     # def __repr__(self) -> str:
         # return f"Genome({self.parameters})"
@@ -201,16 +199,34 @@ class Genome(ABC):
     
 
 class Parameter(ABC):
+    """
+    A Parameter (aka Gene) is a component of a Genome with specific value type, bounds and distribution.
+    """
+    length: int
     value: np.typing.ArrayLike
-    shape: tuple
 
-    def sample(self):
-        pass
+    @abstractmethod
+    def mutate(self, flags: bool | List | ArrayLike) -> 'Parameter':
+        """
+        Mutate and create a modified Paramter with the same distribution and bounds
 
-    def contains(self):
-        pass
+        Args:
+            flags (bool | List | ArrayLike): an array of boolean flags to determine which location of gene
+            to modify. (Must have same length as `Parameter.length`). If a scalar boolean value is passed through,
+            the entire length of Paramter will be affected altogether.
 
-    @classmethod
-    def create(cls, **kwargs):
-        pass
-
+        Returns:
+            Parameter: new Paramter
+        """
+        
+    @abstractmethod
+    def copy(self) -> 'Parameter':
+        """
+        _summary_
+        """
+    
+    @abstractmethod
+    def to_dict(self) -> 'Dict':
+        """
+        _summary_
+        """

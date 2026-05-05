@@ -1,3 +1,11 @@
+v1.1.4
+- Streamlined Parameter type into `RealParam` and `DiscreteParam`
+    - `size` is now `length` property, and can be set in both Parameter types
+    - removed `.create()` class method from `DiscreteParam`
+- Implemented `.mutate()` in BaseParameter
+- Implemented `.mutate()` in CompositeGenome
+- Copied `.mutate()` in BaseGenome from `ANN_Rule.mutate()`
+
 v1.1.3 (Warning: Won't work with experiment)
 - CompositeGenome to store collection of genes
 - `ANN_Rule.__init__` underwent a remake to accommodate `encode_learning_rate` argument and dissimilar genes
