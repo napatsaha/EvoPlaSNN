@@ -2,13 +2,14 @@ from typing import Callable, List, Literal
 import yaml
 
 import numpy as np
+from numpy.typing import ArrayLike
 
 from common.utils import solve_hidden, calculate_size
-from common.base import Genome
-from genome.genome import BaseGenome, CompositeGenome
-from .utils import tile_array
-from .base import BaseLearningRule
+from common.base import Genome, Parameter
+from genome.genome import CompositeGenome
 from genome import parameter as param
+
+from .base import BaseLearningRule
 
 
 
@@ -278,10 +279,13 @@ class ANN_Rule(BaseLearningRule):
                 "mean": np.mean,
                 "sum": np.sum
                 }
+    GENE_ORDER = ("weights", "learning_rate", "hidden_activation", "output_activation")
 
     genome: Genome
 
-    def __init__(self, parameters=None, *, 
+
+    def __init__(self, parameters: ArrayLike = None, genes: List[Parameter] = None, *, 
+                 # Which gene to encode
                  encode_learning_rate: bool = False,
                  encode_hidden_activation: bool = False, 
                  encode_output_activation: bool = False,
@@ -295,6 +299,16 @@ class ANN_Rule(BaseLearningRule):
                  use_trace_pre: bool = False, use_trace_post: bool = False, use_weights: bool = True, use_reward: bool = False, 
                  use_eligibility: bool = False, use_eligibility_pre: bool = False, use_eligibility_post: bool = False, use_eligibility_stdp: bool = False,
                  **kwargs):
+        
+        encode_weights = True # Weights is always encoded
+        self.encode_learning_rate = encode_learning_rate
+        self.encode_hidden_activation = encode_hidden_activation
+        self.encode_output_activation = encode_output_activation
+        self.encodings = [encode_weights, encode_learning_rate, encode_hidden_activation, encode_output_activation]
+
+        if (parameters is not None) and (genes is not None):
+            raise ValueError("Only one of 'parameters' or 'genes' can be passed, not both.")
+
         # If there is parameters, need to figure out which values belong to which gene first
         _later = False # Tag to tell whether to do something later after constructing BaseLearningRule and ANN
         if parameters is not None:
@@ -304,12 +318,25 @@ class ANN_Rule(BaseLearningRule):
             if encode_learning_rate:
                 i += 1
                 val = parameters[-1]
-                learning_rate_gene = param.UniformBounded(val, low=0, high=1) # Placeholder type
+                learning_rate_gene = param.RealParam(val, low=0, high=1) # Placeholder type
                 learning_rate = learning_rate_gene.value # Overwrite init argument
             # Finally, access weight values from parameters
             val = parameters[:-i] if i > 0 else parameters
-            weights_gene = param.UniformBoundedArray(val, low=0, high=1) # Again placeholder type
+            weights_gene = param.RealParam(val, low=0, high=1) # Again placeholder type
             weights = weights_gene.value
+        # If only a list of genes is passed through
+        elif genes is not None:
+            assert isinstance(genes, List), "Genes must be a list of parameters"
+            assert len(genes) == sum(self.encodings), "Length of gene objects must equal number of enabled encoding"
+            for i, (enc, enc_type) in enumerate(zip(self.encodings, self.GENE_ORDER)):
+                if not enc:
+                    continue
+                if enc_type == "weights":
+                    weights = genes[i].value
+                elif enc_type == "learning_rate":
+                    learning_rate = genes[i].value
+                else:
+                    raise NotImplementedError(f"Encoding for {enc_type} not supported yet.")
         else:
             weights = None
 
@@ -326,7 +353,7 @@ class ANN_Rule(BaseLearningRule):
         # else:
         #     ann_parameters = parameters
 
-        BaseLearningRule.__init__(self, learning_rate=learning_rate, learning_rate_thr=learning_rate_thr, threshold_agg_func=threshold_agg_func, 
+        super().__init__(learning_rate=learning_rate, learning_rate_thr=learning_rate_thr, threshold_agg_func=threshold_agg_func, 
                         delta_weight=delta_weight, delta_threshold=delta_threshold, 
                         use_trace_pre=use_trace_pre, use_trace_post=use_trace_post, use_weights=use_weights, use_reward=use_reward, 
                         use_eligibility=use_eligibility, use_eligibility_pre=use_eligibility_pre, use_eligibility_post=use_eligibility_post, use_eligibility_stdp=use_eligibility_stdp, 
@@ -346,11 +373,11 @@ class ANN_Rule(BaseLearningRule):
         else: # If not constructing genes earlier because no parameter is passed through
             genes = []
             val = self.ann.parameters
-            weights_gene = param.UniformBoundedArray(val, low=0, high=1) # Placeholder type
+            weights_gene = param.RealParam(val, low=0, high=1) # Placeholder type
             genes.append(weights_gene)
             if encode_learning_rate:
                 val = self.learning_rate
-                learning_rate_gene = param.UniformBounded(val, low=0, high=1)
+                learning_rate_gene = param.RealParam(val, low=0, high=1)
                 genes.append(learning_rate_gene)
 
 
@@ -359,22 +386,50 @@ class ANN_Rule(BaseLearningRule):
 
         # self.weight_dist = self.ann.weight_dist
 
-
     def forward(self, inp):
         return self.ann.forward(inp)
 
     def mutate(self, rate: float) -> np.ndarray:
-        genome = self.parameters.copy()
-        rate = np.clip(rate, 0, 1, dtype=np.float32)
-        gene_to_mutate = np.random.randint(self.size, size=(int(rate*self.size), ))
-        for gene_id in gene_to_mutate:
-            if self.ann.weight_dist == "uniform":
-                genome[gene_id] = np.random.rand()
-            elif self.ann.weight_dist == "normal":
-                genome[gene_id] = np.random.randn()
-        return genome
+        # genome = self.parameters.copy()
+        # rate = np.clip(rate, 0, 1, dtype=np.float32)
+        # gene_to_mutate = np.random.randint(self.size, size=(int(rate*self.size), ))
+        # for gene_id in gene_to_mutate:
+        #     if self.ann.weight_dist == "uniform":
+        #         genome[gene_id] = np.random.rand()
+        #     elif self.ann.weight_dist == "normal":
+        #         genome[gene_id] = np.random.randn()
+        # return genome
         # return self.__class__(parameters=genome, **self.__dict__)
+        new_genome = self.genome.mutate(rate)
+        return self.__class__(genes = new_genome.genes, **self.to_dict())
 
+
+    def to_dict(self) -> dict:
+        d = dict(
+            # Self params
+            encode_learning_rate = self.encode_learning_rate,
+            encode_hidden_activation = self.encode_hidden_activation,
+            encode_output_activation = self.encode_output_activation,
+            learning_rate = self.learning_rate,
+            learning_rate_thr = self.learning_rate_thr,
+            threshold_agg_func = self.threshold_agg_func,
+            use_trace_pre = self.use_trace_pre,
+            use_trace_post = self.use_trace_post,
+            use_weights = self.use_weights,
+            use_reward = self.use_reward,
+            use_eligibility_pre = self.use_eligibility_pre,
+            use_eligibility_post = self.use_eligibility_post,
+            use_eligibility_stdp = self.use_eligibility_stdp,
+            delta_weight = self.delta_weight,
+            delta_threshold = self.delta_threshold,
+            # ANN params
+            hidden_activation = self.ann.hidden_activation.__name__,
+            output_activation = self.ann.output_activation.__name__,
+            weight_dist = self.ann.weight_dist,
+            bias = self.ann.bias,
+            hidden_size = self.ann.hidden_sizes,
+        )
+        return d
 
     def save_parameters(self, file_path: str, precision: int = 6):
         """

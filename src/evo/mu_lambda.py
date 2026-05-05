@@ -1,5 +1,5 @@
 # from lrule.cgp import CGP_Graph, CGP_Rule
-from common.base import Genome
+from common.base import Genome, LearningRule
 from common.utils import create_learning_rule
 from genome.genome import BaseGenome
 from .base import BaseSolver
@@ -100,7 +100,7 @@ class MuPlusLambda(BaseSolver):
             else:
                 idx = 0
             offspring = self.parents[idx].mutate(self.mutation_rate)
-            if not isinstance(offspring, Genome):
+            if not isinstance(offspring, LearningRule):
                 if self._genome_type is not None:
                     offspring = create_learning_rule(self._genome_type, parameters=offspring, **self._genome_params)
                 else:

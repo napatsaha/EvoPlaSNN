@@ -1,3 +1,17 @@
+v1.1.5
+- `ANN_Rule`:
+    - `.mutate()` which mutates underlying genome and creates a new instance of `ANN_Rule`
+    - `to_dict()` which returns a dictionary of arguments used in constructing self (currently hand-coded)
+    - `__init__()` can pass in list of genes `genes=` instead of `parameters=`
+    - Also supports `.encodings` attribute (will be used more effectively in the future)
+    - Fixed new Param types for random construction (still need relation to weight_dist and type checks)
+- `BaseSolver` and `MuPlusLambda`
+    - removed annoying `solutions.setter` properties which unintentionally convert things into `Genome`
+    - fixed instances where solution is checked to be `Genome` -> now checks for `LearningRule` (need better self reliance)
+    - fixed `save_best` when solution is not Genome or np.ndarray. (Must have genome attribute)
+- Placeholder for GeneticAlgorithm in `evo.ga` module
+
+
 v1.1.4
 - Streamlined Parameter type into `RealParam` and `DiscreteParam`
     - `size` is now `length` property, and can be set in both Parameter types

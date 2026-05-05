@@ -64,7 +64,7 @@ class Evaluator(Protocol):
 
 
 class BaseSolver(Solver):
-    solutions: List['Genome']
+    solutions: List
 
     def __init__(self, ndim: int = 2, popsize: int = None, minimise: bool = True, *,
                  genome_type: str = None, genome_params: dict = None,):
@@ -121,9 +121,15 @@ class BaseSolver(Solver):
         top_solutions = self.take_solutions(top_indices, return_array=False)
         for i in range(n):
             sol = top_solutions[i]
-            if isinstance(sol, Genome):
-                sol = sol.parameters
             i = str(i + 1).zfill(2)  # Ensure two-digit index
+            if isinstance(sol, np.ndarray):
+                pass
+            elif isinstance(sol, Genome):
+                sol = sol.parameters
+            elif hasattr(sol, "genome"):
+                sol = getattr(getattr(sol, "genome"), "parameters")
+            else:
+                raise TypeError(f"Genome {sol} cannot be written via np.savetxt")
             np.savetxt(Path(save_dir) / f"best_rule_{i}.txt", sol, fmt=f'%.{precision}f')
 
     @override
@@ -158,27 +164,29 @@ class BaseSolver(Solver):
         return self._solutions
     @solutions.setter
     def solutions(self, values: List):
-        if len(values) == 0:
-            self._solutions = []
-        elif isinstance(values, List):
-            self._solutions = []
-            for val in values:
-                if isinstance(val, Genome):
-                    self._solutions.append(val)
-                else:
-                    try:
-                        sol = BaseGenome(val)
-                        self._solutions.append(sol)
-                    except:
-                        raise ValueError("Cannot convert solutions into Genome")
-        elif isinstance(values, np.ndarray):
-            self._solutions = []
-            for ind in range(self.popsize):
-                sol = values[ind]
-                try:
-                    self._solutions.append(BaseGenome(sol))
-                except:
-                    raise ValueError("Cannot convert solutions into Genome")
+        assert isinstance(values, List), "Solutions must be a list"
+        self._solutions = values
+        # if len(values) == 0:
+        #     self._solutions = []
+        # elif isinstance(values, List):
+        #     self._solutions = []
+        #     for val in values:
+        #         if isinstance(val, Genome):
+        #             self._solutions.append(val)
+        #         else:
+        #             try:
+        #                 sol = BaseGenome(val)
+        #                 self._solutions.append(sol)
+        #             except:
+        #                 raise ValueError("Cannot convert solutions into Genome")
+        # elif isinstance(values, np.ndarray):
+        #     self._solutions = []
+        #     for ind in range(self.popsize):
+        #         sol = values[ind]
+        #         try:
+        #             self._solutions.append(BaseGenome(sol))
+        #         except:
+        #             raise ValueError("Cannot convert solutions into Genome")
 
 
 
