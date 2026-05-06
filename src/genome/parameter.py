@@ -30,13 +30,13 @@ class BaseParameter(Parameter):
         else:
             if not isinstance(value, np.ndarray):
                 value = np.asarray(value)
+                # Force value to be at least 1D array (not 0D array) for consistent behaviour, e.g. len()
+                if value.ndim == 0:
+                    value = np.array([value])
             length = value.size
             
             # # TODO: Validate value
-            # if hasattr(value, "__len__"):
-            #     length = len(value)
-            # else:
-            #     length = 1
+            # self._validate()
         self._value = value
         self._length = length
 
@@ -111,6 +111,7 @@ class RealParam(BaseParameter):
 
 
 class DiscreteParam(BaseParameter):
+    # TODO: Add n for number of possible values
     def __init__(self, value=None, length=1, low=None, high=None):
         # if high is None:
         #     self.low = 0
@@ -118,6 +119,7 @@ class DiscreteParam(BaseParameter):
         # else:
         #     self.low = low
         #     self.high = high
+        # TODO: Deal with cases where low or high=None
         self.low = low
         self.high = high
         
@@ -126,6 +128,8 @@ class DiscreteParam(BaseParameter):
         # else:
         #     length = len(value)
         super().__init__(value, length)
+
+        self._value = self._value.astype(np.int_)
 
     # @classmethod
     # def create(cls, low, high=None) -> 'DiscreteBounded':

@@ -1,11 +1,14 @@
-from common.base import Solver, LearningRule
+from typing import List
 from importlib import import_module
-import numpy as np
 import warnings
+
+import numpy as np
+
+from common.base import Solver, LearningRule
 
 ## HELPER FUNCTIONS
 
-def solve_hidden(hidden_size):
+def solve_hidden(hidden_size) -> List[int]:
     if isinstance(hidden_size, list | np.ndarray | tuple):
         if len(hidden_size) == 0:
             return []
@@ -33,6 +36,19 @@ def calculate_size(inp, hid, out, bias):
     for l in range(len(sizes) - 1):
         s += get_layer_size(sizes[l], sizes[l + 1], bias)
     return s
+
+def safe_check_length(a, b) -> bool:
+    """
+    A safe way to check if the length of two objects are equal
+
+    Args:
+        a (Any): Object A
+        b (Any): Object B
+
+    Returns:
+        bool: Whether or not the two objects have the same length
+    """
+    pass
 
 def make_target_spikes(labels, num_classes=2):
     onehot = np.zeros((num_classes, len(labels)), dtype=np.int32)

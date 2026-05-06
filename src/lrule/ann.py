@@ -1,4 +1,4 @@
-from typing import Callable, Dict, List, Literal
+from typing import Callable, Dict, Iterable, List, Literal, Tuple
 import yaml
 
 import numpy as np
@@ -46,6 +46,28 @@ _activation_functions = {
     "linear": linear,
     "none": linear
 }
+
+
+def _process_activation_func(value, value_name: str = "Value") -> Tuple[str, Callable]:
+    if value is None:
+        name = "none"
+        func = _activation_functions.get(name)
+    elif isinstance(value, str):
+        name = value
+        assert name in _activation_functions, f"Function {name} must be in supported activation functions: {_activation_functions.keys()}"
+        func = _activation_functions.get(value, linear)
+    elif isinstance(value, Callable):
+        name = getattr(value, "__name__")
+        func = value
+    elif isinstance(value, Iterable):
+        name, func = [], []
+        for val in value:
+            n, f = _process_activation_func(val, value_name)
+            name.append(n)
+            func.append(f)
+    else:
+        raise TypeError(f"{value_name} must be of type 'str' or 'Callable'. Got {type(value)}")
+    return name, func
 
 
 class LinearLayer:
@@ -157,18 +179,20 @@ class ANN:
     """
     def __init__(self, input_size: int, hidden_size: List | int = None, output_size: int = 1, 
                  parameters: List = None, bias: bool = True,
-                 hidden_activation: str | Callable = None, output_activation: str | Callable = None,
+                 hidden_activation: str | Callable = "linear", output_activation: str | Callable = "linear",
                  weight_dist: Literal["uniform", "normal"] = "uniform"):
         super().__init__()
         self.input_size = int(input_size)
         self.hidden_sizes = solve_hidden(hidden_size)
+        self.num_hidden = len(self.hidden_sizes)
         self.output_size = int(output_size)
-        self.hidden_activation = _activation_functions.get(hidden_activation, linear)
-        self.output_activation = _activation_functions.get(output_activation, linear)
+        self.hidden_activation, self._hidden_func = _process_activation_func(hidden_activation, "hidden_activation")
+        self.output_activation, self._output_func = _process_activation_func(output_activation, "output_activation")
         self.weight_dist = weight_dist
         self.bias = bias
     
         self._create_layers(bias, parameters)
+
 
     # def _solve_hidden_sizes(self, hidden_size: List | int | None) -> List[int | None]:
     #     """
@@ -200,8 +224,12 @@ class ANN:
                 current_index += expected_size
             else:
                 params = None
+            if i < self.num_layers - 2:
+                func = self._hidden_func[i] if hasattr(self._hidden_func, "__getitem__") else self._hidden_func
+            else:
+                func = self._output_func
             layer = LinearLayer(self.layer_sizes[i], self.layer_sizes[i + 1], 
-                                activation_function=self.hidden_activation if i < self.num_layers - 2 else self.output_activation,
+                                activation_function=func,
                                 bias=bias, parameters=params, weight_dist=self.weight_dist)
             self.layers.append(layer)
 
@@ -257,7 +285,7 @@ class ANN:
 
     def __repr__(self):
         return f"ANN(input_size={self.input_size}, hidden_sizes={self.hidden_sizes}, output_size={self.output_size}, bias={self.bias}, " + \
-                f"hidden_activation={self.hidden_activation.__name__}, output_activation={self.output_activation.__name__})"
+                f"hidden_activation={self.hidden_activation}, output_activation={self.output_activation})"
     
     def __str__(self):
         s = "{\n"
@@ -280,6 +308,7 @@ class ANN_Rule(BaseLearningRule):
                 "sum": np.sum
                 }
     GENE_ORDER = ("weights", "learning_rate", "hidden_activation", "output_activation")
+    ACTIVATION_FUNC_ORDER = ("linear", "relu", "sigmoid", "tanh")
 
     genome: Genome
 
@@ -332,17 +361,12 @@ class ANN_Rule(BaseLearningRule):
             raise ValueError("Only one of 'parameters' or 'genes' can be passed, not both.")
 
         weight_size = calculate_size(self.input_size, hidden_size, self.output_size, bias)
-
-        # If there is parameters, need to figure out which values belong to which gene first
-        # _later = False # Tag to tell whether to do something later after constructing BaseLearningRule and ANN
+        num_hidden_layers = len(solve_hidden(hidden_size))
 
         # CASE 1: An array of parameters is passed through
         if parameters is not None:
             genes = []
-
-            # _later = True
             i = 0
-
             for enc_flag, enc_type in zip(self.encodings, self.GENE_ORDER):
                 if not enc_flag:
                     continue
@@ -357,32 +381,47 @@ class ANN_Rule(BaseLearningRule):
                     gene = param.RealParam(learning_rate)
                     i += gene.length
                     genes.append(gene)
+                elif enc_type == "hidden_activation":
+                    val = parameters[i:(i+num_hidden_layers)]
+                    gene = param.DiscreteParam(val)
+                    hidden_activation = np.take(self.ACTIVATION_FUNC_ORDER, gene.value)
+                    i += gene.length
+                    genes.append(gene)
+                elif enc_type == "output_activation":
+                    val = parameters[i:(i+1)]
+                    gene = param.DiscreteParam(val)
+                    output_activation = np.take(self.ACTIVATION_FUNC_ORDER, gene.value).item() # Enforce scalar value
+                    i += gene.length
+                    genes.append(gene)                  
                 else:
                     raise NotImplementedError(f"Encoding for {enc_type} not supported yet.")
-
-            # if encode_learning_rate:
-            #     i += 1
-            #     val = parameters[-1]
-            #     learning_rate_gene = param.RealParam(val, low=0, high=1) # Placeholder type
-            #     learning_rate = learning_rate_gene.value # Overwrite init argument
-            # # Finally, access weight values from parameters
-            # val = parameters[:-i] if i > 0 else parameters
-            # weights_gene = param.RealParam(val, low=0, high=1) # Again placeholder type
-            # weights = weights_gene.value
 
         # CASE 2: A list of genes is passed through
         elif genes is not None:
             assert isinstance(genes, List), "Genes must be a list of parameters"
             assert len(genes) == sum(self.encodings), "Length of gene objects must equal number of enabled encoding"
-            for i, (enc_flag, enc_type) in enumerate(zip(self.encodings, self.GENE_ORDER)):
+            i = 0
+            for enc_flag, enc_type in zip(self.encodings, self.GENE_ORDER):
                 if not enc_flag:
                     continue
                 if enc_type == "weights":
                     weights = genes[i].value
                     assert len(weights) == weight_size, f"Values of {enc_type} must be of length {weight_size}. Got {len(weights)}"
+                    i += 1
                 elif enc_type == "learning_rate":
                     learning_rate = genes[i].value
                     assert len(learning_rate) == 1, f"Values of {enc_type} must be of length {1}. Got {len(learning_rate)}"
+                    i += 1
+                elif enc_type == "hidden_activation":
+                    val = genes[i].value
+                    assert len(val) == num_hidden_layers, f"Values of {enc_type} must be of length {num_hidden_layers}. Got {len(val)}"
+                    hidden_activation = np.take(self.ACTIVATION_FUNC_ORDER, val)
+                    i += 1
+                elif enc_type == "output_activation":
+                    val = genes[i].value
+                    assert len(val) == 1, f"Values of {enc_type} must be of length {1}. Got {len(val)}"
+                    output_activation = np.take(self.ACTIVATION_FUNC_ORDER, val).item() # Enforce scalar value
+                    i += 1
                 else:
                     raise NotImplementedError(f"Encoding for {enc_type} not supported yet.")
         
@@ -393,26 +432,28 @@ class ANN_Rule(BaseLearningRule):
                 if not enc_flag:
                     continue
                 if enc_type == "weights":
-                    # gene_params = [d for d in self.genes_to_encode if d.get("name") == enc_type]
-                    # # Assume only one exact gene is found
-                    # assert len(gene_params) == 1, f"Only one exact match for {enc_type} must be found"
-                    # gene_params = gene_params[0].copy()
-                    # gene_params.pop("name")
                     gene_params = self._genes_params.get(enc_type).copy()
                     kind = gene_params.pop("kind")
                     gene = param.create_param(kind=kind, length=weight_size, **gene_params)
                     weights = gene.value
                     genes.append(gene)
                 elif enc_type == "learning_rate":
-                    # gene_params = [d for d in self.genes_to_encode if d.get("name") == enc_type]
-                    # # Assume only one exact gene is found
-                    # assert len(gene_params) == 1, f"Only one exact match for {enc_type} must be found"
-                    # gene_params = gene_params[0].copy()
-                    # gene_params.pop("name")
                     gene_params = self._genes_params.get(enc_type).copy()
                     kind = gene_params.pop("kind")
                     gene = param.create_param(kind=kind, length=1, **gene_params)
                     learning_rate = gene.value
+                    genes.append(gene)
+                elif enc_type == "hidden_activation":
+                    gene_params = self._genes_params.get(enc_type).copy()
+                    kind = gene_params.pop("kind")
+                    gene = param.create_param(kind=kind, length=num_hidden_layers, **gene_params)
+                    hidden_activation = np.take(self.ACTIVATION_FUNC_ORDER, gene.value)
+                    genes.append(gene)
+                elif enc_type == "output_activation":
+                    gene_params = self._genes_params.get(enc_type).copy()
+                    kind = gene_params.pop("kind")
+                    gene = param.create_param(kind=kind, length=1, **gene_params)
+                    output_activation = np.take(self.ACTIVATION_FUNC_ORDER, gene.value).item() # Enforce scalar value
                     genes.append(gene)
                 else:
                     raise NotImplementedError(f"Encoding for {enc_type} not supported yet.")
@@ -432,21 +473,16 @@ class ANN_Rule(BaseLearningRule):
                     gene = param.RealParam(length=1)
                     learning_rate = gene.value
                     genes.append(gene)
+                elif enc_type == "hidden_activation":
+                    gene = param.DiscreteParam(length=num_hidden_layers, low=0, high=len(self.ACTIVATION_FUNC_ORDER))
+                    hidden_activation = np.take(self.ACTIVATION_FUNC_ORDER, gene.value)
+                    genes.append(gene)
+                elif enc_type == "output_activation":
+                    gene = param.DiscreteParam(length=1, low=0, high=len(self.ACTIVATION_FUNC_ORDER))
+                    output_activation = np.take(self.ACTIVATION_FUNC_ORDER, gene.value).item() # Enforce scalar value
+                    genes.append(gene)     
                 else:
                     raise NotImplementedError(f"Encoding for {enc_type} not supported yet.")
-
-        # # Allocate genome and ann parameters properly
-        # if encode_learning_rate:
-        #     if parameters is not None:
-        #         learning_rate = parameters[-1]
-        #         ann_parameters = parameters[:-1]
-        #     else:
-        #         # ann_parameters = param.UniformBoundedArray(parameters, size=len(parameters), low=-1, high=1).value
-        #         ann_parameters = None
-        #         # learning_rate = param.UniformBounded(low=0, high=1).value
-        #         learning_rate = np.random.uniform(0, 1)
-        # else:
-        #     ann_parameters = parameters
 
         # Update learning rate (in case value is pulled from genome)
         self.learning_rate = learning_rate
@@ -462,40 +498,11 @@ class ANN_Rule(BaseLearningRule):
                        bias=bias, weight_dist=weight_dist,
                        **kwargs)
         
-        # if _later:
-        #     genes = []
-        #     genes.append(weights_gene)
-        #     if encode_learning_rate:
-        #         genes.append(learning_rate_gene)
-        # else: # If not constructing genes earlier because no parameter is passed through
-        #     genes = []
-        #     val = self.ann.parameters
-        #     weights_gene = param.RealParam(val, low=0, high=1) # Placeholder type
-        #     genes.append(weights_gene)
-        #     if encode_learning_rate:
-        #         val = self.learning_rate
-        #         learning_rate_gene = param.RealParam(val, low=0, high=1)
-        #         genes.append(learning_rate_gene)
-
-
-        # genome_parameters = np.r_[self.ann.parameters, self.learning_rate] if encode_learning_rate else self.ann.parameters
-
-        # self.weight_dist = self.ann.weight_dist
 
     def forward(self, inp):
         return self.ann.forward(inp)
 
     def mutate(self, rate: float) -> np.ndarray:
-        # genome = self.parameters.copy()
-        # rate = np.clip(rate, 0, 1, dtype=np.float32)
-        # gene_to_mutate = np.random.randint(self.size, size=(int(rate*self.size), ))
-        # for gene_id in gene_to_mutate:
-        #     if self.ann.weight_dist == "uniform":
-        #         genome[gene_id] = np.random.rand()
-        #     elif self.ann.weight_dist == "normal":
-        #         genome[gene_id] = np.random.randn()
-        # return genome
-        # return self.__class__(parameters=genome, **self.__dict__)
         new_genome = self.genome.mutate(rate)
         return self.__class__(genes = new_genome.genes, **self.to_dict())
 
@@ -598,6 +605,7 @@ class ANN_Rule(BaseLearningRule):
             f"learning_rate={[self.learning_rate, self.learning_rate_thr]})"
     
     def __str__(self):
+        # TODO: Print Learning Rate as well
         s = "ANN_Rule("
         s += "Inputs: "
         for i, layer in enumerate(self.ann.layers):

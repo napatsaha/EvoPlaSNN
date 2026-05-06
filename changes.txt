@@ -1,3 +1,12 @@
+v1.1.7
+- Handling 'encode_hidden_activation' and 'encode_output_activation' for each of the 4 input cases of `ANN_Rule`
+- `ann.ANN` can now handle different hidden_activation for each hidden layer
+- A helper input processing function `ann._process_activation_func()` to process activation functions (recursively) within `ANN`
+- Removed unnecessary comments, and added TODO for future work in `lrule.ann`
+- A Placeholder for `safe_check_length()` in `common.utils`
+- `DiscreteParam` now converts value to integer
+- `BaseParameter` ensures values are converted to at least 1D array, to prevent cases where len() could not be called on 0D array
+
 v1.1.6
 - Added `genome.parameter.create_param()` as a factory method within local module
 - `ANN_Rule.__init__`:
