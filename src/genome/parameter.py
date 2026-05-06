@@ -1,9 +1,21 @@
 from copy import copy
+import sys
 
 import numpy as np
 from numpy.typing import ArrayLike
 
 from common.base import Parameter
+
+
+PARAM_DICT = {
+    "real": "RealParam",
+    "discrete": "DiscreteParam"
+}
+
+def create_param(kind, **kwargs) -> Parameter:
+    name = PARAM_DICT.get(kind)
+    param_class = getattr(sys.modules[__name__], name)
+    return param_class(**kwargs)
 
 
 class BaseParameter(Parameter):

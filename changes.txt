@@ -1,3 +1,15 @@
+v1.1.6
+- Added `genome.parameter.create_param()` as a factory method within local module
+- `ANN_Rule.__init__`:
+    - Removed `_later` flag. super() class is init first, then we handle necessary gene construction, then we construct ANN
+        - weight_size is calculated beforehand
+        - self.learning_rate is updated after genes construction
+    - Changed how `ANN_Rule` handles incoming genes or parameters:
+        - Case 1: parameters is passed through -> sliced the array according to which genes to encode
+        - Case 2: genes is passed through -> each gene's values is extracted in order
+        - Case 3: genes_to_encode is passed through -> instructions on how to build each gene is used with Parameter factory method
+        - Case 0: None of above is passed through -> each encoded gene is constructed based on some default options
+
 v1.1.5
 - `ANN_Rule`:
     - `.mutate()` which mutates underlying genome and creates a new instance of `ANN_Rule`
