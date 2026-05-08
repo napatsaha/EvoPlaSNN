@@ -1,3 +1,11 @@
+v1.1.8
+- Improvements on verification process of DiscreteParam and RealParam
+- DiscreteParam now accepts `n=` as argument, or `low=` and `high=`
+- RealParam can now accept `dist=` (only 'uniform' or 'normal' supported):
+    - For 'uniform' (default), both 'low' and 'high' must be supplied
+- `ANN_Rule` has more flexibility in mixing between `parameter=` and `genes_to_encode=` args
+- Fixed `ANN_Rule.to_dict()` for getting activation function names
+
 v1.1.7
 - Handling 'encode_hidden_activation' and 'encode_output_activation' for each of the 4 input cases of `ANN_Rule`
 - `ann.ANN` can now handle different hidden_activation for each hidden layer

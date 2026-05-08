@@ -372,27 +372,50 @@ class ANN_Rule(BaseLearningRule):
                     continue
                 if enc_type == "weights":
                     # Extract positions from full genome
-                    weights = parameters[0:weight_size]
-                    gene = param.RealParam(weights)
+                    val = parameters[0:weight_size]
+                    if enc_type in self._genes_params:
+                        gene_params = self._genes_params.get(enc_type).copy()
+                        kind = gene_params.pop("kind")
+                        gene = param.create_param(kind=kind, length=weight_size, **gene_params)
+                    else:
+                        gene = param.RealParam(value=val, length=weight_size, dist=weight_dist, low=0, high=1)
+                    weights = gene.value
+                    weight_dist = getattr(gene, "dist", None)
                     i += gene.length
                     genes.append(gene)
                 elif enc_type == "learning_rate":
-                    learning_rate = parameters[i:(i+1)]
-                    gene = param.RealParam(learning_rate)
+                    val = parameters[i:(i+1)]
+                    if enc_type in self._genes_params:
+                        gene_params = self._genes_params.get(enc_type).copy()
+                        kind = gene_params.pop("kind")
+                        gene = param.create_param(kind=kind, length=1, **gene_params)
+                    else:
+                        gene = param.RealParam(value=val, dist="uniform", low=0, high=1)
+                    learning_rate = gene.value
                     i += gene.length
                     genes.append(gene)
                 elif enc_type == "hidden_activation":
                     val = parameters[i:(i+num_hidden_layers)]
-                    gene = param.DiscreteParam(val)
+                    if enc_type in self._genes_params:
+                        gene_params = self._genes_params.get(enc_type).copy()
+                        kind = gene_params.pop("kind")
+                        gene = param.create_param(kind=kind, length=num_hidden_layers, **gene_params)
+                    else:
+                        gene = param.DiscreteParam(value=val, length=num_hidden_layers, n=len(self.GENE_ORDER))
                     hidden_activation = np.take(self.ACTIVATION_FUNC_ORDER, gene.value)
                     i += gene.length
                     genes.append(gene)
                 elif enc_type == "output_activation":
                     val = parameters[i:(i+1)]
-                    gene = param.DiscreteParam(val)
+                    if enc_type in self._genes_params:
+                        gene_params = self._genes_params.get(enc_type).copy()
+                        kind = gene_params.pop("kind")
+                        gene = param.create_param(kind=kind, length=1, **gene_params)
+                    else:
+                        gene = param.DiscreteParam(value=val, length=1, n=len(self.GENE_ORDER))
                     output_activation = np.take(self.ACTIVATION_FUNC_ORDER, gene.value).item() # Enforce scalar value
                     i += gene.length
-                    genes.append(gene)                  
+                    genes.append(gene)
                 else:
                     raise NotImplementedError(f"Encoding for {enc_type} not supported yet.")
 
@@ -406,6 +429,7 @@ class ANN_Rule(BaseLearningRule):
                     continue
                 if enc_type == "weights":
                     weights = genes[i].value
+                    weight_dist = getattr(genes[i], "dist", None)
                     assert len(weights) == weight_size, f"Values of {enc_type} must be of length {weight_size}. Got {len(weights)}"
                     i += 1
                 elif enc_type == "learning_rate":
@@ -435,6 +459,7 @@ class ANN_Rule(BaseLearningRule):
                     gene_params = self._genes_params.get(enc_type).copy()
                     kind = gene_params.pop("kind")
                     gene = param.create_param(kind=kind, length=weight_size, **gene_params)
+                    weight_dist = getattr(gene, "dist", None)
                     weights = gene.value
                     genes.append(gene)
                 elif enc_type == "learning_rate":
@@ -466,19 +491,19 @@ class ANN_Rule(BaseLearningRule):
                 if not enc_flag:
                     continue
                 if enc_type == "weights":
-                    gene = param.RealParam(length=weight_size)
+                    gene = param.RealParam(length=weight_size, dist=weight_dist, low=0, high=1)
                     weights = gene.value
                     genes.append(gene)
                 elif enc_type == "learning_rate":
-                    gene = param.RealParam(length=1)
+                    gene = param.RealParam(length=1, dist="uniform", low=0, high=1)
                     learning_rate = gene.value
                     genes.append(gene)
                 elif enc_type == "hidden_activation":
-                    gene = param.DiscreteParam(length=num_hidden_layers, low=0, high=len(self.ACTIVATION_FUNC_ORDER))
+                    gene = param.DiscreteParam(length=num_hidden_layers, n=len(self.ACTIVATION_FUNC_ORDER))
                     hidden_activation = np.take(self.ACTIVATION_FUNC_ORDER, gene.value)
                     genes.append(gene)
                 elif enc_type == "output_activation":
-                    gene = param.DiscreteParam(length=1, low=0, high=len(self.ACTIVATION_FUNC_ORDER))
+                    gene = param.DiscreteParam(length=1, n=len(self.ACTIVATION_FUNC_ORDER))
                     output_activation = np.take(self.ACTIVATION_FUNC_ORDER, gene.value).item() # Enforce scalar value
                     genes.append(gene)     
                 else:
@@ -526,8 +551,8 @@ class ANN_Rule(BaseLearningRule):
             delta_weight = self.delta_weight,
             delta_threshold = self.delta_threshold,
             # ANN params
-            hidden_activation = self.ann.hidden_activation.__name__,
-            output_activation = self.ann.output_activation.__name__,
+            hidden_activation = self.ann.hidden_activation,
+            output_activation = self.ann.output_activation,
             weight_dist = self.ann.weight_dist,
             bias = self.ann.bias,
             hidden_size = self.ann.hidden_sizes,
