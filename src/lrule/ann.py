@@ -364,6 +364,7 @@ class ANN_Rule(BaseLearningRule):
         num_hidden_layers = len(solve_hidden(hidden_size))
 
         # CASE 1: An array of parameters is passed through
+        # Create genes from parameters according to gene_params (if present)
         if parameters is not None:
             genes = []
             i = 0
@@ -376,7 +377,7 @@ class ANN_Rule(BaseLearningRule):
                     if enc_type in self._genes_params:
                         gene_params = self._genes_params.get(enc_type).copy()
                         kind = gene_params.pop("kind")
-                        gene = param.create_param(kind=kind, length=weight_size, **gene_params)
+                        gene = param.create_param(kind=kind, length=weight_size, value=val, **gene_params)
                     else:
                         gene = param.RealParam(value=val, length=weight_size, dist=weight_dist, low=0, high=1)
                     weights = gene.value
@@ -388,7 +389,7 @@ class ANN_Rule(BaseLearningRule):
                     if enc_type in self._genes_params:
                         gene_params = self._genes_params.get(enc_type).copy()
                         kind = gene_params.pop("kind")
-                        gene = param.create_param(kind=kind, length=1, **gene_params)
+                        gene = param.create_param(kind=kind, length=1, value=val, **gene_params)
                     else:
                         gene = param.RealParam(value=val, dist="uniform", low=0, high=1)
                     learning_rate = gene.value
@@ -399,7 +400,7 @@ class ANN_Rule(BaseLearningRule):
                     if enc_type in self._genes_params:
                         gene_params = self._genes_params.get(enc_type).copy()
                         kind = gene_params.pop("kind")
-                        gene = param.create_param(kind=kind, length=num_hidden_layers, **gene_params)
+                        gene = param.create_param(kind=kind, length=num_hidden_layers, value=val, **gene_params)
                     else:
                         gene = param.DiscreteParam(value=val, length=num_hidden_layers, n=len(self.GENE_ORDER))
                     hidden_activation = np.take(self.ACTIVATION_FUNC_ORDER, gene.value)
@@ -410,7 +411,7 @@ class ANN_Rule(BaseLearningRule):
                     if enc_type in self._genes_params:
                         gene_params = self._genes_params.get(enc_type).copy()
                         kind = gene_params.pop("kind")
-                        gene = param.create_param(kind=kind, length=1, **gene_params)
+                        gene = param.create_param(kind=kind, length=1, value=val, **gene_params)
                     else:
                         gene = param.DiscreteParam(value=val, length=1, n=len(self.GENE_ORDER))
                     output_activation = np.take(self.ACTIVATION_FUNC_ORDER, gene.value).item() # Enforce scalar value
@@ -420,6 +421,7 @@ class ANN_Rule(BaseLearningRule):
                     raise NotImplementedError(f"Encoding for {enc_type} not supported yet.")
 
         # CASE 2: A list of genes is passed through
+        # Extract values from passed-in genes
         elif genes is not None:
             assert isinstance(genes, List), "Genes must be a list of parameters"
             assert len(genes) == sum(self.encodings), "Length of gene objects must equal number of enabled encoding"
@@ -450,6 +452,7 @@ class ANN_Rule(BaseLearningRule):
                     raise NotImplementedError(f"Encoding for {enc_type} not supported yet.")
         
         # CASE 3: If `genes_to_encode` instruction is given for how to generate values for encoded genes
+        # Create random genes from passed-in instructions
         elif genes_to_encode is not None:
             genes = []
             for enc_flag, enc_type in zip(self.encodings, self.GENE_ORDER):
@@ -484,6 +487,7 @@ class ANN_Rule(BaseLearningRule):
                     raise NotImplementedError(f"Encoding for {enc_type} not supported yet.")
 
         # CASE 0: Nothing is passed through (but genes must be created accordingly)
+        # Create random genes based on default Parameter classes for each encoding
         else:
             genes = []
             # weights = None
@@ -523,14 +527,12 @@ class ANN_Rule(BaseLearningRule):
                        bias=bias, weight_dist=weight_dist,
                        **kwargs)
         
-
     def forward(self, inp):
         return self.ann.forward(inp)
 
     def mutate(self, rate: float) -> np.ndarray:
-        new_genome = self.genome.mutate(rate)
-        return self.__class__(genes = new_genome.genes, **self.to_dict())
-
+        new_genes = self.genome.mutate(rate, return_genes_only=True)
+        return self.__class__(genes = new_genes, **self.to_dict())
 
     def to_dict(self) -> dict:
         d = dict(
@@ -632,11 +634,13 @@ class ANN_Rule(BaseLearningRule):
     def __str__(self):
         # TODO: Print Learning Rate as well
         s = "ANN_Rule("
-        s += "Inputs: "
+        s += f"\n  Learning Rate: {self.learning_rate}"
+        s += f"\n  Inputs: {self.input_order}"
         for i, layer in enumerate(self.ann.layers):
             s += f"\n  Layer {i}: (\n    "
             s += layer.print_weights(precision=4).replace("\n", "\n    ")
             s +=  "\n  ),"
+        s += f"\n  Outputs: {self.output_order}"
         s += "\n)"
         return s
     

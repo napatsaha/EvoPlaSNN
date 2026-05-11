@@ -67,7 +67,7 @@ class CompositeGenome(Genome):
     # def from_gene(cls, genes, **kwargs) -> 'CompositeGenome':
 
 
-    def mutate(self, rate):
+    def mutate(self, rate, return_genes_only: bool = False) -> Genome | List[Parameter]:
         new_genes = []
         rate = np.clip(rate, 0, 1, dtype=np.float32)
         to_mutate_flag = np.random.binomial(1, rate, size=self.size)
@@ -79,7 +79,10 @@ class CompositeGenome(Genome):
             new_genes.append(new_gene)
             idx += l
 
-        return self.__class__(new_genes)
+        if return_genes_only:
+            return new_genes
+        else:
+            return self.__class__(new_genes)
 
     @property
     def parameters(self) -> np.ndarray:

@@ -172,7 +172,7 @@ class Genome(ABC):
     genes: List['Parameter']
 
     @abstractmethod
-    def mutate(self, rate: float, **kwargs) -> 'Genome':
+    def mutate(self, rate: float, return_genes_only: bool, **kwargs) -> 'Genome':
         """
         Create a modified copy of itself
 

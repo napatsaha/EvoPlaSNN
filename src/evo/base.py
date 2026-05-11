@@ -80,6 +80,10 @@ class BaseSolver(Solver):
             self._genome_type = None
             if self._genome_params is not None and "type" in self._genome_params:
                 self._genome_type = self._genome_params.pop("type")
+        self._first_gen = True
+        self.fitnesses = None
+        self.best_fitness = None
+        self.best_solution = None
         self.reset()
 
     def _generate_new_population(self, ):
@@ -93,9 +97,12 @@ class BaseSolver(Solver):
             self.solutions.append(indiv)
 
     def ask(self) -> List['Genome']:
+        if self._first_gen:
+            self._first_gen = False
         return self.solutions
 
     def reset(self):
+        self._first_gen = True
         self.fitnesses = np.zeros(self.popsize)
         self._solutions = []
         self.best_fitness = None

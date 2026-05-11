@@ -1,3 +1,13 @@
+v1.1.9
+- Fixed issue with `MuPlusLambda.save_best` not saving the best solutions in previous Generations
+    - `.generate_offspring()` is now called within `.ask()` instead of `.tell()` in order to maintain same order
+        between `solutions` and `fitnesses` attributes when `save_best` is called
+    - Added a private attribute `._first_gen` in `BaseSolver` which is set to `False` after the first call to `ask()`
+        and set to True upon `reset()`
+- `CompositeGenome` now has the ability to call `mutate(return_genes_only=True)` to allow `ANN_Rule` to mutate without
+    useless class instantiation
+- More meaningful output when printing `ANN_Rule`
+
 v1.1.8
 - Improvements on verification process of DiscreteParam and RealParam
 - DiscreteParam now accepts `n=` as argument, or `low=` and `high=`

@@ -53,10 +53,9 @@ class MuPlusLambda(BaseSolver):
         # else:
         #     if "type" in self._lrule_params:
         #         self._lrule_type = self._lrule_params.pop("type")
-        self._generate_new_population()
         self.parents: List[Genome] = []
 
-        self.ndim = self.solutions[0].size
+        self.ndim = self.solutions[0].size if len(self.solutions) > 0 else None
 
     def _generate_new_population(self, ):
         self.solutions = []
@@ -68,8 +67,12 @@ class MuPlusLambda(BaseSolver):
     # def reset(self):
     #     self._generate_new_population()
 
-    # def ask(self):
-    #     return self.solutions
+    def ask(self) -> List:
+        if self._first_gen:
+            self._generate_new_population()
+        else:
+            self._generate_offspring()
+        return super().ask()
 
     def tell(self, fitnesses):
         # assert len(fitnesses) == len(self.solutions)
@@ -87,7 +90,8 @@ class MuPlusLambda(BaseSolver):
         idx_best = np.argsort(fitnesses)[:self.mu]
         self.parents = self.take_solutions(idx_best)
 
-        self._generate_offspring()
+        # Moved offspring generation to self.ask()
+        # self._generate_offspring()
 
     def _generate_offspring(self):
         assert (self.parents is not None) or (len(self.parents) > 0)
