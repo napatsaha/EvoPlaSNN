@@ -379,7 +379,7 @@ class ANN_Rule(BaseLearningRule):
                         kind = gene_params.pop("kind")
                         gene = param.create_param(kind=kind, length=weight_size, value=val, **gene_params)
                     else:
-                        gene = param.RealParam(value=val, length=weight_size, dist=weight_dist, low=0, high=1)
+                        gene = param.RealParam(value=val, length=weight_size, dist=weight_dist)
                     weights = gene.value
                     weight_dist = getattr(gene, "dist", None)
                     i += gene.length
@@ -391,7 +391,7 @@ class ANN_Rule(BaseLearningRule):
                         kind = gene_params.pop("kind")
                         gene = param.create_param(kind=kind, length=1, value=val, **gene_params)
                     else:
-                        gene = param.RealParam(value=val, dist="uniform", low=0, high=1)
+                        gene = param.RealParam(value=val, dist="normal", low=0)
                     learning_rate = gene.value
                     i += gene.length
                     genes.append(gene)

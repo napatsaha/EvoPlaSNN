@@ -1,6 +1,6 @@
 from pathlib import Path
 import pickle
-from typing import List, Literal
+from typing import List, Literal, Sequence
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 from matplotlib.axes import Axes
@@ -15,6 +15,8 @@ import seaborn as sns
 
 # from .simulate import SNNSimulator
 from snn.utils import get_spike_times
+from common import base
+from common.utils import get_boundaries_for_lrule_inputs
 
 ### Plotting functions that require Simulator ###
 
@@ -697,13 +699,22 @@ def plot_intermediate_fitness(simulator: 'SNN_Simulator' = None, values: np.ndar
 
 ### Plotting functions for Learning Rule ###
 
-def plot_learning_rule(lrule: 'LearningRule', simulator: 'SNNSimulator' = None, *, 
+def plot_learning_rule(rule: 'LearningRule', simulator: 'SNNSimulator' = None, **kwargs):
+    input_size = getattr(rule, "input_size")
+    if input_size == 2:
+        plot_learning_rule_2D(rule, simulator, **kwargs)
+    elif input_size == 3:
+        plot_learning_rule_3D(rule, simulator, **kwargs)
+    else:
+        raise ValueError(f"Plotting learning rule is not yet supported for input_size={input_size}")
+
+def plot_learning_rule_3D(rule: 'LearningRule', simulator: 'SNNSimulator' = None, *, 
                        cmap: str = "RdBu", num_mesh: int = 100,
                        wmax: float = 1.0, wmin: float = -1.0, emax: float = 2.0, emin: float = 0.0,
                        rew_list: List[float] = None,
                        x_scale: float = 1.0, y_scale: float = 1.0,
                        savepath: str | Path = None, show: bool = True):
-
+    # TODO: Fix format to be generic like plot_learning_rule_1D
     if simulator is not None:
         assert simulator.record_eligibility_pre or simulator.record_eligibility_post or simulator.record_eligibility_stdp, "Eligibility trace recording is not enabled."
         assert simulator.record_weights, "Weight recording is not enabled."
@@ -739,7 +750,7 @@ def plot_learning_rule(lrule: 'LearningRule', simulator: 'SNNSimulator' = None, 
         rr = np.full((N, N), r)
         inp = np.concatenate([ww[..., np.newaxis], rr[..., np.newaxis], ee[..., np.newaxis]], axis=2)
         # inp = np.concatenate([rr[..., np.newaxis], ee[..., np.newaxis]], axis=2)
-        dw = lrule.forward(inp)
+        dw = rule.forward(inp)
         dw_rec[..., i] = dw.reshape(N, N)
     
     # Start plotting
@@ -755,7 +766,7 @@ def plot_learning_rule(lrule: 'LearningRule', simulator: 'SNNSimulator' = None, 
         ax.set_ylabel("Weight")
 
     fig.colorbar(axs[0, 0].images[0], ax=axs, orientation='vertical', fraction=.1, label='ΔWeight')
-    fig.text(0.5, 0.9, f"Learning Rule Response to Inputs:\nf({lrule.input_order}) -> ΔWeight", ha="center", transform=fig.transFigure, fontsize=16)
+    fig.text(0.5, 0.9, f"Learning Rule Response to Inputs:\nf({rule.input_order}) -> ΔWeight", ha="center", transform=fig.transFigure, fontsize=16)
     
     if savepath is not None:
         plt.savefig(savepath)
@@ -763,6 +774,75 @@ def plot_learning_rule(lrule: 'LearningRule', simulator: 'SNNSimulator' = None, 
         plt.show()
     # plt.close(fig)
 
+
+def plot_learning_rule_2D(rule: base.LearningRule, simulator: 'SNNSimulator' = None, *, 
+                          transpose: bool = False,
+                          xmin: float = 0.0, xmax: float = 1.0, ymin: float = 0.0, ymax: float = 1.0,
+                          num_mesh: int = 100, cmap: str = "RdBu", figsize: tuple = (10, 10),
+                          savepath: str | Path = None, show: bool = True,
+                          **kwargs):
+    """
+    Plot Learning Rule in a single heatmap, with outputs as color values.
+    First variable in `input_order` will be on x-axis, second variable on y-axis (unless `transpose=True`)
+
+    Args:
+        rule (base.LearningRule): Learning Rule to be plotted
+        simulator (SNNSimulator, optional): If a Simulator is passed in, boundaries for each input variable will be extracted. Defaults to None.
+        transpose (bool, optional): Whether to swap x-axis and y-axis. Does not effect order of inputs queried in learning rule. Defaults to False.
+        xmin (float, optional): Minimum value for first variable. Defaults to 0.0.
+        xmax (float, optional): Maximum value for first variable. Defaults to 1.0.
+        ymin (float, optional): Minimum value for second variable. Defaults to 0.0.
+        ymax (float, optional): Maximum value for second variable. Defaults to 1.0.
+        num_mesh (int, optional): Level of granularity in plot. Defaults to 100.
+        cmap (str, optional): Name of matplotlib color map. Defaults to "RdBu".
+        figsize (tuple, optional): Figure size. Defaults to (10, 10).
+        savepath (str | Path, optional): Path to save the figure. If None, will not save the plot. Defaults to None.
+        show (bool, optional): Whether to call `plt.show()` at the end. Defaults to True.
+    """
+    # Extract info from learning rule
+    n_inputs = rule.input_size
+    rule_inputs = rule.input_order
+    # Auto extract boundaries if simulator is passed in
+    if simulator is not None:
+        xmin_, xmax_ = get_boundaries_for_lrule_inputs(simulator, rule_inputs[0])
+        xmin = xmin_ if xmin_ is not None else xmin
+        xmax = xmax_ if xmax_ is not None else xmax
+
+        ymin_, ymax_ = get_boundaries_for_lrule_inputs(simulator, rule_inputs[1])
+        ymin = ymin_ if ymin_ is not None else ymin
+        ymax = ymax_ if ymax_ is not None else ymax
+        
+    # Prepare inputs
+    x_vals = np.linspace(xmin, xmax, num_mesh)
+    y_vals = np.linspace(ymin, ymax, num_mesh)
+
+    xx, yy = np.meshgrid(x_vals, y_vals)
+
+    inp = np.concatenate([xx[..., np.newaxis], yy[..., np.newaxis]], axis=2)
+    inp = inp.reshape(-1, n_inputs)
+
+    # Query rule for outputs
+    vv = rule.forward(inp)
+    vv = vv.reshape(num_mesh, num_mesh)
+    if transpose:
+        vv = vv.T
+    fig, axs = plt.subplots(1, 1, figsize=figsize, squeeze=False)
+
+    ax = axs[0, 0]
+    extents = [xmin, xmax, ymin, ymax] if not transpose else [ymin, ymax, xmin, xmax]
+    ax.imshow(vv, extent=extents, origin='lower', aspect='equal', cmap=cmap, norm=mpl.colors.CenteredNorm())
+
+    ax.set_xlabel(rule_inputs[0 if not transpose else 1])
+    ax.set_ylabel(rule_inputs[1 if not transpose else 0])
+
+    fig.colorbar(axs[0, 0].images[0], ax=axs, orientation='vertical', fraction=.1, label='ΔWeight')
+    fig.text(0.5, 0.9, f"Learning Rule Response to Inputs:\nf({rule_inputs}) -> ΔWeight", ha="center", transform=fig.transFigure, fontsize=16)
+
+
+    if savepath is not None:
+        plt.savefig(savepath)
+    if show:
+        plt.show()
 
 ### Plotting functions for Evolutionary Results ###
 

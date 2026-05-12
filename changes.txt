@@ -1,3 +1,14 @@
+v1.1.10
+- `Simulator.update_condition="on-reward"` supported
+- `BaseMaze` has a new attribute `reward_null` which control every other reward output
+- `BaseMaze` children not passing in kwargs
+- Fixed `ANN_Rule` problem when constructing from `parameters` but no `genes_to_encode`:
+    - Boundaries are not specified by default for `weights` and `learning_rate`
+- Support for `plot_learning_rule_2D` in the form of heatmap:
+    - New helper function in `common.utils.get_boundaries_for_lrule_inputs()` to help extract min-max boundaries for 
+        certain supported rule input variables
+    - Interface function `plot_learning_rule` now calls different functions based on how many inputs the rule accepts
+
 v1.1.9
 - Fixed issue with `MuPlusLambda.save_best` not saving the best solutions in previous Generations
     - `.generate_offspring()` is now called within `.ask()` instead of `.tell()` in order to maintain same order

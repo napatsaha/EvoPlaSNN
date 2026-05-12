@@ -277,6 +277,11 @@ class SNNSimulator:
                     if self.update_condition == "on-step":
                         signal = self.modulator.signal(locals=locals()) if self._modulation else reward
                         self.network.update_synapses(reward=signal)
+                    # Update upon receiving reward (require reward=None when no update is desired)
+                    elif self.update_condition == "on-reward":
+                        if reward is not None:
+                            signal = self.modulator.signal(locals=locals()) if self._modulation else reward
+                            self.network.update_synapses(reward=signal)
                     # Update network at the end of each episode
                     elif self.update_condition == "on-end":
                         if episode_done:

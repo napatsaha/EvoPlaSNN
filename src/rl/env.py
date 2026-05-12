@@ -3,6 +3,7 @@
 Simple T-Maze environment with cell number as state observation.
 """
 
+from types import NoneType
 import gymnasium as gym
 import numpy as np
 import matplotlib.pyplot as plt
@@ -81,7 +82,7 @@ class BaseMaze(gym.Env):
                  include_agent_pos: bool = False,
                  reward_step_closer: bool = False,
                  terminate_on_crash: bool = False,
-                 penalty: float = -0.1, reward_inter: float = 0.1,
+                 penalty: float = -0.1, reward_inter: float = 0.1, reward_null: float | NoneType = 0.0,
                  reward_bad: float = -1.0, reward_good: float = 1.0, reward_trunc: float = -1.0,
                  **kwargs):
         """
@@ -122,6 +123,9 @@ class BaseMaze(gym.Env):
             reward_inter (float, optional): The intermediate reward for either stepping into empty cell (if `reward_step_closer=False`)
                 or getting closer to goal (if `reward_step_closer=True`). Defaults to 0.1.
 
+            reward_null (float, NoneType, optional): The intermediate reward which covers situations not covered by other reward types.
+                Defaults to 0.        
+        
             reward_bad (float, optional): The terminal reward for ending up in the bad final state. Defaults to -1.0.
 
             reward_good (float, optional): The terminal reward for ending up in the good final state. Defaults to 1.0.
@@ -147,6 +151,7 @@ class BaseMaze(gym.Env):
         # Intermediate reward
         self.penalty = penalty
         self.reward_inter = reward_inter
+        self.reward_null = reward_null
         # Controls for reward function
         self._check_closest_distance = reward_step_closer
         self.terminate_on_crash = terminate_on_crash
@@ -284,7 +289,7 @@ class BaseMaze(gym.Env):
                 terminated = True
         elif displaced_item == self.AGENT:
             # Stationary case
-            reward = 0.0
+            reward = self.reward_null
         else:
             # Valid movement possible
             self.maze[tuple(self._agent_pos)] = self.EMPTY
@@ -299,9 +304,9 @@ class BaseMaze(gym.Env):
                     self._closest_dist = new_dist
                     reward = self.reward_inter
                 else:
-                    reward = 0.0            
+                    reward = self.reward_null
             else:
-                reward = self.reward_inter
+                reward = self.reward_null
 
             # Calculate reward and terminate for non-empty cells
             if displaced_item == self.GOOD:

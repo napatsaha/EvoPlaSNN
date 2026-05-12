@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Tuple
 from importlib import import_module
 import warnings
 
@@ -123,6 +123,48 @@ def compare_deep_dict(d1: dict, d2: dict, warn_missing_keys: bool = True):
             raise Warning("Reached unsupported case where key not in either Dict1 or Dict2")
     return diffs
 
+
+def get_boundaries_for_lrule_inputs(simulator: 'SNNSimulator', input_var: str) -> Tuple[float, float]:
+    _supported_inputs = ("trace_pre", "trace_post", "weights", "reward", "eligibility_pre", "eligibility_post", "eligibility_stdp")
+    assert input_var in _supported_inputs, f"Input variable needs to be one of {_supported_inputs}. Got {input_var}"
+    min_, max_ = None, None
+    try:
+        if input_var == "reward":
+            rlist = simulator.env.reward_list
+            min_ = min(rlist)
+            max_ = max(rlist)
+        elif input_var == "weights":
+            if simulator.network.synapse_layers[0].clip_weights:
+                min_ = simulator.network.synapse_layers[0].weight_clip_min
+                max_ = simulator.network.synapse_layers[0].weight_clip_max
+            elif simulator.weight_recorder is not None:
+                min_ = simulator.weight_recorder.values[0].min()
+                max_ = simulator.weight_recorder.values[0].max()
+        elif input_var == "eligibility_pre":
+            min_ = 0
+            if simulator.eligibility_pre_recorder is not None:
+                max_ = simulator.eligibility_pre_recorder.values[0].max()
+            else:
+                max_ = simulator.network.synapse_layers[0].e_max
+        elif input_var == "eligibility_post":
+            min_ = 0
+            if simulator.eligibility_post_recorder is not None:
+                max_ = simulator.eligibility_post_recorder.values[0].max()
+            else:
+                max_ = simulator.network.synapse_layers[0].e_max
+        elif input_var == "eligibility_stdp":
+            if simulator.eligibility_stdp_recorder is not None:
+                max_ = simulator.eligibility_stdp_recorder.values[0].max()
+                min_ = simulator.eligibility_stdp_recorder.values[0].min()
+            else:
+                max_ = simulator.network.synapse_layers[0].e_max
+                min_ = None
+        else:
+            raise NotImplementedError(f"Method for finding bounds for variable {input_var} not yet implemented.")
+    except Exception as exc:
+        warnings.warn(f"Could not find bounds for {input_var}. Using default min={min_}, max={max_}")
+        warnings.warn(f"Got exception: {exc}")
+    return min_, max_
 
 ## Factory Methods
 

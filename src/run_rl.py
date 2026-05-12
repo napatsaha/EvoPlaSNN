@@ -291,7 +291,7 @@ def eval(results_path: Path | str = None, *, config_path: str | Path = None, num
             print(f"Error plotting intermediate fitness: {e}")
         # Plot Learning Rule Response
         try:
-            snn_plot.plot_learning_rule(lrule, simulator, rew_list=evaluator.env.reward_list,
+            snn_plot.plot_learning_rule(lrule, simulator, 
                                         savepath=Path(results_path, f"{prefix}_learning_rule.png") if save_plots else None, show=show_plots)
         except Exception as e:
             print(f"Error plotting learning rule: {e}")
