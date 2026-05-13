@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 import numpy as np
 from numpy.typing import ArrayLike
 
-from typing import Any, Literal, Protocol, List, Tuple, Dict
+from typing import Any, Literal, Protocol, List, Sequence, Tuple, Dict, Union
 
 
 class NeuronLayerProtocol(Protocol):
@@ -60,17 +60,41 @@ class LearningRule(ABC):
     Abstract base class for learning rules.
     """
     parameters: np.ndarray | List
+    input_size: int
+    output_size: int
+    input_order: Sequence
     
     def __init__(self):
         pass
 
     @abstractmethod
-    def update(self, always_return_tuple: bool) -> np.ndarray:
+    def update(self, synapse: 'SynapseLayerProtocol', reward: float, always_return_tuple: bool) -> Union[np.ndarray, Tuple]:
         """
-        Update the synaptic weights based on the learning rule.
+        Update the synaptic weights based on the learning rule, given a Synapse layer and reward
+
+        Args:
+            synapse (SynapseLayerProtocol): Synapse Layer which contains all necessary information for the LearningRule
+                to extract inputs from
+            reward (float): The only global input needed for the LearningRule
+            always_return_tuple (bool): If True, output will be Tuple of (delta_weight, delta_threshold)
+
+        Returns:
+            Union[np.ndarray, Tuple]: If `always_return_tuple=False` will only return either delta_weight or delta_threshold.
+                Otherwise will return both as a tuple
         """
         raise NotImplementedError()
 
+    @abstractmethod
+    def forward(self, inp: np.ndarray) -> np.ndarray:
+        """
+        Calculate outputs of a rule's inner function (not necessarily the same as update)
+
+        Args:
+            inp (np.ndarray): Inputs (Must be compatible with Learning Rule's input_size)
+
+        Returns:
+            np.ndarray: Output array
+        """
 
 class SynapseLayerProtocol(Protocol):
     """

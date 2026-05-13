@@ -475,7 +475,8 @@ class CGP_Rule(BaseLearningRule, BaseGenome):
         BaseGenome.__init__(self, parameters=self.parameters)
 
     def forward(self, inp):
-        return self.graph.forward(inp)
+        outp = self.graph.forward(inp)
+        return outp.reshape(-1, self.output_size)
 
     def mutate(self, rate) -> 'CGP_Rule':
         new_graph = self.graph.mutate(mutation_rate=rate)

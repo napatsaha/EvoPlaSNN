@@ -11,6 +11,7 @@ class RewardCollector:
     # _valid_fitness_types: List[str] = ["reward", "latency"]
     _optimise_direction_dict: dict = {
         "reward": 'maximise',
+        "success_rate": 'maximise',
         "latency": 'minimise'
     }
     _agg_func_dict: Dict[str, Callable] = {
@@ -19,6 +20,11 @@ class RewardCollector:
         "min": np.minimum,
         "median": np.median,
         "sum": np.sum
+    }
+    _bounds = {
+        "reward": (-1.0, 1.0),
+        "success_rate": (0.0, 1.0),
+        "latency": (0.0, np.inf)
     }
     def __init__(self, *, fitness_type: Literal["reward", "latency"] = "reward",
                  fitness_agg_func: Literal["mean", "sum", "min", "max", "median"] = "mean",
@@ -39,13 +45,14 @@ class RewardCollector:
         self.records = []
         if fitness_type not in self._optimise_direction_dict:
             raise ValueError(f"Fitness type {fitness_type} is not supported. Only accepts {self._optimise_direction_dict.keys()}")
+        self.fitness_type = fitness_type
+        self.minimise = self._optimise_direction_dict.get(self.fitness_type) == 'minimise'
         if fitness_agg_func not in self._agg_func_dict:
             if not isinstance(fitness_agg_func, Callable):
                 raise ValueError(f"Aggregate function {fitness_agg_func} not supported. \
                                  Only accepts {self._agg_func_dict.keys()} or a Callable.")
-        self.fitness_type = fitness_type
-        self.minimise = self._optimise_direction_dict.get(self.fitness_type) == 'minimise'
         self.fitness_agg_func = fitness_agg_func
+        # TODO: Get min-max fitness from environment
         self.max_fitness = max_fitness
         self.min_fitness = min_fitness
         self.fitness_on_eval_only = fitness_on_eval_only
@@ -109,12 +116,20 @@ class RewardCollector:
         else:
             return [r.exploration for r in self.records]
     
+    def get_success(self, cutoff: int = None) -> list[float]:
+        if cutoff is not None:
+            return [1 if r.terminated and r.reward == self.max_fitness else 0 for r in self.records if r.t >= cutoff]
+        else:
+            return [1 if r.terminated and r.reward == self.max_fitness else 0 for r in self.records]
+
     def get_intermediate_fitness(self, cutoff: int = None) -> List[float]:
         """
         Return list of episode fitnesses before aggregation.
         """
         if self.fitness_type == "reward":
             fitnesses = self.get_rewards(cutoff=cutoff)
+        elif self.fitness_type == "success_rate":
+            fitnesses = self.get_success(cutoff=cutoff)
         elif self.fitness_type == "latency":
             fitnesses = self.get_episode_lengths(cutoff=cutoff)
         else:
@@ -125,12 +140,7 @@ class RewardCollector:
         """
         Calculate fitness for current trial. Depends on `fitness_type`
         """
-        if self.fitness_type == "reward":
-            fitnesses = self.get_rewards(cutoff=cutoff)
-        elif self.fitness_type == "latency":
-            fitnesses = self.get_episode_lengths(cutoff=cutoff)
-        else:
-            fitnesses = []
+        fitnesses = self.get_intermediate_fitness(cutoff)
         if len(fitnesses) == 0:
             return self.min_fitness
         agg = self._agg_func_dict.get(self.fitness_agg_func)

@@ -769,6 +769,7 @@ def plot_learning_rule_3D(rule: 'LearningRule', simulator: 'SNNSimulator' = None
     fig.text(0.5, 0.9, f"Learning Rule Response to Inputs:\nf({rule.input_order}) -> ΔWeight", ha="center", transform=fig.transFigure, fontsize=16)
     
     if savepath is not None:
+        # print(f"Saving plot to {savepath}")
         plt.savefig(savepath)
     if show:
         plt.show()
@@ -835,14 +836,26 @@ def plot_learning_rule_2D(rule: base.LearningRule, simulator: 'SNNSimulator' = N
     ax.set_xlabel(rule_inputs[0 if not transpose else 1])
     ax.set_ylabel(rule_inputs[1 if not transpose else 0])
 
+    if savepath is None:
+        title = "Learning Rule Response to Inputs:" 
+    else:
+        savepath = Path(savepath)
+        parent = savepath.parent
+        rule_no = savepath.stem.split("_")[2]
+        title = "Rule: " + str(parent / f"best_rule_{rule_no}.txt")
+
+    subtitle = f"f({rule_inputs}) = ΔWeight"
     fig.colorbar(axs[0, 0].images[0], ax=axs, orientation='vertical', fraction=.1, label='ΔWeight')
-    fig.text(0.5, 0.9, f"Learning Rule Response to Inputs:\nf({rule_inputs}) -> ΔWeight", ha="center", transform=fig.transFigure, fontsize=16)
+    fig.text(0.5, 0.99, title, ha="center", transform=fig.transFigure, fontsize=15)
+    fig.text(0.5, 0.95, subtitle, ha="center", transform=fig.transFigure, fontsize=15)
 
 
     if savepath is not None:
+        print(f"Saving plot to {savepath}")
         plt.savefig(savepath)
     if show:
         plt.show()
+    plt.close(fig)
 
 ### Plotting functions for Evolutionary Results ###
 

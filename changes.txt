@@ -1,3 +1,11 @@
+v1.1.11
+- collector.fitness_type="success_rate"
+- Fixed minor issue:
+    - `make_input_grid()` in `lrule.utils`
+    - Consistent output shape in CGP_Graph.forward
+    - More information in LearningRule abstract class
+    - Plotting run name in `plot_learning_rule_2D`
+
 v1.1.10
 - `Simulator.update_condition="on-reward"` supported
 - `BaseMaze` has a new attribute `reward_null` which control every other reward output
