@@ -48,8 +48,3 @@ def read_learning_rule(parameter_path: str | Path, config_path: str | Path) -> L
     return lrule_class(parameters=parameters, **lrule_params)
 
     
-def make_input_grid(bounds, N):
-    xii = [np.linspace(low, upp, N) for low, upp in bounds]
-    xgrids = np.meshgrid(*xii)
-    inp = np.concatenate([xi.reshape(-1, 1) for xi in xgrids], axis=-1)
-    return inp

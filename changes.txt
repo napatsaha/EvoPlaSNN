@@ -1,3 +1,8 @@
+v1.1.12
+- Initial attempt at coding Novelty Search in `evo.novelty`
+- Helper functions like `compute_bc()`, `assymetric_min_max_normalise()`
+- Moved `make_input_grid()` from `lrule.utils` to `common.utils`
+
 v1.1.11
 - collector.fitness_type="success_rate"
 - Fixed minor issue:

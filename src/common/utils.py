@@ -166,6 +166,20 @@ def get_boundaries_for_lrule_inputs(simulator: 'SNNSimulator', input_var: str) -
         warnings.warn(f"Got exception: {exc}")
     return min_, max_
 
+def assymetric_min_max_normalise(a, center=0):
+    upper_bound = np.max(a)
+    lower_bound = np.min(a)
+    upper_range = upper_bound - center
+    lower_range = center - lower_bound
+    return np.where(a >= center, (a - center) / upper_range, (a - center) / lower_range)
+
+def make_input_grid(bounds, N):
+    xii = [np.linspace(low, upp, N) for low, upp in bounds]
+    xgrids = np.meshgrid(*xii)
+    inp = np.concatenate([xi.reshape(-1, 1) for xi in xgrids], axis=-1)
+    return inp
+
+
 ## Factory Methods
 
 ALGO_DICT = {
@@ -219,3 +233,5 @@ def create_learning_rule(type_: str = None, **kwargs) -> LearningRule:
     rule_cls = _get_lrule_class(type_)
     instance = rule_cls(**kwargs)
     return instance
+
+
