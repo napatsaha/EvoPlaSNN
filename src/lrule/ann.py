@@ -340,8 +340,6 @@ class ANN_Rule(BaseLearningRule):
         self.encode_learning_rate = encode_learning_rate
         self.encode_hidden_activation = encode_hidden_activation
         self.encode_output_activation = encode_output_activation
-        # TODO: Ensure ordering matches self.GENE_ORDER
-        self.encodings = [self.encode_weights, self.encode_learning_rate, self.encode_hidden_activation, self.encode_output_activation]
 
         self.genes_to_encode = genes_to_encode
         self._genes_params = {}
@@ -362,6 +360,11 @@ class ANN_Rule(BaseLearningRule):
 
         weight_size = calculate_size(self.input_size, hidden_size, self.output_size, bias)
         num_hidden_layers = len(solve_hidden(hidden_size))
+        if num_hidden_layers < 1:
+            self.encode_hidden_activation = False
+            
+        # TODO: Ensure ordering matches self.GENE_ORDER
+        self.encodings = [self.encode_weights, self.encode_learning_rate, self.encode_hidden_activation, self.encode_output_activation]
 
         # CASE 1: An array of parameters is passed through
         # Create genes from parameters according to gene_params (if present)

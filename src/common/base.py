@@ -243,6 +243,19 @@ class Parameter(ABC):
         Returns:
             Parameter: new Paramter
         """
+    
+    @abstractmethod
+    def crossover(self, other: 'Parameter', flags: bool | List | ArrayLike) -> 'Parameter':
+        """
+        Perform a point crossover with another Parameter given an array of flags where crossover should occur.
+
+        Args:
+            other (Parameter): The other Parameter
+            flags (bool | List | ArrayLike): where to recombine the genes
+
+        Returns:
+            Parameter: New recombined Parameter
+        """
         
     @abstractmethod
     def copy(self) -> 'Parameter':

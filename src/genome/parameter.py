@@ -79,6 +79,19 @@ class BaseParameter(Parameter):
         # Generate a new object based on new value
         new_param = self.__class__(value, **self.to_dict())
         return new_param
+    
+    def crossover(self, other: 'Parameter', flags: bool | ArrayLike) -> 'BaseParameter':
+        flags = np.asarray(flags, dtype=bool)
+        assert flags.size == self.length, "Length of flags must be equal to length of param"
+        assert other.length == self.length, "Cannot perform crossover between Parameters of different sizes"
+        # Where flag==0, use this Parameter's value
+        value_this = copy(self.value)
+        value_other = copy(other.value)
+        # Where flag==1, use the other Parameter's value
+        value = np.where(flags, value_other, value_this)
+        # Generate a new object based on new value
+        new_param = self.__class__(value, **self.to_dict())
+        return new_param
 
     def to_dict(self) -> dict:
         return {k: self.__dict__.get(k) for k in self.__dict__ if not k.startswith("_")}

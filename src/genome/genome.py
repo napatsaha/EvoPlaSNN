@@ -63,10 +63,6 @@ class CompositeGenome(Genome):
         param = [g.value for g in self.genes]
         self._parameters = np.r_[*param]
 
-    # @classmethod
-    # def from_gene(cls, genes, **kwargs) -> 'CompositeGenome':
-
-
     def mutate(self, rate, return_genes_only: bool = False) -> Genome | List[Parameter]:
         new_genes = []
         rate = np.clip(rate, 0, 1, dtype=np.float32)
@@ -76,6 +72,26 @@ class CompositeGenome(Genome):
             l = gene.length
             flags = to_mutate_flag[idx:(idx+l)]
             new_gene = gene.mutate(flags)
+            new_genes.append(new_gene)
+            idx += l
+
+        if return_genes_only:
+            return new_genes
+        else:
+            return self.__class__(new_genes)
+
+    def crossover(self, other: Genome, rate: float, return_genes_only: bool = False) -> Genome | List[Parameter]:
+        assert len(self.genes) == len(other.genes), "Both Composite Genomes must have the same number of genes. " + \
+            f"Got {len(self.genes)} genes in first Genome and {len(other.genes)} genes in second Genome."
+        assert self.size == other.size, f"Both genome must have the same size. Got size={self.size} and size={other.size}"
+        new_genes = []
+        rate = np.clip(rate, 0, 1, dtype=np.float32)
+        genome_flags = np.random.binomial(1, rate, size=self.size)
+        idx = 0
+        for gene, other_gene in zip(self.genes, other.genes):
+            l = gene.length
+            local_flags = genome_flags[idx:(idx+l)]
+            new_gene = gene.crossover(other_gene, local_flags)
             new_genes.append(new_gene)
             idx += l
 
