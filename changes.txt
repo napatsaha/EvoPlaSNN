@@ -1,8 +1,15 @@
+v1.1.14:
+- NSGA-II in new module `evo.nsga2`
+- Novelty Search with Local Competition in class `evo.novelty.NSLC`:
+    - Very messy, need work
+    - Haven't tested yet
+- ANN_Rule.crossover and Abstract `Genome.crossover()`
+
 v1.1.13
 - Crossover:
     - `BaseParameter.crossover()`
     - `CompositeGenome.crossover()`
-    - Abstract `Genome.crossover()`
+    - Abstract `Parameter.crossover()`
 - Fixed in `ANN_Rule` when there is no hidden layer, and `encode_hidden_activation=True` 
     -> Force `encode_hidden_activation=False` so no gene will be created
 

@@ -295,7 +295,7 @@ class ANN:
         return s
 
 
-class ANN_Rule(BaseLearningRule):
+class ANN_Rule(BaseLearningRule, Genome):
     """
     A Learning Rule that represents a black box ANN function that converts synapse-related information to weight updates.
     """
@@ -535,6 +535,10 @@ class ANN_Rule(BaseLearningRule):
 
     def mutate(self, rate: float) -> np.ndarray:
         new_genes = self.genome.mutate(rate, return_genes_only=True)
+        return self.__class__(genes = new_genes, **self.to_dict())
+
+    def crossover(self, other: 'ANN_Rule', rate: float):
+        new_genes = self.genome.crossover(other.genome, rate, return_genes_only=True)
         return self.__class__(genes = new_genes, **self.to_dict())
 
     def to_dict(self) -> dict:

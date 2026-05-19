@@ -196,12 +196,18 @@ class Genome(ABC):
     genes: List['Parameter']
 
     @abstractmethod
-    def mutate(self, rate: float, return_genes_only: bool, **kwargs) -> 'Genome':
+    def mutate(self, rate: float, **kwargs) -> 'Genome':
         """
         Create a modified copy of itself
 
         Args:
             rate (float): mutation rate
+        """
+
+    @abstractmethod
+    def crossover(self, other: 'Genome', rate: float) -> 'Genome' | List['Parameter']:
+        """
+        Crossover between two Genomes
         """
 
     @property
