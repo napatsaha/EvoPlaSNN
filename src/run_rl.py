@@ -289,10 +289,20 @@ def eval(results_path: Path | str = None, *, config_path: str | Path = None, num
                                             savepath=Path(results_path, f"{prefix}_intermediate_fitness.png") if save_plots else None, show=show_plots)
         except Exception as e:
             print(f"Error plotting intermediate fitness: {e}")
-        # Plot Learning Rule Response
+        
+        
+        # Plot Learning Rule Response for each rule in save_best
         try:
-            snn_plot.plot_learning_rule(lrule, simulator, 
-                                        savepath=Path(results_path, f"{prefix}_learning_rule.png") if save_plots else None, show=show_plots)
+            num_save_best = config.get("evo_params", {}).get("manager", {}).get("save_best", 0)
+            for rule_id in range(1, num_save_best+1):
+                rule_id_name = f"best_rule_{rule_id:02d}.txt"
+                if not (results_path / rule_id_name).exists():
+                    raise FileNotFoundError(f"Rule file {rule_id_name} not found in {results_path}. Please run the evolution first.")
+                # Load the best ANN learning rule
+                lrule = read_learning_rule(results_path / rule_id_name, config_path=results_path / "config.yaml")
+                prefix = f"eval_rule_{rule_id:02d}"
+                snn_plot.plot_learning_rule(lrule, simulator, 
+                                            savepath=Path(results_path, f"{prefix}_learning_rule.png") if save_plots else None, show=show_plots)
         except Exception as e:
             print(f"Error plotting learning rule: {e}")
 

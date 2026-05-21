@@ -123,6 +123,16 @@ def compare_deep_dict(d1: dict, d2: dict, warn_missing_keys: bool = True):
             raise Warning("Reached unsupported case where key not in either Dict1 or Dict2")
     return diffs
 
+LRULE_INPUT_BOUNDS = {
+    "trace_pre": (0, 1),
+    "trace_post": (0, 1),
+    "weights": (-1, 1), 
+    "reward": (-1, 1), 
+    "eligibility_pre": (0, 1), 
+    "eligibility_post": (0, 1), 
+    "eligibility_stdp": (0, 1)
+}
+
 
 def get_boundaries_for_lrule_inputs(simulator: 'SNNSimulator', input_var: str) -> Tuple[float, float]:
     _supported_inputs = ("trace_pre", "trace_post", "weights", "reward", "eligibility_pre", "eligibility_post", "eligibility_stdp")

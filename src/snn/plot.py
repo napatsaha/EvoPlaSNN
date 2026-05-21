@@ -16,7 +16,7 @@ import seaborn as sns
 # from .simulate import SNNSimulator
 from snn.utils import get_spike_times
 from common import base
-from common.utils import get_boundaries_for_lrule_inputs
+from common.utils import get_boundaries_for_lrule_inputs, LRULE_INPUT_BOUNDS
 
 ### Plotting functions that require Simulator ###
 
@@ -699,7 +699,7 @@ def plot_intermediate_fitness(simulator: 'SNN_Simulator' = None, values: np.ndar
 
 ### Plotting functions for Learning Rule ###
 
-def plot_learning_rule(rule: 'LearningRule', simulator: 'SNNSimulator' = None, **kwargs):
+def plot_learning_rule(rule: 'base.LearningRule', simulator: 'SNNSimulator' = None, **kwargs):
     input_size = getattr(rule, "input_size")
     if input_size == 2:
         plot_learning_rule_2D(rule, simulator, **kwargs)
@@ -708,71 +708,160 @@ def plot_learning_rule(rule: 'LearningRule', simulator: 'SNNSimulator' = None, *
     else:
         raise ValueError(f"Plotting learning rule is not yet supported for input_size={input_size}")
 
-def plot_learning_rule_3D(rule: 'LearningRule', simulator: 'SNNSimulator' = None, *, 
-                       cmap: str = "RdBu", num_mesh: int = 100,
-                       wmax: float = 1.0, wmin: float = -1.0, emax: float = 2.0, emin: float = 0.0,
-                       rew_list: List[float] = None,
-                       x_scale: float = 1.0, y_scale: float = 1.0,
-                       savepath: str | Path = None, show: bool = True):
-    # TODO: Fix format to be generic like plot_learning_rule_1D
-    if simulator is not None:
-        assert simulator.record_eligibility_pre or simulator.record_eligibility_post or simulator.record_eligibility_stdp, "Eligibility trace recording is not enabled."
-        assert simulator.record_weights, "Weight recording is not enabled."
-        wmax = max(wmax, simulator.weight_recorder.values[0].max())
-        wmin = min(wmin, simulator.weight_recorder.values[0].min())
-        emax = max(emax, simulator.eligibility_pre_recorder.values[0].max())
-        emin = min(emin, simulator.eligibility_pre_recorder.values[0].min())
+def plot_learning_rule_3D(rule: 'base.LearningRule', simulator: 'SNNSimulator' = None, *, 
+                          n_bins: int = 100, n_cols: int = 5, var_col: str = "reward",
+                          cmap: str = "RdBu", figsize: tuple = (20, 10),
+                          savepath: str | Path = None, show: bool = True,
+                          **kwargs) -> None:
+    # DONE: Fix format to be generic like plot_learning_rule_1D
+    # Use default values for each inputs
+    bounds = [LRULE_INPUT_BOUNDS.get(inp) for inp in rule.input_order]
+    # TODO: Update bounds with recorded values if a Simulator is passed in
+
+    # Set axis names for column and remaining x-y variables
+    assert var_col in rule.input_order, f"Variable {var_col} to set by column must exists within rule." + \
+        f" Rule only uses following inputs: {rule.input_order}"
+    var_names = rule.input_order.copy()
+    i_col = var_names.index(var_col)
+    var_col = var_names.pop(i_col)
+
+    # Set extent to be used with imshow for remaining x-y variables
+    xy_bounds = bounds.copy()
+    xy_bounds.pop(i_col)
+    xy_bounds = [x for xy in xy_bounds for x in xy]
+
+    # Index for x-y variables
+    xy_index = [*range(rule.input_size)]
+    xy_index.pop(i_col)
+
+    # Preparing spaces for each variables
+    num_meshes = [n_bins, n_bins]
+    num_meshes.insert(i_col, n_cols)
+
+    xii = [np.linspace(low, upp, n) for (low, upp), n in zip(bounds, num_meshes)]
+
+    # Query the rule for each value of column variable
+    # The reason this has to be done in a for loop is because array.reshape
+    #   does not guarantee accurate values when i_col is not the last var
+    vv = np.empty((n_bins, n_bins, n_cols))
+
+    for xi in range(n_cols):
+        # Make meshgrid based on remaining x-y variables
+        xx, yy = np.meshgrid(xii[xy_index[0]], xii[xy_index[1]], indexing='xy')
+        # Make a constant array broadcasted to 2D grid
+        z = xii[i_col][xi]
+        zz = np.full([n_bins, n_bins], z)
+        # Insert this z-array into the position governed by i_col
+        inp_list = [xx, yy]
+        inp_list.insert(i_col, zz)
+        # Flatten inputs and query learning rule
+        inp = np.concatenate([ip.reshape(-1, 1) for ip in inp_list], axis=-1)
+        outp = rule.forward(inp)
+        vv[:, :, xi] = outp.reshape((n_bins, n_bins))
+
+    # After all values are queried, build a divergent colormap based centered at 0 
+    #   and global min-max of outputs
+    vmin = vv.min()
+    vmax = vv.max()
+    colorizer = mpl.colorizer.Colorizer(cmap=cmap, norm=mpl.colors.CenteredNorm(vcenter=0))
+    colorizer.set_clim(vmin, vmax)
+
+    # Values are ready, plots can be made
+    fig, axs = plt.subplots(1, n_cols, figsize=figsize)
+    for xi in range(n_cols):
+        ax = axs[xi]
+        val_xi = xii[i_col][xi]
+        img = ax.imshow(vv[:, :, xi], extent=xy_bounds, aspect="equal", origin="lower", colorizer=colorizer)
+        ax.set_title(f"{var_col} = {val_xi}")
+        ax.set_xlabel(var_names[0])
+        ax.set_ylabel(var_names[1])
+
+    # Cosmetic and text additions to plot space
+    if savepath is None:
+        title = "Learning Rule Response to Inputs:"
     else:
-        wmax = wmax
-        wmin = wmin
-        emax = emax
-        emin = emin
+        savepath = Path(savepath)
+        parent = savepath.parent
+        rule_no = savepath.stem.split("_")[2]
+        title = "Rule: " + str(parent / f"best_rule_{rule_no}.txt")
 
-    # arule = lrule.ann
-    N = num_mesh
-    # Eligibility trace range
-    etrace_r = np.linspace(emin, emax, N)
-    # Weight range
-    weight_r = np.linspace(wmin, wmax, N)
-    ee, ww = np.meshgrid(etrace_r, weight_r)
+    subtitle = f"f({rule.input_order}) = ΔWeight"
+    fig.text(0.5, 0.99, title, ha="center", transform=fig.transFigure, fontsize=15)
+    fig.text(0.5, 0.95, subtitle, ha="center", transform=fig.transFigure, fontsize=15)
+    fig.colorbar(img, ax=axs, fraction=0.1, orientation="horizontal", aspect=50, label='ΔWeight')
 
-    # Reward range
-    if rew_list is not None:
-        rew_r = np.array(rew_list)
-    else:
-        rew_r = np.array([-1.0, -0.1, 0.1, 1.0])
-    rr = np.full((N, N), rew_r[0])
-
-    # Combine
-    dw_rec = np.zeros((N, N, len(rew_r)))
-
-    for i, r in enumerate(rew_r):
-        rr = np.full((N, N), r)
-        inp = np.concatenate([ww[..., np.newaxis], rr[..., np.newaxis], ee[..., np.newaxis]], axis=2)
-        # inp = np.concatenate([rr[..., np.newaxis], ee[..., np.newaxis]], axis=2)
-        dw = rule.forward(inp)
-        dw_rec[..., i] = dw.reshape(N, N)
-    
-    # Start plotting
-    ncol = int(np.ceil(np.sqrt(len(rew_r))))
-    nrow = int(np.ceil(len(rew_r) / ncol))
-    fig, axs = plt.subplots(nrow, ncol, figsize=(ncol * 7.5 * x_scale, nrow * 7.5 * y_scale), squeeze=False)
-
-    for i, r in enumerate(rew_r):
-        ax = axs.flat[i]
-        ax.imshow(dw_rec[..., i], extent=[emin, emax, wmin, wmax], origin='lower', aspect='auto', vmin=-1, vmax=1, cmap=cmap)
-        ax.set_title(f"Reward = {r}")
-        ax.set_xlabel("Eligibility Trace")
-        ax.set_ylabel("Weight")
-
-    fig.colorbar(axs[0, 0].images[0], ax=axs, orientation='vertical', fraction=.1, label='ΔWeight')
-    fig.text(0.5, 0.9, f"Learning Rule Response to Inputs:\nf({rule.input_order}) -> ΔWeight", ha="center", transform=fig.transFigure, fontsize=16)
-    
     if savepath is not None:
-        # print(f"Saving plot to {savepath}")
         plt.savefig(savepath)
     if show:
         plt.show()
+    plt.close(fig)
+
+
+# def plot_learning_rule_3D(rule: 'LearningRule', simulator: 'SNNSimulator' = None, *, 
+#                        cmap: str = "RdBu", num_mesh: int = 100,
+#                        wmax: float = 1.0, wmin: float = -1.0, emax: float = 2.0, emin: float = 0.0,
+#                        rew_list: List[float] = None,
+#                        x_scale: float = 1.0, y_scale: float = 1.0,
+#                        savepath: str | Path = None, show: bool = True):
+
+    # if simulator is not None:
+    #     assert simulator.record_eligibility_pre or simulator.record_eligibility_post or simulator.record_eligibility_stdp, "Eligibility trace recording is not enabled."
+    #     assert simulator.record_weights, "Weight recording is not enabled."
+    #     wmax = max(wmax, simulator.weight_recorder.values[0].max())
+    #     wmin = min(wmin, simulator.weight_recorder.values[0].min())
+    #     emax = max(emax, simulator.eligibility_pre_recorder.values[0].max())
+    #     emin = min(emin, simulator.eligibility_pre_recorder.values[0].min())
+    # else:
+    #     wmax = wmax
+    #     wmin = wmin
+    #     emax = emax
+    #     emin = emin
+
+    # # arule = lrule.ann
+    # N = num_mesh
+    # # Eligibility trace range
+    # etrace_r = np.linspace(emin, emax, N)
+    # # Weight range
+    # weight_r = np.linspace(wmin, wmax, N)
+    # ee, ww = np.meshgrid(etrace_r, weight_r)
+
+    # # Reward range
+    # if rew_list is not None:
+    #     rew_r = np.array(rew_list)
+    # else:
+    #     rew_r = np.array([-1.0, -0.1, 0.1, 1.0])
+    # rr = np.full((N, N), rew_r[0])
+
+    # # Combine
+    # dw_rec = np.zeros((N, N, len(rew_r)))
+
+    # for i, r in enumerate(rew_r):
+    #     rr = np.full((N, N), r)
+    #     inp = np.concatenate([ww[..., np.newaxis], rr[..., np.newaxis], ee[..., np.newaxis]], axis=2)
+    #     # inp = np.concatenate([rr[..., np.newaxis], ee[..., np.newaxis]], axis=2)
+    #     dw = rule.forward(inp)
+    #     dw_rec[..., i] = dw.reshape(N, N)
+    
+    # # Start plotting
+    # ncol = int(np.ceil(np.sqrt(len(rew_r))))
+    # nrow = int(np.ceil(len(rew_r) / ncol))
+    # fig, axs = plt.subplots(nrow, ncol, figsize=(ncol * 7.5 * x_scale, nrow * 7.5 * y_scale), squeeze=False)
+
+    # for i, r in enumerate(rew_r):
+    #     ax = axs.flat[i]
+    #     ax.imshow(dw_rec[..., i], extent=[emin, emax, wmin, wmax], origin='lower', aspect='auto', vmin=-1, vmax=1, cmap=cmap)
+    #     ax.set_title(f"Reward = {r}")
+    #     ax.set_xlabel("Eligibility Trace")
+    #     ax.set_ylabel("Weight")
+
+    # fig.colorbar(axs[0, 0].images[0], ax=axs, orientation='vertical', fraction=.1, label='ΔWeight')
+    # fig.text(0.5, 0.9, f"Learning Rule Response to Inputs:\nf({rule.input_order}) -> ΔWeight", ha="center", transform=fig.transFigure, fontsize=16)
+    
+    # if savepath is not None:
+    #     # print(f"Saving plot to {savepath}")
+    #     plt.savefig(savepath)
+    # if show:
+    #     plt.show()
     # plt.close(fig)
 
 
@@ -803,15 +892,19 @@ def plot_learning_rule_2D(rule: base.LearningRule, simulator: 'SNNSimulator' = N
     # Extract info from learning rule
     n_inputs = rule.input_size
     rule_inputs = rule.input_order
-    # Auto extract boundaries if simulator is passed in
-    if simulator is not None:
-        xmin_, xmax_ = get_boundaries_for_lrule_inputs(simulator, rule_inputs[0])
-        xmin = xmin_ if xmin_ is not None else xmin
-        xmax = xmax_ if xmax_ is not None else xmax
 
-        ymin_, ymax_ = get_boundaries_for_lrule_inputs(simulator, rule_inputs[1])
-        ymin = ymin_ if ymin_ is not None else ymin
-        ymax = ymax_ if ymax_ is not None else ymax
+    bounds = [LRULE_INPUT_BOUNDS.get(inp) for inp in rule.input_order]
+    xmin, xmax = bounds[0]
+    ymin, ymax = bounds[1]
+    # TODO: Update boundaries if simulator is passed in
+    # if simulator is not None:
+    #     xmin_, xmax_ = get_boundaries_for_lrule_inputs(simulator, rule_inputs[0])
+    #     xmin = xmin_ if xmin_ is not None else xmin
+    #     xmax = xmax_ if xmax_ is not None else xmax
+
+    #     ymin_, ymax_ = get_boundaries_for_lrule_inputs(simulator, rule_inputs[1])
+    #     ymin = ymin_ if ymin_ is not None else ymin
+    #     ymax = ymax_ if ymax_ is not None else ymax
         
     # Prepare inputs
     x_vals = np.linspace(xmin, xmax, num_mesh)
