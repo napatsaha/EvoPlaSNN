@@ -1,3 +1,18 @@
+v1.1.17
+- Big changes to `NSLC`:
+    - Behaviour characterisation (BC) is no longer calculated within the class, but rather passed in during `.tell()`
+    - Additional args for `dist_metric` and `minimise`
+    - Added `.offsprings` list of Solution to keep track of both parents and offsprings:
+        - `BaseSolver.solutions` will always be the genome of offsprings after first gen
+    - Changed how `.tell` works
+    - `_eval_novelty()` takes in list of Solution instead of two objective arrays
+    - `_make_new_generation` renamed to `_sort_and_select`:
+        - doesn't rely on crowding distance anymore
+        - only needs N, fronts and dist as args
+    - Adding to archive uses deepcopy
+- Added `rank` attribute to `Solution` container
+- `nsga2.fast_dominated_sort()` no longer needs `sols` as inputs
+
 v1.1.16
 - `CGP_Rule.crossover()`
 - Refactor certain parts of `to_dict()` to inside `BaseLearningRule`

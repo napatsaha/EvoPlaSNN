@@ -31,7 +31,7 @@ def dominates(sol1, sol2, obj1, obj2):
 # def f2(x):
 #     return np.sum(x**2, axis=1)
 
-def fast_nondominated_sort(sols: np.ndarray, obj1, obj2):
+def fast_nondominated_sort(obj1, obj2):
     N = len(obj1)
     S_dom_by = [[] for _ in range(N)]
     n_dom_over = np.zeros(shape=N)
@@ -195,12 +195,12 @@ class NSGA2:
             o1_R = np.concatenate([self.P_o1, self.Q_o1])
             o2_R = np.concatenate([self.P_o2, self.Q_o2])
 
-            fronts_R, ranks_R = fast_nondominated_sort(R, o1_R, o2_R)
+            fronts_R, ranks_R = fast_nondominated_sort(o1_R, o2_R)
 
             self.P, self.P_o1, self.P_o2 = self.select_new_parents(R, fronts_R, ranks_R, o1_R, o2_R)
 
 
-        fronts_P, ranks_P = fast_nondominated_sort(self.P, self.P_o1, self.P_o2)
+        fronts_P, ranks_P = fast_nondominated_sort(self.P_o1, self.P_o2)
         dist_P = crowding_distance(fronts_P, self.N, self.P_o1, self.P_o2)
 
         self.Q = self.create_offspring(self.P, ranks_P, dist_P)
