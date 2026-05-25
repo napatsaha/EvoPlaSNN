@@ -132,6 +132,29 @@ class BaseLearningRule(LearningRule):
     def forward(self, inp: np.ndarray) -> np.ndarray:
         raise NotImplementedError("Each Learning Rule needs to implement its own forward method")
     
+    def to_dict(self) -> dict:
+        """
+        Converts instance attributes necessary for reinitialisation of same class. Used in `.mutate()` and `.crossover()`.
+
+        Returns:
+            dict: Dictionary of init attributes
+        """
+        d = dict(
+            learning_rate = self.learning_rate,
+            learning_rate_thr = self.learning_rate_thr,
+            threshold_agg_func = self.threshold_agg_func,
+            use_trace_pre = self.use_trace_pre,
+            use_trace_post = self.use_trace_post,
+            use_weights = self.use_weights,
+            use_reward = self.use_reward,
+            use_eligibility_pre = self.use_eligibility_pre,
+            use_eligibility_post = self.use_eligibility_post,
+            use_eligibility_stdp = self.use_eligibility_stdp,
+            delta_weight = self.delta_weight,
+            delta_threshold = self.delta_threshold,
+        )
+        return d
+
     # @property
     # def size(self):
     #     raise NotImplementedError("Subclasses should implement method to return genome size")

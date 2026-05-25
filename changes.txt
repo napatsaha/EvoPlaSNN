@@ -1,3 +1,10 @@
+v1.1.16
+- `CGP_Rule.crossover()`
+- Refactor certain parts of `to_dict()` to inside `BaseLearningRule`
+- Renamed `BaseGenome` -> `SimpleGenome`
+- `CGP_Rule` now includes `genome` component instead of being a child of `BaseGenome`
+    - It is still a child of `Genome` for typing / interface purposes
+
 v1.1.15
 - Vast improvement of `plot_learning_rule_3D` after many verification of accuracy in value position
 - Make `run_rl.eval()` plot each learning rule saved in save_best

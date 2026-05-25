@@ -542,30 +542,19 @@ class ANN_Rule(BaseLearningRule, Genome):
         return self.__class__(genes = new_genes, **self.to_dict())
 
     def to_dict(self) -> dict:
-        d = dict(
-            # Self params
+        d = super().to_dict()
+        d.update(dict(
+            # Encoding params
             encode_learning_rate = self.encode_learning_rate,
             encode_hidden_activation = self.encode_hidden_activation,
             encode_output_activation = self.encode_output_activation,
-            learning_rate = self.learning_rate,
-            learning_rate_thr = self.learning_rate_thr,
-            threshold_agg_func = self.threshold_agg_func,
-            use_trace_pre = self.use_trace_pre,
-            use_trace_post = self.use_trace_post,
-            use_weights = self.use_weights,
-            use_reward = self.use_reward,
-            use_eligibility_pre = self.use_eligibility_pre,
-            use_eligibility_post = self.use_eligibility_post,
-            use_eligibility_stdp = self.use_eligibility_stdp,
-            delta_weight = self.delta_weight,
-            delta_threshold = self.delta_threshold,
             # ANN params
             hidden_activation = self.ann.hidden_activation,
             output_activation = self.ann.output_activation,
             weight_dist = self.ann.weight_dist,
             bias = self.ann.bias,
             hidden_size = self.ann.hidden_sizes,
-        )
+        ))
         return d
 
     def save_parameters(self, file_path: str, precision: int = 6):

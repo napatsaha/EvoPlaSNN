@@ -1,19 +1,35 @@
 from typing import List, Literal
 
 import numpy as np
+from numpy.typing import ArrayLike
 
 from common.base import Genome, Parameter
 
 
-class BaseGenome(Genome):
+class SimpleGenome(Genome):
     """
     Base class to allow for genetic-related operations in evolutionary Solver.
     """
-    def __init__(self, parameters = None, **kwargs):
+    def __init__(self, parameters: ArrayLike = None, size: int = None, dist: Literal["normal", "uniform"] = "uniform", **kwargs):
         super().__init__()
-        self._parameters = parameters
+        self.dist = dist
+        if parameters is None:
+            if size is not None:
+                self._parameters = self._make_random_parameters(size)
+            else:
+                raise ValueError("Either 'parameters' or 'size' must be supplied.")
+        else:
+            self._parameters = parameters
 
-    def mutate(self, rate: float, dist: Literal["normal", "uniform"], **kwargs) -> 'Genome':
+    def _make_random_parameters(self, size: int) -> ArrayLike:
+        if self.dist == "uniform":
+            return np.random.random_sample(size=size)
+        elif self.dist == "normal":
+            return np.random.standard_normal(size=size)
+        else:
+            raise ValueError(f"Distribution {self.dist} not supported")
+
+    def mutate(self, rate: float, **kwargs) -> 'Genome':
         """
         Create a modified copy of itself
 
@@ -24,13 +40,15 @@ class BaseGenome(Genome):
         rate = np.clip(rate, 0, 1, dtype=np.float32)
         gene_to_mutate = np.random.randint(self.size, size=(int(rate*self.size), ))
         for gene_id in gene_to_mutate:
-            if dist == "uniform":
-                params[gene_id] = np.random.rand()
-            elif dist == "normal":
-                params[gene_id] = np.random.randn()
-            else:
-                raise ValueError(f"Distribution {dist} not supported")
+            params[gene_id] = self._make_random_parameters(size=1)
         return self.__class__(params)
+
+    def crossover(self, other: Genome, rate: float) -> Genome:
+        assert self.size == other.size, f"Both genome must have the same size. Got size={self.size} and size={other.size}"
+        rate = np.clip(rate, 0, 1)
+        flags = np.random.binomial(1, p=rate, size=self.size)
+        new_params = np.where(flags, self.parameters, other.parameters)
+        return self.__class__(parameters=new_params, dist=self.dist)
 
     @property
     def parameters(self) -> np.ndarray:
@@ -45,6 +63,10 @@ class BaseGenome(Genome):
         Returns the number of parameters that exists in the genome
         """
         return len(self._parameters)
+
+    @property
+    def genome(self) -> Genome:
+        return self
 
     def __repr__(self) -> str:
         return f"Genome({self.parameters})"
@@ -80,7 +102,7 @@ class CompositeGenome(Genome):
         else:
             return self.__class__(new_genes)
 
-    def crossover(self, other: Genome, rate: float, return_genes_only: bool = False) -> Genome | List[Parameter]:
+    def crossover(self, other: 'CompositeGenome', rate: float, return_genes_only: bool = False) -> Genome | List[Parameter]:
         assert len(self.genes) == len(other.genes), "Both Composite Genomes must have the same number of genes. " + \
             f"Got {len(self.genes)} genes in first Genome and {len(other.genes)} genes in second Genome."
         assert self.size == other.size, f"Both genome must have the same size. Got size={self.size} and size={other.size}"

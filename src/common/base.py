@@ -193,7 +193,7 @@ class Genome(ABC):
     # def __init__(self, **kwargs):
     #     super().__init__()
         # self._parameters = parameters
-    genes: List['Parameter']
+    # genes: List['Parameter']
 
     @abstractmethod
     def mutate(self, rate: float, **kwargs) -> 'Genome':

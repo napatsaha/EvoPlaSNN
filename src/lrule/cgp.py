@@ -10,7 +10,7 @@ from numpy.typing import ArrayLike
 
 from lrule.base import BaseLearningRule
 from common.base import Genome
-from genome.genome import BaseGenome
+from genome.genome import SimpleGenome
 
 
 
@@ -434,7 +434,7 @@ class CGP_Graph:
         return f"CGP_Graph({self._tuplify_genome()}, n_inputs={self.n_inputs}, n_rows={self.n_rows}, n_cols={self.n_cols}, n_outputs={self.n_outputs})"
 
 
-class CGP_Rule(BaseLearningRule, BaseGenome):
+class CGP_Rule(BaseLearningRule, Genome):
     """
     Learning Rule version of CGP.
     Contains a CGP graph calibrated to synaptic update
@@ -472,7 +472,7 @@ class CGP_Rule(BaseLearningRule, BaseGenome):
             **kwargs
         )
 
-        BaseGenome.__init__(self, parameters=self.parameters)
+        self.genome = SimpleGenome(parameters=self.parameters)
 
     def forward(self, inp):
         outp = self.graph.forward(inp)
@@ -483,6 +483,27 @@ class CGP_Rule(BaseLearningRule, BaseGenome):
         new_rule = copy.copy(self)
         new_rule.graph = new_graph
         return new_rule
+
+    def crossover(self, other: 'CGP_Rule', rate: float) -> 'CGP_Rule':
+        new_genome = self.genome.crossover(other.genome, rate)
+        return self.__class__(parameters=new_genome.parameters, **self.to_dict())
+        # return super().crossover(other, rate)
+
+    def to_dict(self):
+        d = super().to_dict()
+        d.update(
+            dict(
+                n_rows = self.graph.n_rows, 
+                n_cols = self.graph.n_cols, 
+                function_list = self.graph.function_list,
+                arity = self.graph.arity, 
+                levels_back = self.graph.levels_back, 
+                allow_input_anywhere = self.graph._allow_inputs,
+                mutation_rate = self.graph._mu_rate, 
+                mutation_method = self.graph.mutation_method,
+            )
+        )
+        return d
 
     @property
     def size(self):
@@ -497,7 +518,7 @@ class CGP_Rule(BaseLearningRule, BaseGenome):
         self.graph.genome = value
 
     # Alias
-    genome = parameters
+    # genome = parameters
 
     def __repr__(self):
         return f"CGP_Rule(parameters={self.graph._tuplify_genome()}, size={self.size}, input_order={self.input_order}, outputs={self.output_order}, learning_rate={self.learning_rate})"

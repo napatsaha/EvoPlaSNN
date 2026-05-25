@@ -5,7 +5,7 @@ import numpy as np
 from common.base import Solver
 from common.base import Genome
 from common.utils import create_learning_rule
-from genome.genome import BaseGenome
+from genome.genome import SimpleGenome
 
 
 class Evaluator(Protocol):
@@ -93,7 +93,7 @@ class BaseSolver(Solver):
             if self._genome_type is not None:
                 indiv = create_learning_rule(self._genome_type, **self._genome_params)
             else:
-                indiv = BaseGenome(ndim=self.ndim)
+                indiv = SimpleGenome(size=self.ndim)
             self.solutions.append(indiv)
 
     def ask(self) -> List['Genome']:
