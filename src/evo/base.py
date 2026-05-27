@@ -1,4 +1,4 @@
-from typing import List, Tuple, Protocol, Union, override
+from typing import List, Tuple, Union, override
 from pathlib import Path
 import numpy as np
 
@@ -6,61 +6,6 @@ from common.base import Solver
 from common.base import Genome
 from common.utils import create_learning_rule
 from genome.genome import SimpleGenome
-
-
-class Evaluator(Protocol):
-    """
-    Base class for evaluation functions.
-    """
-    def __init__(self):
-        pass
-        # self.fitnesses: List[float] = []
-
-    def evaluate(self, solution: object, num_trials: int = None) -> float:
-        """
-        Evaluates a given solution and returns its fitness.
-        """
-        raise NotImplementedError("evaluate method must be implemented by subclasses.")
-    
-    def get_parameter_size(self) -> int:
-        """
-        Returns the size of the parameter space.
-        """
-        raise NotImplementedError("get_parameter_size method must be implemented by subclasses.")
-    
-    def setup_logger(self, log_file: str = None):
-        """
-        Sets up a logger for the evaluator.
-        """
-        pass
-
-    # def generate_new_classes(self) -> None:
-    #     """
-    #     Update set of classes used for spike generation.
-    #     Meant to be called at beginning of each generation.
-    #     """
-    #     pass
-
-    def setup_generation(self, gen_count: int, **kwargs):
-        """
-        Sets up at the beginning of each generation.  
-        To be called outside the class (i.e. by `Manager`), before whole population is to be evaluated.
-        """
-        pass
-
-    def setup_individual(self, inv_count: int, **kwargs):
-        """
-        Sets up at the beginning of each individual evaluation.  
-        To be called inside the class (within `evaluate()`), before trial evaluation loop is begun.
-        """
-        pass
-
-    def setup_trial(self, trial_count: int, **kwargs):
-        """
-        Sets up at the beginning of each trial evaluation.  
-        To be called inside the class (within `evaluate()`), at the start of each iteration of the trial loop.
-        """
-        pass
 
 
 class BaseSolver(Solver):
@@ -81,10 +26,10 @@ class BaseSolver(Solver):
             if self._genome_params is not None and "type" in self._genome_params:
                 self._genome_type = self._genome_params.pop("type")
         self._first_gen = True
-        self.fitnesses = None
+        self.fitnesses = np.zeros(self.popsize)
         self.best_fitness = None
         self.best_solution = None
-        self.reset()
+        # self.reset()
 
     def _generate_new_population(self, ):
         self.solutions = []
@@ -103,8 +48,8 @@ class BaseSolver(Solver):
 
     def reset(self):
         self._first_gen = True
-        self.fitnesses = np.zeros(self.popsize)
-        self._solutions = []
+        self.fitnesses.clear()
+        self._solutions.clear()
         self.best_fitness = None
         self.best_solution = None
 

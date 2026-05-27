@@ -123,15 +123,43 @@ def compare_deep_dict(d1: dict, d2: dict, warn_missing_keys: bool = True):
             raise Warning("Reached unsupported case where key not in either Dict1 or Dict2")
     return diffs
 
+## Concerning Learning Rule
+
 LRULE_INPUT_BOUNDS = {
     "trace_pre": (0, 1),
     "trace_post": (0, 1),
-    "weights": (-1, 1), 
+    "weights": (-5, 5), 
     "reward": (-1, 1), 
     "eligibility_pre": (0, 1), 
     "eligibility_post": (0, 1), 
     "eligibility_stdp": (0, 1)
 }
+
+def compute_lrule_bc(rule: LearningRule, inp: np.ndarray = None, normalise: bool = False, *,
+                           num_bin=10, bounds=None) -> np.ndarray:
+    assert isinstance(rule, LearningRule), "Currently only support Behaviour Characterisation for LearningRule"
+    assert inp.ndim == 2
+    assert inp.shape[1] == rule.input_size, "Second dimension of input arrays should have the same size as rule's inputs"
+
+    if inp is None:
+        if bounds is None:
+            raise NotImplementedError(f"Auto-calculating Input Bounds from Rule alone is not yet supported")
+        inp = make_input_grid(bounds, num_bin)
+
+    bc = rule.forward(inp)
+    if normalise:
+        bc = assymetric_min_max_normalise(bc)
+    return bc.flatten()
+
+
+def make_bc_func(input_order, num_grid, normalise):
+    bounds = [LRULE_INPUT_BOUNDS.get(var) for var in input_order]
+    inp = make_input_grid(bounds, num_grid)
+
+    def bc_func(rule):
+        return compute_lrule_bc(rule, inp, normalise)
+    
+    return bc_func
 
 
 def get_boundaries_for_lrule_inputs(simulator: 'SNNSimulator', input_var: str) -> Tuple[float, float]:
@@ -196,7 +224,8 @@ ALGO_DICT = {
     "cma_es": ("evo.cma_es", "CMA_ES"),
     "es": ("evo.es", "EvolutionStrategy"),
     "simple": ("evo.es", "EvolutionStrategy"),
-    "mu_plus_lambda": ("evo.mu_lambda", "MuPlusLambda")
+    "mu_plus_lambda": ("evo.mu_lambda", "MuPlusLambda"),
+    "nslc": ("evo.novelty", "NSLC")
 }
 
 
@@ -243,5 +272,7 @@ def create_learning_rule(type_: str = None, **kwargs) -> LearningRule:
     rule_cls = _get_lrule_class(type_)
     instance = rule_cls(**kwargs)
     return instance
+
+
 
 

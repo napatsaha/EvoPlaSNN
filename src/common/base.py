@@ -186,6 +186,69 @@ class Solver(Protocol):
         raise NotImplementedError("result method must be implemented by subclasses.")
 
 
+class Evaluator(Protocol):
+    """
+    Base class for evaluation functions.
+    """
+    measure_behaviour: bool
+
+    def __init__(self):
+        pass
+        # self.fitnesses: List[float] = []
+
+    def evaluate(self, solution: object, num_trials: int = None) -> Tuple[List, float, float, Sequence]:
+        """
+        Evaluates a given solution and returns its fitness.
+
+        Returns a Tuple containing: fts_list, avg_fts, std_fts, behv
+        - List of fitnesses for each trial
+        - Average fitness
+        - Standard Deviation of fitnesses
+        - Behaviour measure (if measure_behaviour is enabled)
+        """
+        raise NotImplementedError("evaluate method must be implemented by subclasses.")
+
+    def get_parameter_size(self) -> int:
+        """
+        Returns the size of the parameter space.
+        """
+        raise NotImplementedError("get_parameter_size method must be implemented by subclasses.")
+
+    def setup_logger(self, log_file: str = None):
+        """
+        Sets up a logger for the evaluator.
+        """
+        pass
+
+    # def generate_new_classes(self) -> None:
+    #     """
+    #     Update set of classes used for spike generation.
+    #     Meant to be called at beginning of each generation.
+    #     """
+    #     pass
+
+    def setup_generation(self, gen_count: int, **kwargs):
+        """
+        Sets up at the beginning of each generation.  
+        To be called outside the class (i.e. by `Manager`), before whole population is to be evaluated.
+        """
+        pass
+
+    def setup_individual(self, inv_count: int, **kwargs):
+        """
+        Sets up at the beginning of each individual evaluation.  
+        To be called inside the class (within `evaluate()`), before trial evaluation loop is begun.
+        """
+        pass
+
+    def setup_trial(self, trial_count: int, **kwargs):
+        """
+        Sets up at the beginning of each trial evaluation.  
+        To be called inside the class (within `evaluate()`), at the start of each iteration of the trial loop.
+        """
+        pass
+
+
 class Genome(ABC):
     """
     Base class to allow for genetic-related operations in evolutionary Solver.
@@ -274,3 +337,5 @@ class Parameter(ABC):
         """
         _summary_
         """
+
+

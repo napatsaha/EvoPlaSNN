@@ -1,5 +1,5 @@
 import numpy as np
-from .base import Evaluator
+from common.base import Evaluator
 
 
 def rastrigin_nD(*x, A=10, offsets=None):

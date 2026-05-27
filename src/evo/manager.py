@@ -1,20 +1,22 @@
 from pathlib import Path
 import logging
 import time
-from common.base import Genome
+from common.base import Evaluator, Genome
 from tqdm import tqdm
 
 import numpy as np
 
 
-from .base import BaseSolver, Evaluator
+from .base import BaseSolver
 
 
 class EvoManager:
     """
     Main class for managing loop of evolutionary optimisation.
     """
-    def __init__(self, solver: BaseSolver, evaluator: Evaluator, *, num_trials: int = 1, results_path: str = None,
+    def __init__(self, solver: BaseSolver, evaluator: Evaluator, *, 
+                 num_trials: int = 1, 
+                 results_path: str = None,
                  max_generations: int = None, max_stagnation: int = None,
                  use_target_fitness: bool = None, target_fitness: float = None, tolerance: float = 1e-6, 
                  record_classes: bool = False, save_best: int = 1,
@@ -23,6 +25,9 @@ class EvoManager:
         self.solver = solver
         self.evaluator = evaluator
         self.minimise = self.solver.minimise
+
+        # Get flag on whether to process a behaviour stage or not
+        self.measure_behaviour = self.evaluator.measure_behaviour
 
         self.num_trials = num_trials
         self.save_best = save_best
@@ -76,6 +81,8 @@ class EvoManager:
                 solutions = self.solver.ask()
 
                 fitness_list = np.zeros(self.solver.popsize)
+                if self.measure_behaviour:
+                    behaviours = []
 
                 # Update set of classes
                 # self.evaluator.generate_new_classes()
@@ -88,10 +95,16 @@ class EvoManager:
                 # Evaluate solution
                 for i, solution in tqdm(enumerate(solutions), desc="Populations", total=self.solver.popsize, position=1, leave=False):
                     self.evaluator.setup_individual(inv_count=i)
-                    fitness_list[i] = self.evaluator.evaluate(solution, num_trials=self.num_trials, gen_count=gen_count, indiv_count=i)
+                    fts_list, avg_fts, std_fts, behv = self.evaluator.evaluate(solution, num_trials=self.num_trials, gen_count=gen_count, indiv_count=i)
+                    fitness_list[i] = avg_fts
+                    if self.measure_behaviour:
+                        behaviours.append(behv)
 
-                # Inform solver about fitnesses
-                self.solver.tell(fitness_list)
+                # Inform solver about fitnesses (and optionally behaviour)
+                if self.measure_behaviour:
+                    self.solver.tell(fitness_list, behaviours)
+                else:
+                    self.solver.tell(fitness_list)
 
                 # Get best solutions and their fitnesses
                 best_solution, best_fitness = self.solver.result()

@@ -1,5 +1,5 @@
 from collections import namedtuple
-from typing import List, Literal, Tuple, Callable
+from typing import List, Literal, Sequence, Tuple, Callable
 from copy import deepcopy
 
 import numpy as np
@@ -8,25 +8,8 @@ from scipy.spatial import distance as dst
 
 from .base import BaseSolver
 from . import nsga2
-from common.base import Genome, LearningRule
-from common.utils import make_input_grid, assymetric_min_max_normalise
-
-
-def compute_lrule_bc(rule: LearningRule, inp: np.ndarray = None, normalise: bool = False, *,
-                           num_bin=10, bounds=None) -> np.ndarray:
-    assert isinstance(rule, LearningRule), "Currently only support Behaviour Characterisation for LearningRule"
-    assert inp.ndim == 2
-    assert inp.shape[1] == rule.input_size, "Second dimension of input arrays should have the same size as rule's inputs"
-
-    if inp is None:
-        if bounds is None:
-            raise NotImplementedError(f"Auto-calculating Input Bounds from Rule alone is not yet supported")
-        inp = make_input_grid(bounds, num_bin)
-
-    bc = rule.forward(inp)
-    if normalise:
-        bc = assymetric_min_max_normalise(bc)
-    return bc.flatten()
+from common.base import Genome
+from common.utils import make_input_grid, compute_lrule_bc
 
 
 ArchiveEntry = namedtuple('ArchiveEntry', ["rule", "bc", "fitness"])
@@ -177,7 +160,7 @@ class NSLC(BaseSolver):
             self.offsprings = [Solution(genome=sol) for sol in self.solutions]
         return sols
     
-    def tell(self, fitnesses, behaviours):
+    def tell(self, fitnesses: List[float], behaviours: List[ArrayLike]) -> None:
         super().tell(fitnesses)
 
         # bcs = self._compute_bc(self.solutions)

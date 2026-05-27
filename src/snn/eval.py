@@ -6,7 +6,7 @@ from typing import Dict, Any, List, Union, Tuple
 from common.base import LearningRule
 import numpy as np
 
-from evo.base import Evaluator
+from common.base import Evaluator
 from snn import SNN, SNNSimulator
 # from snn.spikegen import BinaryClassGenerator
 import snn.spikegen as spkgen

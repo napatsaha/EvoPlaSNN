@@ -8,7 +8,7 @@ from evosax.types import Params, Population
 from evosax.algorithms.base import EvolutionaryAlgorithm
 from evosax.problems.problem import Problem, State
 
-from evo.base import Evaluator
+from common.base import Evaluator
 
 
 class ProblemWrapper(Problem):

@@ -2,18 +2,18 @@ import logging
 import copy
 import time
 from pathlib import Path
-from typing import Dict, Any, List, Union, Tuple
-from common.base import Genome, LearningRule
-from common.utils import create_learning_rule
-import numpy as np
+from typing import Dict, Any, List, Sequence, Union, Tuple
 
-from evo.base import Evaluator
+import numpy as np
+from numpy.typing import ArrayLike
+
+from common.base import Genome, LearningRule, Evaluator
+from common.utils import create_learning_rule, make_bc_func
 from snn import SNN, SNNSimulator
 # from snn.spikegen import BinaryClassGenerator
 import snn.spikegen as spkgen
 # from snn.spikegen import create_spikegen, create_poisson_class_timing, create_binary_class_timing
 # import snn.spikegen
-
 from lrule import LearningRule
 from rl import ENV_DICT, StateCoder, RewardCollector, BaseMaze
     
@@ -30,6 +30,8 @@ class RL_Evaluator(Evaluator):
                  max_episodes: int = None,
                  eval_episodes: int = None,
                  plastic_on_eval: bool = True,
+                 measure_behaviour: bool = False,
+                 behaviour_params: dict = None,
                  **kwargs
                  ):
         super().__init__()
@@ -87,6 +89,15 @@ class RL_Evaluator(Evaluator):
                                       )
         self.logger = None
 
+        self.measure_behaviour = measure_behaviour
+        self.behaviour_params = {} if behaviour_params is None or not self.measure_behaviour else behaviour_params
+        if self.measure_behaviour:
+            num_grid = self.behaviour_params.get("num_grid", 2)
+            normalise = self.behaviour_params.get("normalise", False)
+            self.bc_func = make_bc_func(self.learning_rule.input_order, num_grid, normalise)
+        else:
+            self.bc_func = None
+
     def get_parameter_size(self):
         """
         Returns the number of parameters in the genome required to build an Evolutionary Algorithm.
@@ -139,8 +150,14 @@ class RL_Evaluator(Evaluator):
                 f.write("gen,indiv,genome\n")
 
 
-    def evaluate(self, genome: np.ndarray | LearningRule | Genome = None, num_trials=1, gen_count: int = None, indiv_count: int = None,
-                 return_std: bool = False, return_fitness_list: bool = False) -> Union[float, Tuple[float, float], List[float]]:
+    def evaluate(self, genome: np.ndarray | LearningRule | Genome = None, num_trials=1, 
+                 gen_count: int = None, indiv_count: int = None) -> Tuple[List, float, float, ArrayLike]:
+        # Prepare output variables:
+        fitnesses = []
+        avg_fitness = None
+        std_fitness = None
+        behv = None
+
         if genome is not None:
             if isinstance(genome, LearningRule):
                 self.learning_rule = genome
@@ -165,7 +182,10 @@ class RL_Evaluator(Evaluator):
             self.logger.info(f"Generation {self.gen_count}, Individual {self.inv_count}")
             self.write_genome(self.gen_count, self.inv_count, genome)
 
-        fitnesses = []
+        # Measure behaviour characteristics of the learning rule (currently assumed to be separate from fitness evaluation)
+        if self.measure_behaviour:
+            behv = self.bc_func(rule=self.learning_rule)
+
         for i in range(num_trials):
             # if self._log_info >= 1:
             #     self.logger.info(f"Trial {i+1}/{num_trials}: Starting Evaluation...")
@@ -193,8 +213,8 @@ class RL_Evaluator(Evaluator):
                 intermediate_fitness = self.simulator.get_intermediate_fitness(use_cutoff=True) if self.record_inter_fitness else None
                 self.write_trial(self.gen_count, self.inv_count, i, fitness, intermediate_fitness, precision=self.precision)
         
-        if return_fitness_list:
-            return fitnesses        
+        # if return_fitness_list:
+        #     return fitnesses        
         
         avg_fitness = np.mean(fitnesses, where=~np.isnan(fitnesses))
         std_fitness = np.std(fitnesses, where=~np.isnan(fitnesses))
@@ -204,11 +224,12 @@ class RL_Evaluator(Evaluator):
             self.write_indiv(self.gen_count, self.inv_count, avg_fitness, std_fitness)
             self.logger.info(f"Individual evalution time: {t10 - t00:.4f} seconds")
 
-        if return_std:
-            return avg_fitness, std_fitness
+        # if return_std:
+        #     return avg_fitness, std_fitness
+        # else:
+        #     return avg_fitness
 
-        else:
-            return avg_fitness
+        return fitnesses, avg_fitness, std_fitness, behv
 
     def setup_generation(self, gen_count: int, num_sets: int = None, record_classes: bool = None, **kwargs):
         self.gen_count = gen_count

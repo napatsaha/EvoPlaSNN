@@ -13,7 +13,7 @@ from rl.eval import RL_Evaluator
 # from evo.es import EvolutionStrategy
 from common.utils import create_solver
 from evo.manager import EvoManager
-from evo.base import Evaluator
+from common.base import Evaluator
 from lrule.utils import read_learning_rule
 
 # from snn.plot import plot_weight_over_time, plot_weights, plot_spikes, plot_membranes
@@ -200,11 +200,11 @@ def eval(results_path: Path | str = None, *, config_path: str | Path = None, num
 
     if eval_results:
         evaluator.setup_generation(gen_count=0, num_sets=num_evals)
-        fitnesses = evaluator.evaluate(num_trials=num_evals, return_fitness_list=True)
+        fts_list, avg_fts, std_fts, behv = evaluator.evaluate(num_trials=num_evals)
         if save_results:
             with open(results_path / f"{prefix}_eval_result.csv", "w") as f:
                 f.write("trial,fitness\n")
-                for i, fitness in enumerate(fitnesses):
+                for i, fitness in enumerate(fts_list):
                     f.write(f"{i},{fitness}\n")
         
         # fits = []
@@ -214,12 +214,12 @@ def eval(results_path: Path | str = None, *, config_path: str | Path = None, num
         #     fitness = simulator.get_fitness()
         #     fits.append(fitness)
 
-        mean_fts = np.mean(fitnesses)
-        std_fts = np.std(fitnesses)
+        # mean_fts = np.mean(fitnesses)
+        # std_fts = np.std(fitnesses)
 
         if verbose:
             fitness_type = config.get("fitnessor_params", {}).get("type", "unknown")
-            print(f"Mean fitness (Type: {fitness_type}): {mean_fts:.2f} +/- {std_fts:.2f} SD ({num_evals} evaluations)")
+            print(f"Mean fitness (Type: {fitness_type}): {avg_fts:.2f} +/- {std_fts:.2f} SD ({num_evals} evaluations)")
 
     # Plotting
     if save_plots or show_plots:
@@ -307,7 +307,7 @@ def eval(results_path: Path | str = None, *, config_path: str | Path = None, num
             print(f"Error plotting learning rule: {e}")
 
     if not return_evaluator and eval_results:
-        return mean_fts, std_fts
+        return avg_fts, std_fts
     else:
         # Return the evaluator object if requested
         return evaluator

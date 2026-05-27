@@ -1,3 +1,20 @@
+v1.1.18
+- Integration of NSLC with rest of experiment (at least for `run_rl`):
+    - `RL_Evaluator` handles the behaviour characterisation via two new arguments:
+        - `measure_behaviour` and `behaviour_params`
+    - Changed output signature of `Evaluator.evaluate()` to be a tuple of four elements
+        to remain consistent across usage:
+        - fts_list, avg_fts, std_fts, behv
+    - `Manager` now handles each generation slightly different depending on whether
+        `evaluator.measure_behaviour` is enabled
+    - Added a function `make_bc_func` to return "frozen" version of `compute_lrule_bc`
+        with num_grid, inp values fixed, to be created during `Evaluator.__init__`
+    - Added 'nlsc' to ALGO_DICT
+    - Removed `.reset()` call from `BaseSolver.__init__()` to prevent calling reset of child class
+        which is not yet instantiated
+- Moved `Evaluator` protocol to `common.base`
+- Moved `compute_lrule_bc` from `evo.novelty` to `common.utils`
+
 v1.1.17
 - Big changes to `NSLC`:
     - Behaviour characterisation (BC) is no longer calculated within the class, but rather passed in during `.tell()`
