@@ -1,6 +1,7 @@
 from collections import namedtuple
 from typing import List, Literal, Sequence, Tuple, Callable
 from copy import deepcopy
+import csv
 
 import numpy as np
 from numpy.typing import ArrayLike
@@ -103,6 +104,27 @@ class Solution:
         self.global_fitness: float = global_fitness
         self.behaviour: ArrayLike = behaviour
         self.rank: int = rank
+
+    def to_dict(self, precision: int = None) -> dict:
+        if precision is not None:
+            precision = int(precision)
+            return {
+                "genome": np.round(self.genome.parameters, precision).tolist(),
+                "novelty_dist": np.round(self.novelty_dist, precision),
+                "local_fitness": np.round(self.local_fitness, precision),
+                "global_fitness": np.round(self.global_fitness, precision),
+                "rank": int(self.rank),
+                "behaviour": np.round(self.behaviour, precision).tolist()
+            }
+        else:
+            return {
+                "genome": self.genome.parameters.tolist(),
+                "novelty_dist": self.novelty_dist,
+                "local_fitness": self.local_fitness,
+                "global_fitness": self.global_fitness,
+                "rank": int(self.rank),
+                "behaviour": self.behaviour.tolist()
+            }
 
     def __repr__(self):
         return f"Solution(genome={np.round(self.genome.parameters, 2)}, novelty_dist={self.novelty_dist:.2g}, local_fitness={self.local_fitness:.2g}, " + \
@@ -213,6 +235,59 @@ class NSLC(BaseSolver):
 
         self._add_to_archive()
 
+    def setup_logger(self, log_path=None):
+        super().setup_logger(log_path)
+        if self._record:
+            self._solution_file = open(self.log_path / "solutions.csv", 'w')
+            self._writer = csv.DictWriter(self._solution_file, fieldnames=[
+                "gen", "indiv", "global_fitness", "local_fitness", "novelty_dist", "rank", "genome", "behaviour"
+            ])
+            self._writer.writeheader()
+
+    def wrapup(self, n_best):
+        super().wrapup(n_best)
+        self.write_archive()
+
+    def write_to_file(self, gen_no: int):
+        """
+        Write solution in current generation to file
+
+        Args:
+            gen_no (int): counter for generation
+        """
+        if self._record:
+            # Record offspring of previous generation's parents
+            if len(self.offsprings) > 0:
+                for i, sol in enumerate(self.offsprings):
+                    row = dict(
+                        gen=int(gen_no) - 1,
+                        indiv=f"o{i}",
+                        **sol.to_dict(precision=3)
+                    )
+                    self._writer.writerow(row)
+            # Record parents
+            if len(self.parents) > 0:
+                for i, sol in enumerate(self.parents):
+                    row = dict(
+                        gen=int(gen_no),
+                        indiv=f"p{i}",
+                        **sol.to_dict(precision=3)
+                    )
+                    self._writer.writerow(row)
+
+
+    def write_archive(self):
+        """
+        Save existing solution in the archive.
+        """
+        if self._record and len(self.archive) > 0:
+            with open(self.log_path / "archive.csv", 'w') as f:
+                writer = csv.DictWriter(f, fieldnames=[
+                    "id", "global_fitness", "local_fitness", "novelty_dist", "rank", "genome", "behaviour"
+                ])
+                writer.writeheader()
+                for i, sol in enumerate(self.archive):
+                    writer.writerow({"id": i, **sol.to_dict(precision=3)})
 
     def _generate_offspring(self):
         if self.parents is None:
@@ -315,12 +390,11 @@ class NSLC(BaseSolver):
         return idx_parents
 
     def _add_to_archive(self):
-        if self.archive_method == "threshold":
-            for sol in self.parents:
+        for sol in self.parents:
+            if self.archive_method == "threshold":
                 if sol.novelty_dist >= self.novelty_threshold:
                     self.archive.append(deepcopy(sol))
-        elif self.archive_method == "probabilistic":
-            for sol in self.parents:
+            elif self.archive_method == "probabilistic":
                 if np.random.rand() < self.archive_prob:
                     self.archive.append(deepcopy(sol))
 

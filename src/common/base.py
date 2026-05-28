@@ -164,6 +164,8 @@ class Solver(Protocol):
     """
     Base solver for all Evolutionary Algorithms.
     """
+    popsize: int
+    minimise: bool
     def __init__(self, popsize: int):
         pass
 
@@ -185,6 +187,28 @@ class Solver(Protocol):
         """
         raise NotImplementedError("result method must be implemented by subclasses.")
 
+    def write_to_file(self, gen_no: int):
+        """
+        Write solution in current generation to file
+        """
+
+    def setup_logger(self, log_path: str = None):
+        """
+        Sets up a logger for the solver.
+        """
+
+    def wrapup(self, **kwargs):
+        """
+        Doing any necessary task after evolution has finished running.
+
+        Note that this is different from `close()` which should handle any emergency 
+        tasks like closing file IO.
+        """
+
+    def close(self):
+        """
+        Close any opened stream
+        """
 
 class Evaluator(Protocol):
     """
@@ -218,7 +242,11 @@ class Evaluator(Protocol):
         """
         Sets up a logger for the evaluator.
         """
-        pass
+    
+    def close(self):
+        """
+        Close any opened stream
+        """
 
     # def generate_new_classes(self) -> None:
     #     """

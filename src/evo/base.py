@@ -1,3 +1,4 @@
+from io import TextIOWrapper
 from typing import List, Tuple, Union, override
 from pathlib import Path
 import numpy as np
@@ -30,6 +31,10 @@ class BaseSolver(Solver):
         self.best_fitness = None
         self.best_solution = None
         # self.reset()
+        self.log_path: Path = None
+        self._record = False
+        self._solution_file: TextIOWrapper = None
+        self._writer = None
 
     def _generate_new_population(self, ):
         self.solutions = []
@@ -60,6 +65,29 @@ class BaseSolver(Solver):
         self.best_fitness = fitnesses[best_idx]
         self.best_solution = self.solutions[best_idx]
 
+    @override
+    def result(self) -> Tuple['Genome', float]:
+        """Return the best solution and its fitness."""
+        return self.best_solution, self.best_fitness
+    
+    def write_to_file(self, gen_no: int):
+        """
+        Write solution in current generation to file
+
+        Args:
+            gen_no (int): counter for generation
+        """
+        pass
+
+    def setup_logger(self, log_path: str | Path = None):
+        if log_path is not None:
+            self.log_path = Path(log_path)
+            self._record = True
+    
+    def wrapup(self, n_best):
+        if self._record:
+            self.save_best(self.log_path, n=n_best)
+
     def save_best(self, save_dir: str | Path, n: int = 1, precision: int = 6):
         top_indices = np.argsort(self.fitnesses if self.minimise else -self.fitnesses) # Will arrange from lowest to highest fitness
         top_indices = top_indices[:n]
@@ -84,11 +112,10 @@ class BaseSolver(Solver):
                 raise TypeError(f"Genome {sol} cannot be written via np.savetxt")
             np.savetxt(Path(save_dir) / f"best_rule_{i}.txt", sol, fmt=f'%.{precision}f')
 
-    @override
-    def result(self) -> Tuple['Genome', float]:
-        """Return the best solution and its fitness."""
-        return self.best_solution, self.best_fitness
-    
+    def close(self):
+        if self._record and self._solution_file is not None:
+            self._solution_file.close()
+
     def take_solutions(self, indices: int | List | np.ndarray, return_array: bool = False, simplify: bool = True) -> Union['Genome' | List['Genome'] | np.ndarray]:
         """
         A safe method for bulk indexing Genome objects within `solutions` list.

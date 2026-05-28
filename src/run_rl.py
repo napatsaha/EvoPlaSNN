@@ -320,6 +320,7 @@ if __name__ == "__main__":
     argparser.add_argument("--override", "-o", type=str, nargs="*", help="Override specific config values (e.g., snn_params.neuron_params.tau_mem=0.05)")
     argparser.add_argument("--parent", "-p", type=str, default=None, help="Parent run directory to save results in. Useful for running series of related results.")
     argparser.add_argument("--num_evals", "-e", type=int, default=10, help="Number of evaluation trials to run for the best rule at the end.")
+    argparser.add_argument("--plot", "-t", action=argparse.BooleanOptionalAction, default=True, type=bool, help="Specify --no-plot to avoid plot at the end (default is to plot)")
     args = argparser.parse_args()
 
     # Parse overrides
@@ -328,4 +329,4 @@ if __name__ == "__main__":
     # Run main function
     results_path = main(config_file=args.config, config_overrides=config_overrides, parent_run=args.parent)
     # Evaluation of best solution
-    eval(results_path, save_plots=True, save_results=True, num_evals=args.num_evals, verbose=True)
+    eval(results_path, save_plots=args.plot, save_results=True, num_evals=args.num_evals, verbose=True)

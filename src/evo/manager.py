@@ -1,20 +1,20 @@
 from pathlib import Path
 import logging
 import time
-from common.base import Evaluator, Genome
+from common.base import Evaluator, Genome, Solver
 from tqdm import tqdm
 
 import numpy as np
 
 
-from .base import BaseSolver
+# from .base import BaseSolver
 
 
 class EvoManager:
     """
     Main class for managing loop of evolutionary optimisation.
     """
-    def __init__(self, solver: BaseSolver, evaluator: Evaluator, *, 
+    def __init__(self, solver: Solver, evaluator: Evaluator, *, 
                  num_trials: int = 1, 
                  results_path: str = None,
                  max_generations: int = None, max_stagnation: int = None,
@@ -64,8 +64,11 @@ class EvoManager:
         Runs the evolutionary optimisation loop.
         """
         t0 = time.time()
+        # Setup logging for each component
         self._setup_logger()
         self.evaluator.setup_logger(self.results_path)
+        self.solver.setup_logger(self.results_path)
+
         if self.max_generations is None:
             self.max_generations = 1000  # Default maximum generations
 
@@ -105,6 +108,8 @@ class EvoManager:
                     self.solver.tell(fitness_list, behaviours)
                 else:
                     self.solver.tell(fitness_list)
+
+                self.solver.write_to_file(gen_no=gen_count)
 
                 # Get best solutions and their fitnesses
                 best_solution, best_fitness = self.solver.result()
@@ -146,10 +151,15 @@ class EvoManager:
                 
                 gen_count += 1
                 pbar.update(1)
+
+            # Save best solution
+            self.solver.wrapup(n_best=self.save_best)
         finally:
             pbar.close()
             t1 = time.time()
             dt = t1 - t0
+            self.solver.close()
+            self.evaluator.close()
 
         if isinstance(best_solution, Genome):
             best_solution = best_solution.parameters.round(4)
@@ -160,9 +170,8 @@ class EvoManager:
         self.logger.info(f"Total generations: {gen_count}")
         self.logger.info(f"Results saved to directory: {self.results_path}")
 
-        # Save best solution
-        if self.results_path is not None:
-            save_path = Path(self.results_path)
-            self.solver.save_best(save_path, n=self.save_best, precision=6)
+        # if self.results_path is not None:
+        #     save_path = Path(self.results_path)
+        #     self.solver.save_best(save_path, n=self.save_best, precision=6)
 
         

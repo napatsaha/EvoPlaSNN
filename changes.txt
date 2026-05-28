@@ -1,3 +1,18 @@
+v1.1.19
+- Saving of solutions and archive to files 'solutions.csv' and 'archive.csv' respectively
+- Added following methods to `Solver` and `BaseSolver`
+    - write_to_file, setup_logger, wrapup, close
+- In `NSLC`, use `csv.DictWriter` to record 6 components of each SOlution of parents and offsprings
+    at each generation -> `write_to_file()`
+    - At the end of evolution run (`wrapup()`), record archive to files
+    - `close()` handles any opened File IO
+- A dummy `close()` method for `Evaluator` (to be filled up later)
+- Manager calls `setup_logger` for Solver and Evaluator before run, and calls `wrapup` and `close`
+    at the end:
+    - Also calls `solver.write_to_file()` after `solver.tell()`
+- Added option for `--no-plot` within `run_rl` cmd line call
+- Moved solver.save_best() from Manager.run to solver.wrapup()
+
 v1.1.18
 - Integration of NSLC with rest of experiment (at least for `run_rl`):
     - `RL_Evaluator` handles the behaviour characterisation via two new arguments:

@@ -298,6 +298,9 @@ class RL_Evaluator(Evaluator):
                 genome_str = ','.join([f"{param:.{precision}f}" for param in genome])
                 f.write(f"{gen},{indiv},{genome_str}\n")
 
+    def close(self):
+        pass
+
     @property
     def log_level(self) -> int:
         """
