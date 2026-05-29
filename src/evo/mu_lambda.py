@@ -74,7 +74,7 @@ class MuPlusLambda(BaseSolver):
             self._generate_offspring()
         return super().ask()
 
-    def tell(self, fitnesses):
+    def tell(self, fitnesses, *, gen_no: int = None):
         # assert len(fitnesses) == len(self.solutions)
         # self.fitnesses = fitnesses
         # if not self.minimise:

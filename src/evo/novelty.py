@@ -122,11 +122,12 @@ class Solution:
                 "novelty_dist": self.novelty_dist,
                 "local_fitness": self.local_fitness,
                 "global_fitness": self.global_fitness,
-                "rank": int(self.rank),
-                "behaviour": self.behaviour.tolist()
+                "rank": self.rank,
+                "behaviour": self.behaviour
             }
 
     def __repr__(self):
+        # TODO: Prevent error when printing when any value is None
         return f"Solution(genome={np.round(self.genome.parameters, 2)}, novelty_dist={self.novelty_dist:.2g}, local_fitness={self.local_fitness:.2g}, " + \
             f"global_fitness={np.round(self.global_fitness, 3)}, behaviour={np.round(self.behaviour, 2)}, rank={self.rank})"
 
@@ -159,6 +160,7 @@ class NSLC(BaseSolver):
         self.dist_metric = dist_metric
         self.dist_func = getattr(dst, self.dist_metric)
 
+        self._archive_id: List = [] # List to record ids of which individual gets recorded
         self.archive: List[Solution] = []
         self.parents: List[Solution] = []
         self.offsprings: List[Solution] = []
@@ -167,6 +169,7 @@ class NSLC(BaseSolver):
 
     def reset(self) -> None:
         super().reset()
+        self._archive_id.clear()
         self.archive.clear()
         self.parents.clear()
         self.offsprings.clear()
@@ -182,7 +185,8 @@ class NSLC(BaseSolver):
             self.offsprings = [Solution(genome=sol) for sol in self.solutions]
         return sols
     
-    def tell(self, fitnesses: List[float], behaviours: List[ArrayLike]) -> None:
+    def tell(self, fitnesses: List[float], behaviours: List[ArrayLike],
+             *, gen_no: int = None) -> None:
         super().tell(fitnesses)
 
         # bcs = self._compute_bc(self.solutions)
@@ -233,7 +237,7 @@ class NSLC(BaseSolver):
                 sol for ix, sol in enumerate(R) if ix in idx_parents
             ]
 
-        self._add_to_archive()
+        self._add_to_archive(gen_no)
 
     def setup_logger(self, log_path=None):
         super().setup_logger(log_path)
@@ -283,28 +287,53 @@ class NSLC(BaseSolver):
         if self._record and len(self.archive) > 0:
             with open(self.log_path / "archive.csv", 'w') as f:
                 writer = csv.DictWriter(f, fieldnames=[
-                    "id", "global_fitness", "local_fitness", "novelty_dist", "rank", "genome", "behaviour"
+                    "gen", "indiv", "global_fitness", "local_fitness", "novelty_dist", "rank", "genome", "behaviour"
                 ])
                 writer.writeheader()
-                for i, sol in enumerate(self.archive):
-                    writer.writerow({"id": i, **sol.to_dict(precision=3)})
+                for sol, id in zip(self.archive, self._archive_id):
+                    gen, indiv = id
+                    writer.writerow({"gen": gen, "indiv": indiv, 
+                                     **sol.to_dict(precision=3)})
 
     def _generate_offspring(self):
         if self.parents is None:
             raise ValueError("No parents to create offsprings from")
-        Q = []
+        Q: List[Genome] = []
         for _ in range(self.popsize):
-            # Tournament selection
-            # TODO: Make it a true Tournament Selection:
-            # -> Save fronts and ranks from fast-sort parents
-            ix, iy = np.random.choice(self.popsize, size=2, replace=False)
-            Px = self.parents[ix].genome
-            Py = self.parents[iy].genome
-            offspring = Px.crossover(Py, rate=self.crossover_rate)
+            # DONE: Binary Tournament Selection:
+            # -> Select two parents from two random pairs
+            # -> Choose one with lower rank, or if equal, higher novelty_dist
+            Px = self._binary_tournament(self.parents)
+            Py = self._binary_tournament(self.parents)
+            # ix, iy = np.random.choice(self.popsize, size=2, replace=False)
+            # Px = self.parents[ix].genome
+            # Py = self.parents[iy].genome
+            # Recombination and (Resampling) Mutation
+            offspring = Px.genome.crossover(Py.genome, rate=self.crossover_rate)
             offspring = offspring.mutate(rate=self.mutation_rate)
             Q.append(offspring)
         return Q
     
+    def _binary_tournament(self, sols: List[Solution]) -> Solution:
+        n = len(sols)
+        ix, iy = np.random.choice(n, size=2, replace=False)
+        Px: Solution = sols[ix]
+        Py: Solution = sols[iy]
+        if Px.rank < Py.rank:
+            return Px
+        elif Px.rank > Py.rank:
+            return Py
+        elif Px.rank == Py.rank:
+            if Px.novelty_dist > Py.novelty_dist:
+                return Px
+            elif Py.novelty_dist > Px.novelty_dist:
+                return Py
+            else:
+                if np.random.rand() < 0.5:
+                    return Px
+                else:
+                    return Py
+
     # def _compute_bc(self, solutions):
     #     bcs = []
     #     for sol in solutions:
@@ -342,7 +371,8 @@ class NSLC(BaseSolver):
             # Find nearest individuals based on novelty distance
             bc_i = sol.behaviour
             nov_dist_i = [self.dist_func(bc_i, bc) for j, bc in enumerate(bcs) if i != j]
-            k_nearest = np.argsort(nov_dist_i)[1:self.k+1]
+            nov_dist_i = np.where(np.isnan(nov_dist_i), 0.0, nov_dist_i)
+            k_nearest = np.argsort(nov_dist_i)[:self.k]
             # Novelty metric = Average novelty distance to k nearest neighbours
             rho = np.mean(np.take(nov_dist_i, k_nearest))
             rhos.append(rho) # Maximising novelty
@@ -389,15 +419,16 @@ class NSLC(BaseSolver):
 
         return idx_parents
 
-    def _add_to_archive(self):
-        for sol in self.parents:
+    def _add_to_archive(self, gen_no: int = None):
+        for i, sol in enumerate(self.parents):
             if self.archive_method == "threshold":
                 if sol.novelty_dist >= self.novelty_threshold:
                     self.archive.append(deepcopy(sol))
+                    self._archive_id.append((gen_no, i))
             elif self.archive_method == "probabilistic":
                 if np.random.rand() < self.archive_prob:
                     self.archive.append(deepcopy(sol))
-
+                    self._archive_id.append((gen_no, i))
 
     def __repr__(self):
         return f"NSLC(k={self.k}, ndim={self.ndim}, popsize={self.popsize}, minimise={self.minimise})"

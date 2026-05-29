@@ -1,3 +1,13 @@
+v1.1.20
+- Added option to pass in gen number information during `solver.tell()`
+- NSLC:
+    - When a solution is added to archive, it keeps track of which generation, parent id was added
+    - Binary tournament during offspring creation, 
+        comparing parents rank (lower is better) and novelty_dist (higher is better)
+    - To prevent cosine distance outputting `nan` when beh is all zeros, we replace any `nan` distance with 0.0
+        to signify no distance (may not cover the ONLY case of nan, so a temporary solution)
+- Added dummy method `forward()` to `Empty_Rule`
+
 v1.1.19
 - Saving of solutions and archive to files 'solutions.csv' and 'archive.csv' respectively
 - Added following methods to `Solver` and `BaseSolver`

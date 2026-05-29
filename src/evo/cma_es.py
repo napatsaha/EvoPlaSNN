@@ -63,7 +63,7 @@ class CMA_ES(BaseSolver):
         return self.solutions
     
     @override
-    def tell(self, fitnesses):
+    def tell(self, fitnesses, *, gen_no: int = None):
         # Save best solution and fitness
         super().tell(fitnesses)
 

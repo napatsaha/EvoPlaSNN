@@ -15,6 +15,9 @@ class Empty_Rule(LearningRule):
         # No update
         return 0.0
     
+    def forward(self, inp):
+        return 0.0
+    
 
 class BaseLearningRule(LearningRule):
     INPUT_ORDER = ("trace_pre", "trace_post", "weights", "reward", "eligibility_pre", "eligibility_post", "eligibility_stdp")

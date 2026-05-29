@@ -58,7 +58,7 @@ class BaseSolver(Solver):
         self.best_fitness = None
         self.best_solution = None
 
-    def tell(self, fitnesses):
+    def tell(self, fitnesses, *, gen_no: int = None):
         best_idx = np.argmin(fitnesses) if self.minimise else np.argmax(fitnesses)
         # Update self
         self.fitnesses = fitnesses

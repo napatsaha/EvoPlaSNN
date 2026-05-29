@@ -105,7 +105,7 @@ class EvoManager:
 
                 # Inform solver about fitnesses (and optionally behaviour)
                 if self.measure_behaviour:
-                    self.solver.tell(fitness_list, behaviours)
+                    self.solver.tell(fitness_list, behaviours, gen_no=gen_count)
                 else:
                     self.solver.tell(fitness_list)
 
