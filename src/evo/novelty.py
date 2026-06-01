@@ -137,12 +137,12 @@ class NSLC(BaseSolver):
                  novelty_threshold: float = None, archive_prob: float = 0.05,
                  dist_metric: Literal["cosine", "euclidean"] = "cosine",
                  ndim = None, *, 
-                 crossover_rate: float = 0.5, mutation_rate: float = 0.5,
+                 crossover_rate: float = 0.5, #mutation_rate: float = 0.5,
                  genome_type = None, genome_params = None, **kwargs):
         # minimise = False
         super().__init__(ndim, popsize, minimise, genome_type=genome_type, genome_params=genome_params)
         self.crossover_rate = np.clip(crossover_rate, 0, 1)
-        self.mutation_rate = np.clip(mutation_rate, 0, 1)
+        # self.mutation_rate = np.clip(mutation_rate, 0, 1)
         # self.normalise = normalise
         # self.bounds = bounds
         # self.num_grid = num_grid
@@ -310,7 +310,7 @@ class NSLC(BaseSolver):
             # Py = self.parents[iy].genome
             # Recombination and (Resampling) Mutation
             offspring = Px.genome.crossover(Py.genome, rate=self.crossover_rate)
-            offspring = offspring.mutate(rate=self.mutation_rate)
+            offspring = offspring.mutate(rate=self.mutation_rate, scale=self.mutation_scale, method=self.mutation_method)
             Q.append(offspring)
         return Q
     

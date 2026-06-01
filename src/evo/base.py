@@ -1,5 +1,5 @@
 from io import TextIOWrapper
-from typing import List, Tuple, Union, override
+from typing import List, Literal, Tuple, Union, override
 from pathlib import Path
 import numpy as np
 
@@ -13,11 +13,18 @@ class BaseSolver(Solver):
     solutions: List
 
     def __init__(self, ndim: int = 2, popsize: int = None, minimise: bool = True, *,
+                 mutation_method: Literal["resample", "perturb"] = "resample", mutation_rate: float = 0.5, mutation_scale: float = 1.0,
                  genome_type: str = None, genome_params: dict = None,):
         self._solutions = []
         self.ndim = ndim
         self.popsize = popsize if popsize is not None else int(4 + np.floor(3 + np.log(self.ndim)))
         self.minimise = minimise
+        # Gene Operator info
+        assert mutation_method in ["resample", "perturb"]
+        self.mutation_method = mutation_method
+        self.mutation_rate = min(1.0, max(0.0, mutation_rate))
+        self.mutation_scale = max(0.0, mutation_scale)
+
         # Genome Info
         self._genome_params = genome_params if genome_params is not None else {}
         if genome_type is not None:

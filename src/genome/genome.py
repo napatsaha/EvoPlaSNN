@@ -29,7 +29,7 @@ class SimpleGenome(Genome):
         else:
             raise ValueError(f"Distribution {self.dist} not supported")
 
-    def mutate(self, rate: float, **kwargs) -> 'Genome':
+    def mutate(self, rate: float, scale: float, method: Literal["resample", "perturb"], **kwargs) -> 'Genome':
         """
         Create a modified copy of itself
 
@@ -37,10 +37,14 @@ class SimpleGenome(Genome):
             rate (float): mutation rate
         """
         params = self.parameters.copy()
-        rate = np.clip(rate, 0, 1, dtype=np.float32)
-        gene_to_mutate = np.random.randint(self.size, size=(int(rate*self.size), ))
-        for gene_id in gene_to_mutate:
-            params[gene_id] = self._make_random_parameters(size=1)
+        if method == "resample":
+            rate = np.clip(rate, 0, 1, dtype=np.float32)
+            gene_to_mutate = np.random.randint(self.size, size=(int(rate*self.size), ))
+            for gene_id in gene_to_mutate:
+                params[gene_id] = self._make_random_parameters(size=1)
+        elif method == "perturb":
+            delta = np.random.normal(0, scale=scale, size=self.size)
+            params = params + delta
         return self.__class__(params)
 
     def crossover(self, other: Genome, rate: float) -> Genome:
@@ -85,7 +89,8 @@ class CompositeGenome(Genome):
         param = [g.value for g in self.genes]
         self._parameters = np.r_[*param]
 
-    def mutate(self, rate, return_genes_only: bool = False) -> Genome | List[Parameter]:
+    def mutate(self, rate: float, scale: float, method: Literal["resample", "perturb"], *, 
+               return_genes_only: bool = False) -> Genome | List[Parameter]:
         new_genes = []
         rate = np.clip(rate, 0, 1, dtype=np.float32)
         to_mutate_flag = np.random.binomial(1, rate, size=self.size)
@@ -93,7 +98,7 @@ class CompositeGenome(Genome):
         for gene in self.genes:
             l = gene.length
             flags = to_mutate_flag[idx:(idx+l)]
-            new_gene = gene.mutate(flags)
+            new_gene = gene.mutate(flags=flags, method=method, scale=scale)
             new_genes.append(new_gene)
             idx += l
 

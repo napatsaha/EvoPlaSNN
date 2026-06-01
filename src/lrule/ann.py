@@ -533,8 +533,8 @@ class ANN_Rule(BaseLearningRule, Genome):
     def forward(self, inp):
         return self.ann.forward(inp)
 
-    def mutate(self, rate: float) -> np.ndarray:
-        new_genes = self.genome.mutate(rate, return_genes_only=True)
+    def mutate(self, rate: float, scale: float, method: str) -> np.ndarray:
+        new_genes = self.genome.mutate(rate=rate, scale=scale, method=method, return_genes_only=True)
         return self.__class__(genes = new_genes, **self.to_dict())
 
     def crossover(self, other: 'ANN_Rule', rate: float):

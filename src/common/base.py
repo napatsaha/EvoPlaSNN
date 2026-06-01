@@ -287,7 +287,7 @@ class Genome(ABC):
     # genes: List['Parameter']
 
     @abstractmethod
-    def mutate(self, rate: float, **kwargs) -> 'Genome':
+    def mutate(self, rate: float, scale: float, method: str, **kwargs) -> 'Genome':
         """
         Create a modified copy of itself
 
@@ -328,7 +328,7 @@ class Parameter(ABC):
     value: np.typing.ArrayLike
 
     @abstractmethod
-    def mutate(self, flags: bool | List | ArrayLike) -> 'Parameter':
+    def mutate(self, flags: bool | List | ArrayLike, method: Literal["resample", "perturb"], scale: float) -> 'Parameter':
         """
         Mutate and create a modified Paramter with the same distribution and bounds
 

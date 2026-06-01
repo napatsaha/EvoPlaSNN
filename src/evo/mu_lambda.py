@@ -26,7 +26,7 @@ class MuPlusLambda(BaseSolver):
     # solutions: List[Genome]
 
     def __init__(self, mu, lambd, *, minimise = True,
-                 mutation_rate: float = 0.1,
+                #  mutation_rate: float = 0.1,
                 #  lrule_type: str = None, lrule_params: dict = None,
                  **kwargs):
         """
@@ -42,9 +42,10 @@ class MuPlusLambda(BaseSolver):
         self.mu = mu
         self.lambd = lambd
         popsize = self.mu + self.lambd
-        self.mutation_rate = np.clip(0, 1, mutation_rate)
+        # self.mutation_rate = np.clip(0, 1, mutation_rate)
 
-        super().__init__(ndim=None, popsize=popsize, minimise=minimise, **kwargs)
+        super().__init__(ndim=None, popsize=popsize, minimise=minimise,
+                          **kwargs)
 
 
         # self._lrule_params = kwargs if lrule_params is None else lrule_params
@@ -103,7 +104,7 @@ class MuPlusLambda(BaseSolver):
                 idx = np.random.randint(0, self.mu)
             else:
                 idx = 0
-            offspring = self.parents[idx].mutate(self.mutation_rate)
+            offspring = self.parents[idx].mutate(rate=self.mutation_rate, scale=self.mutation_scale, method=self.mutation_method)
             if not isinstance(offspring, LearningRule):
                 if self._genome_type is not None:
                     offspring = create_learning_rule(self._genome_type, parameters=offspring, **self._genome_params)

@@ -1,6 +1,6 @@
 from copy import copy
 import sys
-from typing import Any, Literal
+from typing import Any, Literal, Sequence
 
 import numpy as np
 from numpy.typing import ArrayLike
@@ -48,6 +48,11 @@ class BaseParameter(Parameter):
     def _generate(self, size) -> ArrayLike:
         raise NotImplementedError()
     
+    def _perturb(self, location, scale: float) -> ArrayLike:
+        delta = np.random.normal(0, scale=scale, size=self._length)
+        value = np.where(location, self.value + delta, self.value)
+        return value
+
     def _validate(self, value: np.ndarray) -> np.ndarray:
         """
         Check for validity, return processed value and raise TypeError or ValueError
@@ -63,19 +68,29 @@ class BaseParameter(Parameter):
         """
         raise NotImplementedError(f"Each subclass must implement their own method of verifying value fits within distribution")
 
-    def mutate(self, flags: bool | ArrayLike) -> 'BaseParameter':
+    def mutate(self, flags: bool | ArrayLike, method: Literal["resample", "perturb"] = "resample", scale: float = None) -> 'BaseParameter':
         # if not isinstance(bool):
         #     assert len(flags) == self.length
-        flags = np.asarray(flags, dtype=bool)
-        assert flags.size == self.length, "Length of flags must be equal to length of param"
+        if isinstance(flags, (np.ndarray, Sequence)):
+            assert flags.size == self.length, "Length of flags must be equal to length of param"
+            flags = np.asarray(flags, dtype=bool)
+        elif isinstance(flags, (bool, int, float)):
+            flags = np.full(self.length, bool(flags), dtype=bool)
+        else:
+            raise ValueError(f"Invalid flags argument: type={type(flags)}, value={flags}")
         # Make n number of changes according to how True there is in flags
-        n_changes = sum(flags)
-        replacement = self._generate(n_changes)
-        # Identify location to swap
-        idx_to_change = np.where(flags)
-        # Insert changes into a copy of own value
-        value = copy(self.value)
-        np.put(value, idx_to_change, replacement)
+        if method == "resample":
+            n_changes = sum(flags)
+            replacement = self._generate(n_changes)
+            # Identify location to swap
+            idx_to_change = np.where(flags)
+            # Insert changes into a copy of own value
+            value = copy(self.value)
+            np.put(value, idx_to_change, replacement)
+        elif method == "perturb":
+            value = self._perturb(flags, scale)
+        else:
+            raise NotImplementedError(f"Mutation method {method} not yet supported. Only accept 'resample' or 'perturb'")
         # Generate a new object based on new value
         new_param = self.__class__(value, **self.to_dict())
         return new_param
@@ -154,14 +169,19 @@ class RealParam(BaseParameter):
         else:
             return np.zeros(shape=size)
     
+    def _perturb(self, location, scale):
+        value = super()._perturb(location, scale)
+        value = np.clip(value, self.low, self.high)
+        return value
+
     def _validate(self, value):
-        check_upper = (value < self.high) if self.high is not None else True
+        check_upper = (value <= self.high) if self.high is not None else True
         check_lower = (value >= self.low) if self.low is not None else True
         check = check_lower & check_upper
         if not np.all(check):
             idx = np.where(~check)
             vals = value[idx]
-            raise ValueError(f"All Values must be between [{self.low}, {self.high}). At index(s) {idx[0]}, got value(s) {vals}")
+            raise ValueError(f"All Values must be between [{self.low}, {self.high}]. At index(s) {idx[0]}, got value(s) {vals}")
         return value
 
     def __repr__(self):
@@ -232,12 +252,18 @@ class DiscreteParam(BaseParameter):
     def _generate(self, size):
         return np.random.randint(self.low, self.high, size)
 
+    def _perturb(self, location, scale):
+        value = super()._perturb(location, scale)
+        value = np.round(value, 0).astype(int)
+        value = np.clip(value, self.low, self.high-1)
+        return value
+
     def _validate(self, value: np.ndarray) -> np.ndarray:
         check = (value >= self.low) & (value < self.high)
         if not np.all(check):
             idx = np.where(~check)
             vals = value[idx]
-            raise ValueError(f"All Values must be between [{self.low}, {self.high}). At index(s) {idx[0]}, got value(s) {vals}")
+            raise ValueError(f"All Values must be integers between [{self.low}, {self.high}). At index(s) {idx[0]}, got value(s) {vals}")
         return value.astype(np.int_)
 
     # def sample(self):

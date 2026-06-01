@@ -478,7 +478,7 @@ class CGP_Rule(BaseLearningRule, Genome):
         outp = self.graph.forward(inp)
         return outp.reshape(-1, self.output_size)
 
-    def mutate(self, rate) -> 'CGP_Rule':
+    def mutate(self, rate: float, scale: float, method: str,) -> 'CGP_Rule':
         new_graph = self.graph.mutate(mutation_rate=rate)
         new_rule = copy.copy(self)
         new_rule.graph = new_graph
