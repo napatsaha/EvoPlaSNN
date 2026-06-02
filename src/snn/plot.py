@@ -1,5 +1,5 @@
 from pathlib import Path
-import pickle
+import csv, pickle
 from typing import List, Literal, Sequence
 import matplotlib.pyplot as plt
 import matplotlib as mpl
@@ -84,6 +84,7 @@ def plot_spikes(simulator: 'SNNSimulator' = None, values: List[np.ndarray] = Non
     fig.suptitle(title if title is not None else "Spike Trains", fontsize=20)
     fig.supylabel("Neuron Index")
     if savepath is not None:
+        print(f"Saving plot to {savepath}")
         plt.savefig(savepath)
     if show:
         plt.show()
@@ -144,6 +145,7 @@ def plot_traces(simulator: 'SNNSimulator', x_scale: float = 0.2, y_scale: float 
     fig.suptitle(title if title is not None else "Neuron Traces", fontsize=20)
     fig.supylabel("Neuron Index")
     if savepath is not None:
+        print(f"Saving plot to {savepath}")
         plt.savefig(savepath)
     if show:
         plt.show()
@@ -400,6 +402,7 @@ def plot_weights(simulator: "SNNSimulator" = None, values: List[np.ndarray] = No
     fig.colorbar(img, ax=axs, orientation='vertical', label='Weight Value')
     fig.text(x=0.5, y=0.99, s="SNN Synaptic Weights", fontsize=20, ha='center')
     if savepath is not None:
+        print(f"Saving plot to {savepath}")
         plt.savefig(savepath)
     if show:
         plt.show()
@@ -443,6 +446,7 @@ def plot_weight_over_time(simulator: 'SNNSimulator' = None, values: List[np.ndar
     fig.text(s=title if title is not None else "SNN Weight over Time", fontsize=20, x=0.5, y=1.00, ha='center')
 
     if savepath is not None:
+        print(f"Saving plot to {savepath}")
         plt.savefig(savepath)
     if show:
         plt.show()
@@ -477,6 +481,7 @@ def plot_weight_heatmap(simulator: 'SNNSimulator', *, x_scale: float = 0.2, y_sc
     fig.text(0.5, 1.05, f"Weight Heatmap", fontsize=16)
     fig.text(0.5, 1.02, f"Synapse Layer {synapse_layer}", fontsize=12)
     if savepath is not None:
+        print(f"Saving plot to {savepath}")
         plt.savefig(savepath)
     if show:
         plt.show()
@@ -514,6 +519,7 @@ def plot_env_weight_actions(simulator: 'SNNSimulator', *,
     plt.colorbar(img, ax=axs, orientation='horizontal', fraction=0.05, pad=0.1, label="Weights")
 
     if savepath is not None:
+        print(f"Saving plot to {savepath}")
         plt.savefig(savepath)
     if show:
         plt.show()
@@ -556,6 +562,7 @@ def plot_env_weight_greedy(simulator: 'SNNSimulator', *, tolerance: float = 1e-1
     plt.colorbar(img, ax=ax, orientation='horizontal', fraction=0.05, pad=0.1, label="Weights")
 
     if savepath is not None:
+        print(f"Saving plot to {savepath}")
         plt.savefig(savepath)
     if show:
         plt.show()
@@ -609,6 +616,7 @@ def plot_eligibility_traces(simulator: 'SNNSimulator' = None, values: np.ndarray
     axs[-1, 0].set_xlabel("Time steps")
     fig.suptitle(f"Eligibility Traces\nSynapse Layer {synapse_layer}", fontsize=16)
     if savepath is not None:
+        print(f"Saving plot to {savepath}")
         plt.savefig(savepath)
     if show:
         plt.show()
@@ -691,6 +699,7 @@ def plot_intermediate_fitness(simulator: 'SNN_Simulator' = None, values: np.ndar
     agg_func = simulator.reward_collector.fitness_agg_func
     fig.text(0.5, 1.02, f"{agg_func.title()} Fitness: {ft:.2f}", ha='center', fontsize=14)
     if savepath is not None:
+        print(f"Saving plot to {savepath}")
         plt.savefig(savepath)
     if show:
         plt.show()
@@ -791,6 +800,7 @@ def plot_learning_rule_3D(rule: 'base.LearningRule', simulator: 'SNNSimulator' =
     fig.colorbar(img, ax=axs, fraction=0.1, orientation="horizontal", aspect=50, label='ΔWeight')
 
     if savepath is not None:
+        print(f"Saving plot to {savepath}")
         plt.savefig(savepath)
     if show:
         plt.show()
@@ -996,11 +1006,88 @@ def plot_fitness_generation(file_path: str | Path, *, estimator: str = "mean", e
     ax.text(1.00, 1.05, comment, ha='right', fontsize=16, transform=ax.transAxes)
 
     if savepath is not None:
+        print(f"Saving plot to {savepath}")
         plt.savefig(savepath, bbox_inches='tight')
     if show:
         plt.show()
     # plt.close(fig)
 
+
+def plot_solution_generation(solution_file: str | Path = None, var: Literal["global_fitness", "local_fitness", "novelty_dist", "rank"] = "global_fitness", df: pd.DataFrame = None, *, 
+                             estimator: str = "mean", errorband: str | tuple = ("pi", 100),
+                            linecolor_best: str = "black", linecolor_est: str = "blue", point_cmap: str = 'dark:gray',
+                            sns_style: str = "whitegrid", sns_palette: str = "muted", figsize: tuple = None,
+                            title: str = None, subtitle: str = None, comment: str = None,
+                            x_eps: int = 2, x_scale: float = 0.3, y_scale: float = 1.3, y_size: float = 10,
+                            savepath: str | Path = None, show: bool = True):
+    # assert var in ["global_fitness", "local_fitness", "novelty_dist", "rank"]
+
+    if solution_file is not None:
+        run_name = Path(solution_file).parent.stem
+
+        # Read data
+        solutions = []
+        with open(solution_file) as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                solutions.append(row)
+
+        sols_df = pd.DataFrame.from_records(solutions, exclude=["genome", "behaviour"], coerce_float=True)
+        sols_df = sols_df.astype({'gen': 'int', 'rank': 'int', 'global_fitness': 'float', 'local_fitness': 'float', 'novelty_dist': 'float'})
+        sols_df["indiv_type"] = sols_df["indiv"].str.slice(0, 1).map({"p":"Parent", "o": "Offspring"})
+        assert var in sols_df.columns, f"var={var} not found in solution file columns: {sols_df.columns}"
+        df = sols_df
+    elif df is not None:
+        _cols_to_check = ["gen", "indiv", var]
+        _check_cols = np.isin(_cols_to_check, df.columns)
+        assert np.all(_check_cols), f"DataFrame is missing columns: {np.asarray(_cols_to_check)[~_check_cols]}"
+        if "indiv_type" not in df.columns:
+            df["indiv_type"] = df["indiv"].str.slice(0, 1).map({"p":"Parent", "o": "Offspring"})
+        df = df
+        run_name = "NA"
+    else:
+        raise AssertionError(f"Either 'solution_file' or 'df' must be specified.")
+
+    # Calulate best all-time fitness
+    best_fts = df.groupby("gen")[var].max().cummax()
+    best_fts.rename("best_fitness", inplace=True)
+    res = df.join(best_fts, on="gen", how="left")
+
+    num_gens = res["gen"].max() + 1
+    best_fts = res["best_fitness"].max()
+    # fts_range = res[var].max() - res[var].min()
+    var_pretty = var.replace('_', ' ').title()
+
+    fig, ax = plt.subplots(1, 1, figsize=(num_gens * x_scale, y_size) if figsize is None else figsize)
+    # sns.set_theme(palette=sns_palette, style=sns_style)
+    # Fitness per individual
+    sns.stripplot(data=res, x="gen", y=var, hue="indiv_type", size=5, ax=ax, alpha=0.5, palette=point_cmap)
+    # Best cumulative fitness
+    sns.lineplot(data=res, x="gen", y="best_fitness", color=linecolor_best, linewidth=2, ax=ax, label=f"Best {var_pretty}")
+    # Average fitness for each generation
+    sns.lineplot(data=res, x="gen", y=var, estimator=estimator, errorbar=errorband, ax=ax, color=linecolor_est, linewidth=2, label=f"{estimator.title()} {var_pretty}")
+    ax.set_xlim(0-x_eps, num_gens+x_eps)
+    ax.xaxis.set_major_locator(plt.MultipleLocator(5))
+    ax.set_xlabel("Generation", fontsize=12)
+    ax.set_ylabel(var_pretty, fontsize=12)
+    # ax.legend(loc="upper right", fontsize=10)
+    ax.grid(True, which='both', linestyle='--', linewidth=0.5, alpha=0.5)
+
+    ax.text(num_gens - 1, best_fts, f"{best_fts:.2f}", ha='right', va="bottom", fontsize=16, transform=ax.transData, color=linecolor_best)
+    title_main = f"{var_pretty} Over Generations" if title is None else title
+    subtitle = f"({estimator.title()}  +/- {errorband[1]} {errorband[0].upper()})" if subtitle is None else subtitle
+    comment = f"Run: {run_name}" if comment is None else comment
+    fig.text(0.5, 0.95, title_main, ha='center', fontsize=24)
+    fig.text(0.5, 0.90, subtitle, ha='center', fontsize=16)
+    ax.text(1.00, 1.05, comment, ha='right', fontsize=16, transform=ax.transAxes)
+
+    if savepath is not None:
+        print(f"Saving plot to {savepath}")
+        plt.savefig(savepath, bbox_inches='tight')
+    if show:
+        plt.show()
+    plt.close(fig)
+    return df
 
 ## Plotting functions for entire experiment (containing multiple runs) ##
 def plot_compare_run(exp_dir: str | Path, x_var: str, hue_var: str = None, col_var: str = None, *,
@@ -1082,6 +1169,7 @@ def plot_compare_run(exp_dir: str | Path, x_var: str, hue_var: str = None, col_v
     plt.text(0.5, 1.05, f"{exp_name} | {num_sim_steps} Simulation timesteps", transform=fig.transFigure, ha='center', fontsize=16)
     plt.text(0.5, 1.02, f"Mean Fitness +/- Std ({num_evals} Evaluations)", transform=fig.transFigure, ha='center', fontsize=12)
     if savepath is not None:
+        print(f"Saving plot to {savepath}")
         plt.savefig(savepath, dpi=300, bbox_inches='tight')
     if show:
         plt.show()

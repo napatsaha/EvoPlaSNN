@@ -119,11 +119,11 @@ def main(config_file: str | Path | dict, *, config_overrides: dict = None, paren
     # Begin experiment
     manager.run()
 
-    # Plot fitness
-    if hasattr(evaluator, "_fits_indiv_file"):
-        file_path = results_path / evaluator._fits_indiv_file 
-        snn_plot.plot_fitness_generation(file_path, savepath=results_path / "fitness_gen.png", show=False, estimator="median", 
-                                         errorband=("pi", 50))
+    # # Plot fitness
+    # if hasattr(evaluator, "_fits_indiv_file"):
+    #     file_path = results_path / evaluator._fits_indiv_file 
+    #     snn_plot.plot_fitness_generation(file_path, savepath=results_path / "fitness_gen.png", show=False, estimator="median", 
+    #                                      errorband=("pi", 50))
 
     print(f"Evolution run completed. Results saved to {results_path}")
 
@@ -228,6 +228,29 @@ def eval(results_path: Path | str = None, *, config_path: str | Path = None, num
         simulator.reset()
         simulator.run(num_steps=evaluator.max_steps, num_eps=evaluator.max_episodes)
         fitness = simulator.get_fitness()
+        # Plot fitness
+        try:
+            if (results_path / "fitness_per_indiv.csv").exists():
+                snn_plot.plot_fitness_generation(results_path / "fitness_per_indiv.csv", savepath=results_path / "offspring_fitness_gen.png", show=False, estimator="median", 
+                                                errorband=("pi", 50))
+            if (results_path / "solutions.csv").exists():
+                run_name = results_path.stem
+                # Plot solution global fitness
+                sols_df = snn_plot.plot_solution_generation(results_path / "solutions.csv", var="global_fitness", comment=f"Run: {run_name}", 
+                                                            point_cmap="husl", estimator="median", errorband=("pi", 75),
+                                                            show=False, savepath=results_path / "solution_fitness_gen.png")
+                # Plot solution novelty distance
+                snn_plot.plot_solution_generation(df=sols_df, var="novelty_dist", comment=f"Run: {run_name}", point_cmap="husl", 
+                                                  estimator="median", errorband=("pi", 50),
+                                                  show=False, savepath=results_path / "solution_novelty_gen.png")
+                snn_plot.plot_solution_generation(df=sols_df, var="local_fitness", comment=f"Run: {run_name}", point_cmap="husl", 
+                                                  estimator="mean", errorband=("se", 3),
+                                                  show=False, savepath=results_path / "solution_local_gen.png")
+                snn_plot.plot_solution_generation(df=sols_df, var="rank", comment=f"Run: {run_name}", point_cmap="husl", 
+                                                  estimator="median", errorband=("pi", 50),
+                                                  show=False, savepath=results_path / "solution_rank_gen.png")
+        except Exception as e:
+            print(f"Error plotting fitness: {e}")
         # Plot spike raster
         try:
             snn_plot.plot_spikes(simulator, x_eps=2, x_range=200,

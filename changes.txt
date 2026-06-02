@@ -1,3 +1,14 @@
+v1.1.22
+- `snn.plot.plot_solution_generation()`:
+    - Plot Solution (parent+offspring) per generation for any recorded variables in 'solutions.csv'
+    - Can specify variables: "global_fitness", "local_fitness", "novelty_dist", "rank"
+    - Can accept pre-read Data frame (to prevent repetitive computation)
+    - Also return Data frame
+- For all plots in `snn.plot` added print to show when and where plots are being saved to
+- `run_rl.py`
+    - Moved Plot fitness to eval()
+    - Added section within plotting to plot the four variables if "solutions.csv" is available
+
 v1.1.21
 - Perturbation style mutation
 - `BaseSolver` now stores 3 variables during init: mutation_rate, mutation_scale, mutation_method
