@@ -74,10 +74,10 @@ class NeuronLayer(NeuronLayerProtocol):
             self._last_only = True if trace_type in ["dx3", "dx4"] else False # dx2 and dx1 are cumulative traces
 
         # Deals with positive integer tau's as a unit of dt
-        if tau_mem is not None and isinstance(tau_mem, int):
-            tau_mem = tau_mem * dt
-        if tau_trace is not None and isinstance(tau_trace, int):
-            tau_trace = tau_trace * dt
+        # if tau_mem is not None and isinstance(tau_mem, int):
+        #     tau_mem = tau_mem * dt
+        # if tau_trace is not None and isinstance(tau_trace, int):
+        #     tau_trace = tau_trace * dt
 
         # Membrane potential parameters
         self.mem_rest = mem_rest
@@ -290,6 +290,38 @@ class NeuronLayer(NeuronLayerProtocol):
         Returns the trace of the neuron layer.
         """
         return self.get_trace()
+
+    @property
+    def tau_trace(self):
+        """
+        Time constant for neuron trace
+        
+        If specified as integer or as value greater than 1, will be converted to units of `dt`.
+        """
+        return self._tau_trace
+    @tau_trace.setter
+    def tau_trace(self, value: int | float):
+        if value <= 0:
+            raise ValueError(f"tau_mem must not be negative or zero. Got {value}")
+        if isinstance(value, int) or value > 1:
+            value = value * self.dt
+        self._tau_trace = value
+
+    @property
+    def tau_mem(self):
+        """
+        Time constant for membrane potential. 
+        
+        If specified as integer or as value greater than 1, will be converted to units of `dt`.
+        """
+        return self._tau_mem
+    @tau_mem.setter
+    def tau_mem(self, value: int | float):
+        if value <= 0:
+            raise ValueError(f"tau_mem must not be negative or zero. Got {value}")
+        if isinstance(value, int) or value > 1:
+            value = value * self.dt
+        self._tau_mem = value
 
     @property
     def spike_method(self) -> str:

@@ -1,3 +1,7 @@
+v1.1.23
+- settable tau_mem and tau_trace properties in `snn.snn.SNN` for each layer
+- tau input control moved from init to property.setter in `snn.neurons.NeuronLayer`
+
 v1.1.22
 - `snn.plot.plot_solution_generation()`:
     - Plot Solution (parent+offspring) per generation for any recorded variables in 'solutions.csv'

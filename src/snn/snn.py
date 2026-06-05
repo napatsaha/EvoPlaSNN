@@ -2,7 +2,7 @@
 Simple Network of LIF neurons
 """
 
-from typing import List, Literal
+from typing import List, Literal, Sequence
 from common.base import LearningRule
 import numpy as np
 from typing import Union
@@ -185,6 +185,32 @@ class SNN:
         self._learning_rule = rule
         for synapse in self.synapse_layers:
             synapse.learning_rule = rule
+
+    @property
+    def tau_trace(self) -> List[float]:
+        return [layer.tau_trace for layer in self.neuron_layers]
+    @tau_trace.setter
+    def tau_trace(self, value: int | float | Sequence | np.ndarray):
+        if isinstance(value, (Sequence, np.ndarray)):
+            assert len(value) == len(self.neuron_layers)
+            for v, neuron_layer in zip(value, self.neuron_layers):
+                neuron_layer.tau_trace = v
+        else:
+            for neuron_layer in self.neuron_layers:
+                neuron_layer.tau_trace = value
+
+    @property
+    def tau_mem(self) -> List[float]:
+        return [layer.tau_mem for layer in self.neuron_layers]
+    @tau_mem.setter
+    def tau_mem(self, value: int | float | Sequence):
+        if isinstance(value, (Sequence, np.ndarray)):
+            assert len(value) == len(self.neuron_layers)
+            for v, neuron_layer in zip(value, self.neuron_layers):
+                neuron_layer.tau_mem = v
+        else:
+            for neuron_layer in self.neuron_layers:
+                neuron_layer.tau_mem = value
 
     def __repr__(self):
         return f"SpikingNetwork(input_size={self.input_size}, hidden_size={self.hidden_size}, output_size={self.output_size})"
