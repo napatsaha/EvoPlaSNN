@@ -131,12 +131,13 @@ class BaseParameter(Parameter):
 class RealParam(BaseParameter):
     _supported_dist = ("uniform", "normal")
     def __init__(self, value=None, length=1, *,
-                 low=None, high=None, loc=None, scale=None,
+                 low=None, high=None, dist_params: dict = {},
                  dist: Literal["uniform", "normal"] = "uniform",
                  **kwargs):
         # Can be unbounded
         self.low = low #if low is not None else -np.inf
         self.high = high #if high is not None else np.inf
+        self._bounded = (self.low is not None) or (self.high is not None)
         if (self.low is not None) and (self.high is not None): 
             if self.low >= self.high:
                 raise ValueError(f"'low' must be less than 'high'. Got low={self.low}, high={self.high}")
@@ -150,22 +151,28 @@ class RealParam(BaseParameter):
         # Assign distribution for quick checks later on
         if dist == "uniform":
             self._uniform = True
-            if (low is None) or (high is None):
-                raise ValueError("For 'uniform' distribution, both 'low' and 'high' boundaries must be provided. " + \
-                                 f"Found low={low}, high={high}")
+            self.dist_params = {"low": dist_params.get("low", 0 if low is None else low),
+                                "high": dist_params.get("high", 1 if high is None else high)}
+            # if (low is None) or (high is None):
+            #     raise ValueError("For 'uniform' distribution, both 'low' and 'high' boundaries must be provided. " + \
+            #                      f"Found low={low}, high={high}")
         elif dist == "normal":
             self._normal = True
-            self.loc = loc if loc is not None else 0
-            self.scale = scale if scale is not None else 1
+            self.dist_params = {"loc": dist_params.get("loc", kwargs.get("loc", 0)),
+                                "scale": dist_params.get("scale", kwargs.get("scale", 1))}
+            # self.loc = loc if loc is not None else 0
+            # self.scale = scale if scale is not None else 1
 
         super().__init__(value, length)
 
     def _generate(self, size):
         if self._uniform:
-            return np.random.uniform(self.low, self.high, size)
+            return np.random.uniform(size=size, **self.dist_params)
         elif self._normal:
-            vals = np.random.normal(self.loc, self.scale, size)
-            return np.clip(vals, self.low, self.high)
+            vals = np.random.normal(size=size, **self.dist_params)
+            if self._bounded:
+                vals = np.clip(vals, self.low, self.high)
+            return vals
         else:
             return np.zeros(shape=size)
     
@@ -175,13 +182,14 @@ class RealParam(BaseParameter):
         return value
 
     def _validate(self, value):
-        check_upper = (value <= self.high) if self.high is not None else True
-        check_lower = (value >= self.low) if self.low is not None else True
-        check = check_lower & check_upper
-        if not np.all(check):
-            idx = np.where(~check)
-            vals = value[idx]
-            raise ValueError(f"All Values must be between [{self.low}, {self.high}]. At index(s) {idx[0]}, got value(s) {vals}")
+        if self._bounded:
+            check_upper = (value <= self.high) if self.high is not None else True
+            check_lower = (value >= self.low) if self.low is not None else True
+            check = check_lower & check_upper
+            if not np.all(check):
+                idx = np.where(~check)
+                vals = value[idx]
+                raise ValueError(f"All Values must be between [{self.low}, {self.high}]. At index(s) {idx[0]}, got value(s) {vals}")
         return value
 
     def __repr__(self):
