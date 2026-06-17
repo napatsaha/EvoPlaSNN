@@ -60,7 +60,7 @@ class BaseSolver(Solver):
 
     def reset(self):
         self._first_gen = True
-        self.fitnesses.clear()
+        self.fitnesses.fill(0)
         self._solutions.clear()
         self.best_fitness = None
         self.best_solution = None
@@ -68,7 +68,7 @@ class BaseSolver(Solver):
     def tell(self, fitnesses, *, gen_no: int = None):
         best_idx = np.argmin(fitnesses) if self.minimise else np.argmax(fitnesses)
         # Update self
-        self.fitnesses = fitnesses
+        self.fitnesses = np.asarray(fitnesses)
         self.best_fitness = fitnesses[best_idx]
         self.best_solution = self.solutions[best_idx]
 
@@ -132,14 +132,14 @@ class BaseSolver(Solver):
         """
         if isinstance(indices, int) or isinstance(indices, np.int_):
             indices = [indices]
+        sols = [self.solutions[i] for i in indices]
         if return_array: # Return a 2D array of concatenated solutions
-            sols = np.c_[[sol.parameters for i, sol in enumerate(self.solutions) if i in indices]]
+            sols = np.c_[[sol.parameters for sol in sols]]
             if simplify:
                 return np.squeeze(sols)
             else:
                 return sols
         else:
-            sols = [sol for i, sol in enumerate(self.solutions) if i in indices]
             if simplify and len(sols) == 1:
                 return sols[0]
             else:
@@ -152,27 +152,7 @@ class BaseSolver(Solver):
     def solutions(self, values: List):
         assert isinstance(values, List), "Solutions must be a list"
         self._solutions = values
-        # if len(values) == 0:
-        #     self._solutions = []
-        # elif isinstance(values, List):
-        #     self._solutions = []
-        #     for val in values:
-        #         if isinstance(val, Genome):
-        #             self._solutions.append(val)
-        #         else:
-        #             try:
-        #                 sol = BaseGenome(val)
-        #                 self._solutions.append(sol)
-        #             except:
-        #                 raise ValueError("Cannot convert solutions into Genome")
-        # elif isinstance(values, np.ndarray):
-        #     self._solutions = []
-        #     for ind in range(self.popsize):
-        #         sol = values[ind]
-        #         try:
-        #             self._solutions.append(BaseGenome(sol))
-        #         except:
-        #             raise ValueError("Cannot convert solutions into Genome")
+
 
 
 

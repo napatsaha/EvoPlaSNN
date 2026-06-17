@@ -130,9 +130,9 @@ LRULE_INPUT_BOUNDS = {
     "trace_post": (0, 1),
     "weights": (-5, 5), 
     "reward": (-1, 1), 
-    "eligibility_pre": (0, 1), 
+    "eligibility_pre": (0, 1),
     "eligibility_post": (0, 1), 
-    "eligibility_stdp": (0, 1)
+    "eligibility_stdp": (-1, 1)
 }
 
 def compute_lrule_bc(rule: LearningRule, inp: np.ndarray = None, normalise: bool = False, *,

@@ -49,6 +49,12 @@ class CMA_ES(BaseSolver):
         self.c_1 = 2 / ((self.ndim + 1.3)**2 + self.mu_eff) if c_1 is None else c_1
         self.c_mu = min(1 - self.c_1, 2 * (self.mu_eff + 1/self.mu_eff - 2) / ((self.ndim+2)**2 + self.mu_eff)) if c_mu is None else c_mu
         
+    def reset(self):
+        super().reset()
+        self.mean = np.zeros(self.ndim)
+        self.cov = np.eye(self.ndim)
+        self.pc = np.zeros(self.ndim)
+
     @override
     def ask(self):
         samples = self.rng.multivariate_normal(self.mean, self.cov, size=(self.popsize, ))

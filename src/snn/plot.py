@@ -718,13 +718,17 @@ def plot_learning_rule(rule: 'base.LearningRule', simulator: 'SNNSimulator' = No
         raise ValueError(f"Plotting learning rule is not yet supported for input_size={input_size}")
 
 def plot_learning_rule_3D(rule: 'base.LearningRule', simulator: 'SNNSimulator' = None, *, 
+                          custom_bounds: dict[str, tuple] = None,
                           n_bins: int = 100, n_cols: int = 5, var_col: str = "reward",
-                          cmap: str = "RdBu", figsize: tuple = (20, 10),
+                          cmap: str = "RdBu", figsize: tuple = (20, 10), aspect="equal",
                           savepath: str | Path = None, show: bool = True,
                           **kwargs) -> None:
     # DONE: Fix format to be generic like plot_learning_rule_1D
     # Use default values for each inputs
-    bounds = [LRULE_INPUT_BOUNDS.get(inp) for inp in rule.input_order]
+    if custom_bounds is not None:
+        bounds = [LRULE_INPUT_BOUNDS.get(inp) if inp not in custom_bounds else custom_bounds.get(inp) for inp in rule.input_order]
+    else:
+        bounds = [LRULE_INPUT_BOUNDS.get(inp) for inp in rule.input_order]
     # TODO: Update bounds with recorded values if a Simulator is passed in
 
     # Set axis names for column and remaining x-y variables
@@ -780,7 +784,7 @@ def plot_learning_rule_3D(rule: 'base.LearningRule', simulator: 'SNNSimulator' =
     for xi in range(n_cols):
         ax = axs[xi]
         val_xi = xii[i_col][xi]
-        img = ax.imshow(vv[:, :, xi], extent=xy_bounds, aspect="equal", origin="lower", colorizer=colorizer)
+        img = ax.imshow(vv[:, :, xi], extent=xy_bounds, aspect=aspect, origin="lower", colorizer=colorizer, **kwargs)
         ax.set_title(f"{var_col} = {val_xi}")
         ax.set_xlabel(var_names[0])
         ax.set_ylabel(var_names[1])
@@ -876,7 +880,7 @@ def plot_learning_rule_3D(rule: 'base.LearningRule', simulator: 'SNNSimulator' =
 
 
 def plot_learning_rule_2D(rule: base.LearningRule, simulator: 'SNNSimulator' = None, *, 
-                          transpose: bool = False,
+                          transpose: bool = False, custom_bounds: dict[str, tuple] = None,
                           xmin: float = 0.0, xmax: float = 1.0, ymin: float = 0.0, ymax: float = 1.0,
                           num_mesh: int = 100, cmap: str = "RdBu", figsize: tuple = (10, 10),
                           savepath: str | Path = None, show: bool = True,
@@ -903,7 +907,10 @@ def plot_learning_rule_2D(rule: base.LearningRule, simulator: 'SNNSimulator' = N
     n_inputs = rule.input_size
     rule_inputs = rule.input_order
 
-    bounds = [LRULE_INPUT_BOUNDS.get(inp) for inp in rule.input_order]
+    if custom_bounds is not None:
+        bounds = [LRULE_INPUT_BOUNDS.get(inp) if inp not in custom_bounds else custom_bounds.get(inp) for inp in rule.input_order]
+    else:
+        bounds = [LRULE_INPUT_BOUNDS.get(inp) for inp in rule.input_order]
     xmin, xmax = bounds[0]
     ymin, ymax = bounds[1]
     # TODO: Update boundaries if simulator is passed in
