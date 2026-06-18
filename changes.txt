@@ -1,3 +1,9 @@
+v1.1.25
+- snn.plot.plot_learning_rule_4D for 4 inputs
+- Added optional `rule_name` to be displayed along with plot
+- Fixed issue with displayed image not being square
+- Allow all kwargs to be passed into `imshow()`
+
 v1.1.24
 - Fixed issue with `BaseSolver.take_solutions()` not ordering results in the same way as indices
 - Added `reset()` to CMA-ES that fixes `mean` and `cov` appropriately
