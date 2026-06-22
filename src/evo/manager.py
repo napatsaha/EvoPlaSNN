@@ -1,11 +1,15 @@
 from pathlib import Path
 import logging
 import time
-from common.base import Evaluator, Genome, Solver
+from typing import List
+import yaml
 from tqdm import tqdm
 
 import numpy as np
 
+from common.base import Evaluator, Genome, Solver
+from common.utils import create_solver
+from rl.eval import RL_Evaluator
 
 # from .base import BaseSolver
 
@@ -14,20 +18,82 @@ class EvoManager:
     """
     Main class for managing loop of evolutionary optimisation.
     """
-    def __init__(self, solver: Solver, evaluator: Evaluator, *, 
+    def __init__(self, config: dict,  #solver: Solver, evaluator: Evaluator, 
+                 *, 
                  num_trials: int = 1, 
                  results_path: str = None,
+                 multiple_evaluators: bool = False,
                  max_generations: int = None, max_stagnation: int = None,
                  use_target_fitness: bool = None, target_fitness: float = None, tolerance: float = 1e-6, 
                  record_classes: bool = False, save_best: int = 1,
                 #  update_inputs: bool = True,  # Whether to update input classes for each generation
                  **kwargs):
+        self.multiple_evaluators = multiple_evaluators
+        
+
+        # Copied from rul_rl.py
+        if "arule_params" in config:
+            config["lrule_params"] = config.get("lrule_params", {}).update(config["arule_params"])
+            del config["arule_params"]
+
+        # Configure SNN Evaluator object
+        self.evaluator: Evaluator = None
+        self.evaluators: List[Evaluator] = None
+        if not self.multiple_evaluators:
+            evaluator: Evaluator = RL_Evaluator(
+                params=config,
+                record_info=False,
+                **config["evo_params"]["evaluator"]
+            )
+            # use_target_fitness = config["evo_params"]["manager"].get("use_target_fitness", False)
+            # if use_target_fitness:
+            # TODO: Calculate this without Evaluator
+            config["evo_params"]["manager"]["target_fitness"] = evaluator.get_target_fitness()  
+            # Evaluator info
+            self.evaluator = evaluator
+            
+        else:
+            envs_params: dict = config.get("envs_params", {})
+            envs_params["envs"] = []
+            self.evaluators = []
+            
+            for file in envs_params.get("files", []):
+                with open(file) as f:
+                    env_config = yaml.safe_load(f)
+                    env_config = env_config.get("env_params", env_config)
+                envs_params["envs"] = env_config
+                evaluator: Evaluator = RL_Evaluator(
+                    params=config,
+                    env_params=env_config,
+                    record_info=False,
+                    **config["evo_params"]["evaluator"]
+                )
+                self.evaluators.append(evaluator)
+
+
+        # Configure Evolution Solver object
+        # if config["lrule_params"]["type"] == "ann":
+        #     config["evo_params"]["solver"]["ndim"] = evaluator.get_parameter_size()
+        # TODO: Calculate this without Evaluator
+        config["evo_params"]["solver"]["minimise"] = evaluator.is_minimise()
+        solver = create_solver(config["evo_params"]["solver"], genome_params=config.get("lrule_params").copy())
+        if "popsize" not in config["evo_params"]["solver"]:
+            config["evo_params"]["solver"]["popsize"] = solver.popsize
+        if "ndim" not in config["evo_params"]["solver"]:
+            config["evo_params"]["solver"]["ndim"] = solver.ndim
+        # Solver info
         self.solver = solver
-        self.evaluator = evaluator
         self.minimise = self.solver.minimise
 
+
+        self.config = config
+
+
+
+
+
         # Get flag on whether to process a behaviour stage or not
-        self.measure_behaviour = self.evaluator.measure_behaviour
+        self.measure_behaviour = evaluator.measure_behaviour
 
         self.num_trials = num_trials
         self.save_best = save_best
@@ -66,7 +132,11 @@ class EvoManager:
         t0 = time.time()
         # Setup logging for each component
         self._setup_logger()
-        self.evaluator.setup_logger(self.results_path)
+        if self.multiple_evaluators:
+            for evaluator in self.evaluators:
+                evaluator.setup_logger(self.results_path)
+        else:
+            self.evaluator.setup_logger(self.results_path)
         self.solver.setup_logger(self.results_path)
 
         if self.max_generations is None:
@@ -93,15 +163,27 @@ class EvoManager:
                 #     self.evaluator.write_classes(self.results_path, gen_count)
 
                 # Set up evaluator before start of evaluation
-                self.evaluator.setup_generation(gen_count=gen_count)
+                # self.evaluator.setup_generation(gen_count=gen_count)
 
                 # Evaluate solution
                 for i, solution in tqdm(enumerate(solutions), desc="Populations", total=self.solver.popsize, position=1, leave=False):
-                    self.evaluator.setup_individual(inv_count=i)
-                    fts_list, avg_fts, std_fts, behv = self.evaluator.evaluate(solution, num_trials=self.num_trials, gen_count=gen_count, indiv_count=i)
-                    fitness_list[i] = avg_fts
-                    if self.measure_behaviour:
-                        behaviours.append(behv)
+                    # self.evaluator.setup_individual(inv_count=i)
+                    if self.multiple_evaluators:
+                        fts_per_trial = []
+                        for evaluator in self.evaluators:
+                            fts_list, _, _, behv = evaluator.evaluate(solution, num_trials=self.num_trials, gen_count=gen_count, inv_count=i)
+                            # Since trials is split between multiple evaluators, only raw trial fitness list is used
+                            fts_per_trial.extend(fts_list)
+                        # Then average out separately across evaluators
+                        fitness_list[i] = np.mean(fts_per_trial, where=~np.isnan(fts_per_trial))
+                        # Since `behv` is the same for every trial, then we can just use the last one
+                        if self.measure_behaviour:
+                            behaviours.append(behv)
+                    else:
+                        fts_list, avg_fts, std_fts, behv = self.evaluator.evaluate(solution, num_trials=self.num_trials, gen_count=gen_count, inv_count=i)
+                        fitness_list[i] = avg_fts
+                        if self.measure_behaviour:
+                            behaviours.append(behv)
 
                 # Inform solver about fitnesses (and optionally behaviour)
                 if self.measure_behaviour:
@@ -159,7 +241,11 @@ class EvoManager:
             t1 = time.time()
             dt = t1 - t0
             self.solver.close()
-            self.evaluator.close()
+            if self.evaluator is not None:
+                self.evaluator.close()
+            if self.evaluators is not None:
+                for evaluator in self.evaluators:
+                    evaluator.close()
 
         if isinstance(best_solution, Genome):
             best_solution = best_solution.parameters.round(4)

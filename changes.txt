@@ -1,3 +1,14 @@
+v1.2.0 (2026-06-22)
+- Removed `setup_generation`, `setup_individual` and `setup_trial` in `RL_Evaluator`. Instead, 
+    `.evaluate()` passes in `gen_count` and `inv_count` for external information
+- Moved `Evaluator` and `Solver` initialisation from `run_rl.main()` to `Manager.__init__()`
+- Manager handles whether to create one or multiple Evaluators based on `multiple_evaluators=True`
+    - All calls to `self.evaluator` changes to `self.evaluators` based on that flag
+- RL_Evaluator now take in `env_params` separately from `params`. If not supplied, it will look for
+    `'env_params'` item in params
+
+----
+
 v1.1.25
 - snn.plot.plot_learning_rule_4D for 4 inputs
 - Added optional `rule_name` to be displayed along with plot

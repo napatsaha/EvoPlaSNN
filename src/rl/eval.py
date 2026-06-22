@@ -16,11 +16,11 @@ import snn.spikegen as spkgen
 # import snn.spikegen
 from lrule import LearningRule
 from rl import ENV_DICT, StateCoder, RewardCollector, BaseMaze
-    
 
 class RL_Evaluator(Evaluator):
     def __init__(self, 
-                 params: Dict = {},
+                 params: Dict, *,
+                 env_params: Dict = None,
                  record_info: bool = False,
                  log_level: int = 2,
                  record_inter_fitness: bool = True,
@@ -54,16 +54,20 @@ class RL_Evaluator(Evaluator):
         self.precision = precision if not record_inter_fitness else 1
 
         # Generation and other trackers
-        self.gen_count = 0
-        self.inv_count = 0
-        self.trial_count = 0
+        # self.gen_count = 0
+        # self.inv_count = 0
+        # self.trial_count = 0
 
         # Initialise environment and spike coder
-        env_name = params.get("env_params", {}).pop("name", None)
+        if env_params is None:
+            env_params = params.get("env_params", {})
+        else:
+            env_params = copy.deepcopy(env_params)
+        env_name = env_params.pop("name", None)
         if env_name not in ENV_DICT:
             raise ValueError(f"Environment '{env_name}' not yet supported. "
                              f"Supported environments: {list(ENV_DICT.keys())}")
-        self.env: BaseMaze = ENV_DICT.get(env_name)(**params["env_params"])
+        self.env: BaseMaze = ENV_DICT.get(env_name)(**env_params)
         # num_states = self.env.observation_space.n
         # num_actions = self.env.action_space.n
         self.spike_coder = StateCoder(self.env.observation_space, self.env.action_space, **params["spike_coder_params"])
@@ -151,7 +155,7 @@ class RL_Evaluator(Evaluator):
 
 
     def evaluate(self, genome: np.ndarray | LearningRule | Genome = None, num_trials=1, 
-                 gen_count: int = None, indiv_count: int = None) -> Tuple[List, float, float, ArrayLike]:
+                 gen_count: int = None, inv_count: int = None) -> Tuple[List, float, float, ArrayLike]:
         # Prepare output variables:
         fitnesses = []
         avg_fitness = None
@@ -179,8 +183,8 @@ class RL_Evaluator(Evaluator):
 
         if self._log_info >= 1:
             t00 = time.time()
-            self.logger.info(f"Generation {self.gen_count}, Individual {self.inv_count}")
-            self.write_genome(self.gen_count, self.inv_count, genome)
+            self.logger.info(f"Generation {gen_count}, Individual {inv_count}")
+            self.write_genome(gen_count, inv_count, genome)
 
         # Measure behaviour characteristics of the learning rule (currently assumed to be separate from fitness evaluation)
         if self.measure_behaviour:
@@ -190,7 +194,7 @@ class RL_Evaluator(Evaluator):
             # if self._log_info >= 1:
             #     self.logger.info(f"Trial {i+1}/{num_trials}: Starting Evaluation...")
             # Set up the individual for evaluation
-            self.setup_trial(trial_count=i)
+            # self.setup_trial(trial_count=i)
             
             # Reset everything
             self.simulator.reset()
@@ -211,7 +215,7 @@ class RL_Evaluator(Evaluator):
                 self.logger.info(f"Trial {i+1}/{num_trials}: Time taken: {t1 - t0:.4f} seconds.")
                 # Get intermediate fitness across samples
                 intermediate_fitness = self.simulator.get_intermediate_fitness(use_cutoff=True) if self.record_inter_fitness else None
-                self.write_trial(self.gen_count, self.inv_count, i, fitness, intermediate_fitness, precision=self.precision)
+                self.write_trial(gen_count, inv_count, i, fitness, intermediate_fitness, precision=self.precision)
         
         # if return_fitness_list:
         #     return fitnesses        
@@ -221,7 +225,7 @@ class RL_Evaluator(Evaluator):
         
         if self._log_info >= 1:
             t10 = time.time()
-            self.write_indiv(self.gen_count, self.inv_count, avg_fitness, std_fitness)
+            self.write_indiv(gen_count, inv_count, avg_fitness, std_fitness)
             self.logger.info(f"Individual evalution time: {t10 - t00:.4f} seconds")
 
         # if return_std:
@@ -231,8 +235,8 @@ class RL_Evaluator(Evaluator):
 
         return fitnesses, avg_fitness, std_fitness, behv
 
-    def setup_generation(self, gen_count: int, num_sets: int = None, record_classes: bool = None, **kwargs):
-        self.gen_count = gen_count
+    # def setup_generation(self, gen_count: int, num_sets: int = None, record_classes: bool = None, **kwargs):
+    #     self.gen_count = gen_count
         # if self.pattern_type == "poisson_a":
         #     params = self.pattern_params.copy()
         #     if num_sets is not None:
@@ -244,11 +248,11 @@ class RL_Evaluator(Evaluator):
         #     if record_classes:
         #         self.write_classes(self.results_path, gen_count)
 
-    def setup_individual(self, inv_count: int, **kwargs):
-        self.inv_count = inv_count
+    # def setup_individual(self, inv_count: int, **kwargs):
+    #     self.inv_count = inv_count
         
-    def setup_trial(self, trial_count: int, **kwargs):
-        self.trial_count = trial_count
+    # def setup_trial(self, trial_count: int, **kwargs):
+    #     self.trial_count = trial_count
         # # If Poisson Type A, update classes with the current set of classes.
         # if self.pattern_type == "poisson_a":
         #     self.spikegen.update_classes(self.classes[trial_count % len(self.classes)])

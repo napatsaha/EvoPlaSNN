@@ -81,33 +81,36 @@ def main(config_file: str | Path | dict, *, config_overrides: dict = None, paren
 
     # manager_type = config["evo_params"]["manager"].pop("type", "original")
     # Rename config["arule_params"] to config["lrule_params"] if exist
-    if "arule_params" in config:
-        config["lrule_params"] = config.get("lrule_params", {}).update(config["arule_params"])
-        del config["arule_params"]
+    # if "arule_params" in config:
+    #     config["lrule_params"] = config.get("lrule_params", {}).update(config["arule_params"])
+    #     del config["arule_params"]
 
-    # Configure SNN Evaluator object
-    evaluator: Evaluator = RL_Evaluator(
-        params=config,
-        record_info=False,
-        **config["evo_params"]["evaluator"]
-    )
+    # # Configure SNN Evaluator object
+    # evaluator: Evaluator = RL_Evaluator(
+    #     params=config,
+    #     record_info=False,
+    #     **config["evo_params"]["evaluator"]
+    # )
 
-    # Configure Evolution Solver object
-    # if config["lrule_params"]["type"] == "ann":
-    #     config["evo_params"]["solver"]["ndim"] = evaluator.get_parameter_size()
-    config["evo_params"]["solver"]["minimise"] = evaluator.is_minimise()
-    solver = create_solver(config["evo_params"]["solver"], genome_params=config.get("lrule_params").copy())
-    if "popsize" not in config["evo_params"]["solver"]:
-        config["evo_params"]["solver"]["popsize"] = solver.popsize
-    if "ndim" not in config["evo_params"]["solver"]:
-        config["evo_params"]["solver"]["ndim"] = solver.ndim
+    # # Configure Evolution Solver object
+    # # if config["lrule_params"]["type"] == "ann":
+    # #     config["evo_params"]["solver"]["ndim"] = evaluator.get_parameter_size()
+    # # TODO: Calculate this without Evaluator
+    # config["evo_params"]["solver"]["minimise"] = evaluator.is_minimise()
+    # solver = create_solver(config["evo_params"]["solver"], genome_params=config.get("lrule_params").copy())
+    # if "popsize" not in config["evo_params"]["solver"]:
+    #     config["evo_params"]["solver"]["popsize"] = solver.popsize
+    # if "ndim" not in config["evo_params"]["solver"]:
+    #     config["evo_params"]["solver"]["ndim"] = solver.ndim
     
-    # use_target_fitness = config["evo_params"]["manager"].get("use_target_fitness", False)
-    # if use_target_fitness:
-    config["evo_params"]["manager"]["target_fitness"] = evaluator.get_target_fitness()
+    # # use_target_fitness = config["evo_params"]["manager"].get("use_target_fitness", False)
+    # # if use_target_fitness:
+    # # TODO: Calculate this without Evaluator
+    # config["evo_params"]["manager"]["target_fitness"] = evaluator.get_target_fitness()
     
     # Configure Evolution Manager object
-    manager = EvoManager(solver, evaluator, results_path=results_path, **config["evo_params"]["manager"])
+    manager = EvoManager(config, results_path=results_path, **config["evo_params"]["manager"])
+    config = manager.config
 
     # Re-insert the manager type into the config
     # config["evo_params"]["manager"]["type"] = manager_type
@@ -199,7 +202,7 @@ def eval(results_path: Path | str = None, *, config_path: str | Path = None, num
     )
 
     if eval_results:
-        evaluator.setup_generation(gen_count=0, num_sets=num_evals)
+        # evaluator.setup_generation(gen_count=0, num_sets=num_evals)
         fts_list, avg_fts, std_fts, behv = evaluator.evaluate(num_trials=num_evals)
         if save_results:
             with open(results_path / f"{prefix}_eval_result.csv", "w") as f:
@@ -223,7 +226,7 @@ def eval(results_path: Path | str = None, *, config_path: str | Path = None, num
 
     # Plotting
     if save_plots or show_plots:
-        evaluator.setup_trial(trial_count=0)
+        # evaluator.setup_trial(trial_count=0)
         simulator = evaluator.simulator
         simulator.reset()
         simulator.run(num_steps=evaluator.max_steps, num_eps=evaluator.max_episodes)
