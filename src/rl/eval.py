@@ -25,7 +25,7 @@ class RL_Evaluator(Evaluator):
                  log_level: int = 2,
                  record_inter_fitness: bool = True,
                  precision: int = 3,
-                 learning_rule: LearningRule = None,
+                #  learning_rule: LearningRule = None,
                  max_steps: int = None,
                  max_episodes: int = None,
                  eval_episodes: int = None,
@@ -71,10 +71,8 @@ class RL_Evaluator(Evaluator):
         # num_states = self.env.observation_space.n
         # num_actions = self.env.action_space.n
         self.spike_coder = StateCoder(self.env.observation_space, self.env.action_space, **params["spike_coder_params"])
-        # self.learning_rule = ANN_Rule(**params["arule_params"]) if learning_rule is None else learning_rule
-        self.learning_rule = create_learning_rule(**params.get("lrule_params", {})) if learning_rule is None else learning_rule
         self.snn = SNN(input_size=self.spike_coder.input_size, output_size=self.spike_coder.output_size, 
-                       learning_rule=self.learning_rule, **params["snn_params"])
+                       **params["snn_params"])
         self.reward_collector = RewardCollector(**params["collector_params"])
         # Update min and max fitness from environment
         self.reward_collector.min_fitness = self.env.get_min_reward()
@@ -93,12 +91,17 @@ class RL_Evaluator(Evaluator):
                                       )
         self.logger = None
 
+        # Dummy Learning Rule for some pre-calculation
+        self._lrule_params = params.get("lrule_params", {})
+        self._lrule_type = self._lrule_params.pop("type")
+        self.dummy_rule = create_learning_rule(self._lrule_type, **self._lrule_params) #if learning_rule is None else learning_rule
         self.measure_behaviour = measure_behaviour
         self.behaviour_params = {} if behaviour_params is None or not self.measure_behaviour else behaviour_params
         if self.measure_behaviour:
             num_grid = self.behaviour_params.get("num_grid", 2)
             normalise = self.behaviour_params.get("normalise", False)
-            self.bc_func = make_bc_func(self.learning_rule.input_order, num_grid, normalise)
+            self.bc_func = make_bc_func(self.dummy_rule.input_order, num_grid, normalise)
+            self.bc_dim = num_grid ** len(self.dummy_rule.input_order)
         else:
             self.bc_func = None
 
@@ -106,7 +109,7 @@ class RL_Evaluator(Evaluator):
         """
         Returns the number of parameters in the genome required to build an Evolutionary Algorithm.
         """
-        return self.learning_rule.size if self.learning_rule is not None else None
+        return self.dummy_rule.size if self.dummy_rule is not None else None
     
     def is_minimise(self):
         """
@@ -141,17 +144,18 @@ class RL_Evaluator(Evaluator):
         # one for recording fitnesses in each trial
         # one for recording average fitness for each individual
         # one for recording genome of each individual
-        if self._log_info >= 2:
-            self._fits_trial_file = "fitness_per_trial.csv"
-            with open(self.results_path / self._fits_trial_file, "w") as f:
-                f.write("gen,indiv,trial,fitness,intermediate\n")
-        if self._log_info >= 1:
-            self._fits_indiv_file = "fitness_per_indiv.csv"
-            with open(self.results_path / self._fits_indiv_file, "w") as f:
-                f.write("gen,indiv,avg_fitness,std_fitness\n")
-            self._genome_file = "genome.csv"
-            with open(self.results_path / self._genome_file, "w") as f:
-                f.write("gen,indiv,genome\n")
+        if results_path is not None:
+            if self._log_info >= 2:
+                self._fits_trial_file = "fitness_per_trial.csv"
+                with open(self.results_path / self._fits_trial_file, "w") as f:
+                    f.write("gen,indiv,trial,fitness,intermediate\n")
+            if self._log_info >= 1:
+                self._fits_indiv_file = "fitness_per_indiv.csv"
+                with open(self.results_path / self._fits_indiv_file, "w") as f:
+                    f.write("gen,indiv,avg_fitness,std_fitness\n")
+                self._genome_file = "genome.csv"
+                with open(self.results_path / self._genome_file, "w") as f:
+                    f.write("gen,indiv,genome\n")
 
 
     def evaluate(self, genome: np.ndarray | LearningRule | Genome = None, num_trials=1, 
@@ -164,31 +168,28 @@ class RL_Evaluator(Evaluator):
 
         if genome is not None:
             if isinstance(genome, LearningRule):
-                self.learning_rule = genome
-                self.snn.learning_rule = genome
-                genome = genome.parameters
+                rule = genome
             elif isinstance(genome, Genome):
-                if self.learning_rule is not None:
-                    self.learning_rule.parameters = genome.parameters
-                    genome = genome.parameters
-                else:
-                    raise ValueError("Learning Rule must not be empty if array-like genome is passed as input. Otherwise a full LearningRule object must be passed in.")
+                rule = create_learning_rule(self._lrule_type, parameters=genome.parameters, **self._lrule_params)
             elif isinstance(genome, np.ndarray):
-                if self.learning_rule is not None:
-                    self.learning_rule.parameters = genome
-                else:
-                    raise ValueError("Learning Rule must not be empty if array-like genome is passed as input. Otherwise a full LearningRule object must be passed in.")
+                rule = create_learning_rule(self._lrule_type, parameters=genome, **self._lrule_params)
             else:
                 raise ValueError("Parameters passed into evaluate must be either 'LearningRule', 'Genome' or an 'ArrayLike' object.")
+            self.snn.learning_rule = rule
+            genome: np.ndarray = rule.parameters
+
+        else:
+            raise ValueError("A solution must be specified to be evaluated. Supported types: np.ndarray | LearningRule | Genome")
 
         if self._log_info >= 1:
             t00 = time.time()
             self.logger.info(f"Generation {gen_count}, Individual {inv_count}")
-            self.write_genome(gen_count, inv_count, genome)
+            if self.results_path is not None:
+                self.write_genome(gen_count, inv_count, genome)
 
         # Measure behaviour characteristics of the learning rule (currently assumed to be separate from fitness evaluation)
         if self.measure_behaviour:
-            behv = self.bc_func(rule=self.learning_rule)
+            behv = self.bc_func(rule=rule)
 
         for i in range(num_trials):
             # if self._log_info >= 1:
@@ -215,7 +216,8 @@ class RL_Evaluator(Evaluator):
                 self.logger.info(f"Trial {i+1}/{num_trials}: Time taken: {t1 - t0:.4f} seconds.")
                 # Get intermediate fitness across samples
                 intermediate_fitness = self.simulator.get_intermediate_fitness(use_cutoff=True) if self.record_inter_fitness else None
-                self.write_trial(gen_count, inv_count, i, fitness, intermediate_fitness, precision=self.precision)
+                if self.results_path is not None:
+                    self.write_trial(gen_count, inv_count, i, fitness, intermediate_fitness, precision=self.precision)
         
         # if return_fitness_list:
         #     return fitnesses        
@@ -225,8 +227,9 @@ class RL_Evaluator(Evaluator):
         
         if self._log_info >= 1:
             t10 = time.time()
-            self.write_indiv(gen_count, inv_count, avg_fitness, std_fitness)
             self.logger.info(f"Individual evalution time: {t10 - t00:.4f} seconds")
+            if self.results_path is not None:
+                self.write_indiv(gen_count, inv_count, avg_fitness, std_fitness)
 
         # if return_std:
         #     return avg_fitness, std_fitness

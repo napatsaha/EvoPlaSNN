@@ -1,3 +1,12 @@
+v1.2.1 (2026-06-24)
+- RL_Evaluator:
+    - Ensure a new learning rule is created with each call to `evaluate()`
+    - Construct a dummy_rule during init to extract useful information such as input_order and solution_dim
+    - Store '_lrule_type' and '_lrule_params' during init for later creation
+    - Ensure no call to writing external files is ran when `results_path` is None
+- `run_rl.eval()`: moved Evaluator init to within `if eval_results` call
+- Updated `requirements.yml` and `requirements_full.yml` after many recent pip install calls
+
 v1.2.0 (2026-06-22)
 - Removed `setup_generation`, `setup_individual` and `setup_trial` in `RL_Evaluator`. Instead, 
     `.evaluate()` passes in `gen_count` and `inv_count` for external information

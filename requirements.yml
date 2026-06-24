@@ -18,4 +18,6 @@ dependencies:
     - evosax==0.2.0
     - jax==0.6.2
     - rich==14.0.0
+    - cma=4.4.4
+    - ribs=0.11.0
 prefix: /Users/90961365/miniconda3/envs/snn-test

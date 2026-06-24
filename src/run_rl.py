@@ -193,17 +193,16 @@ def eval(results_path: Path | str = None, *, config_path: str | Path = None, num
          "record_inter_fitness": False}
     )
 
-    evaluator = RL_Evaluator(
-        params=config,
-        record_info=True,
-        learning_rule=lrule,
-        # log_level=0,
-        **config["evo_params"]["evaluator"]
-    )
+
 
     if eval_results:
+        evaluator = RL_Evaluator(
+            params=config,
+            record_info=True,
+            **config["evo_params"]["evaluator"]
+        )
         # evaluator.setup_generation(gen_count=0, num_sets=num_evals)
-        fts_list, avg_fts, std_fts, behv = evaluator.evaluate(num_trials=num_evals)
+        fts_list, avg_fts, std_fts, behv = evaluator.evaluate(genome=lrule, num_trials=num_evals)
         if save_results:
             with open(results_path / f"{prefix}_eval_result.csv", "w") as f:
                 f.write("trial,fitness\n")
