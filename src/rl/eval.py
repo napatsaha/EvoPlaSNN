@@ -48,7 +48,7 @@ class RL_Evaluator(Evaluator):
         #     else:
         #         raise ValueError("Either 'simulator_params.num_steps' or ('env_params.max_steps' and 'simulator_params.num_episodes') must be specified in params.")
         self.results_path: Path = None
-        self._log_info = int(log_level)
+        # self._log_info = int(log_level)
         self.record_info = bool(record_info)
         self.record_inter_fitness = record_inter_fitness
         self.precision = precision if not record_inter_fitness else 1
@@ -125,35 +125,47 @@ class RL_Evaluator(Evaluator):
         """
         return self.reward_collector.max_fitness
 
-    def setup_logger(self, results_path: Path = None):
+    def setup_logger(self, results_path: Path = None, 
+                     logfile_name: str = None, fits_trial_file: str = None, 
+                     fits_indiv_file: str = None, genome_file: str = None,
+                     logger_name: str = "SNN_Evaluator"):
         self.results_path = results_path
-        self._log_info = max(0, self._log_info)
+        # self._log_info = max(0, self._log_info)
         # Set up logging to record runtime information
-        self._logfile_name = "log_trials.log"
-        handler = logging.StreamHandler() if results_path is None else logging.FileHandler(results_path / self._logfile_name)
-        formatter = logging.Formatter('%(asctime)s - %(message)s')
-        handler.setFormatter(formatter)
-        self.logger = logging.getLogger("SNN_Evaluator")
-        self.logger.setLevel(logging.INFO)
-        if self.logger.hasHandlers():
-            # Prevent adding multiple handlers if logger is already configured
-            self.logger.handlers.clear()
-        self.logger.addHandler(handler)
+        # self._logfile_name = "log_trials.log"
+        self._logfile_name = logfile_name
+        if self._logfile_name is not None:
+            handler = logging.StreamHandler() if results_path is None else logging.FileHandler(results_path / self._logfile_name)
+            formatter = logging.Formatter('%(asctime)s - %(message)s')
+            handler.setFormatter(formatter)
+            self.logger = logging.getLogger(logger_name if logger_name is not None else __name__)
+            self.logger.setLevel(logging.INFO)
+            if self.logger.hasHandlers():
+                # Prevent adding multiple handlers if logger is already configured
+                self.logger.handlers.clear()
+            self.logger.addHandler(handler)
 
         # Setup three csv files: 
         # one for recording fitnesses in each trial
         # one for recording average fitness for each individual
         # one for recording genome of each individual
         if results_path is not None:
-            if self._log_info >= 2:
-                self._fits_trial_file = "fitness_per_trial.csv"
+            # self._fits_trial_file = "fitness_per_trial.csv"
+            self._fits_trial_file = fits_trial_file
+            if self._fits_trial_file is not None:
                 with open(self.results_path / self._fits_trial_file, "w") as f:
-                    f.write("gen,indiv,trial,fitness,intermediate\n")
-            if self._log_info >= 1:
-                self._fits_indiv_file = "fitness_per_indiv.csv"
+                    if self.record_inter_fitness:
+                        f.write("gen,indiv,trial,fitness,intermediate\n")
+                    else:
+                        f.write("gen,indiv,trial,fitness\n")
+            # self._fits_indiv_file = "fitness_per_indiv.csv"
+            self._fits_indiv_file = fits_indiv_file
+            if self._fits_indiv_file is not None:
                 with open(self.results_path / self._fits_indiv_file, "w") as f:
                     f.write("gen,indiv,avg_fitness,std_fitness\n")
-                self._genome_file = "genome.csv"
+            # self._genome_file = "genome.csv"
+            self._genome_file = genome_file
+            if self._genome_file is not None:
                 with open(self.results_path / self._genome_file, "w") as f:
                     f.write("gen,indiv,genome\n")
 
@@ -181,11 +193,10 @@ class RL_Evaluator(Evaluator):
         else:
             raise ValueError("A solution must be specified to be evaluated. Supported types: np.ndarray | LearningRule | Genome")
 
-        if self._log_info >= 1:
-            t00 = time.time()
-            self.logger.info(f"Generation {gen_count}, Individual {inv_count}")
-            if self.results_path is not None:
-                self.write_genome(gen_count, inv_count, genome)
+        t00 = time.time()
+        if self.logger is not None:
+            self.logger.info(f"Generation {gen_count}, Individual {inv_count}") 
+        self.write_genome(gen_count, inv_count, genome)
 
         # Measure behaviour characteristics of the learning rule (currently assumed to be separate from fitness evaluation)
         if self.measure_behaviour:
@@ -212,12 +223,12 @@ class RL_Evaluator(Evaluator):
             # Final Fitness
             fitness = self.reward_collector.get_fitness()
             fitnesses.append(fitness)
-            if self._log_info >= 2:
+
+            if self.logger is not None:
                 self.logger.info(f"Trial {i+1}/{num_trials}: Time taken: {t1 - t0:.4f} seconds.")
-                # Get intermediate fitness across samples
-                intermediate_fitness = self.simulator.get_intermediate_fitness(use_cutoff=True) if self.record_inter_fitness else None
-                if self.results_path is not None:
-                    self.write_trial(gen_count, inv_count, i, fitness, intermediate_fitness, precision=self.precision)
+            # Get intermediate fitness across samples
+            intermediate_fitness = self.simulator.get_intermediate_fitness(use_cutoff=True) if self.record_inter_fitness else None
+            self.write_trial(gen_count, inv_count, i, fitness, intermediate_fitness, precision=self.precision)
         
         # if return_fitness_list:
         #     return fitnesses        
@@ -225,11 +236,11 @@ class RL_Evaluator(Evaluator):
         avg_fitness = np.mean(fitnesses, where=~np.isnan(fitnesses))
         std_fitness = np.std(fitnesses, where=~np.isnan(fitnesses))
         
-        if self._log_info >= 1:
-            t10 = time.time()
+
+        t10 = time.time()
+        if self.logger is not None:
             self.logger.info(f"Individual evalution time: {t10 - t00:.4f} seconds")
-            if self.results_path is not None:
-                self.write_indiv(gen_count, inv_count, avg_fitness, std_fitness)
+        self.write_indiv(gen_count, inv_count, avg_fitness, std_fitness)
 
         # if return_std:
         #     return avg_fitness, std_fitness

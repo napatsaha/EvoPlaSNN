@@ -1,6 +1,6 @@
 import time
 import argparse
-from typing import Tuple
+from typing import List, Tuple
 # from lrule.ann import read_ANN_Rule
 
 import yaml
@@ -164,7 +164,7 @@ def eval(results_path: Path | str = None, *, config_path: str | Path = None, num
         
         # Load the best ANN learning rule
         lrule = read_learning_rule(results_path / rule_id_name, config_path=results_path / "config.yaml")
-        prefix = f"eval_rule_{rule_id:02d}"
+        prefix = f"eval_rule-{rule_id:02d}"
     else:
         assert isinstance(learning_rule, LearningRule), f"{type(learning_rule)} is not a LearningRule object."
         lrule = learning_rule
@@ -192,22 +192,58 @@ def eval(results_path: Path | str = None, *, config_path: str | Path = None, num
         {"log_level": 0,
          "record_inter_fitness": False}
     )
+    multiple_evaluators = config["evo_params"]["manager"].get("multiple_evaluators", False)
 
-
-
-    if eval_results:
-        evaluator = RL_Evaluator(
+    evaluator: Evaluator = None
+    evaluators: List[Evaluator] = None
+    if not multiple_evaluators:
+        evaluator: Evaluator = RL_Evaluator(
             params=config,
             record_info=True,
             **config["evo_params"]["evaluator"]
         )
+        
+    else:
+        envs_params: dict = config.get("envs_params", {})
+        envs_params["envs"] = []
+        evaluators = []
+        
+        for file in envs_params.get("files", []):
+            with open(file) as f:
+                env_config = yaml.safe_load(f)
+                env_config = env_config.get("env_params", env_config)
+            envs_params["envs"] = env_config
+            evaluator: Evaluator = RL_Evaluator(
+                params=config,
+                env_params=env_config,
+                record_info=True,
+                **config["evo_params"]["evaluator"]
+            )
+            evaluators.append(evaluator)
+
+    if eval_results:
+        # evaluator = RL_Evaluator(
+        #     params=config,
+        #     record_info=True,
+        #     **config["evo_params"]["evaluator"]
+        # )
         # evaluator.setup_generation(gen_count=0, num_sets=num_evals)
-        fts_list, avg_fts, std_fts, behv = evaluator.evaluate(genome=lrule, num_trials=num_evals)
-        if save_results:
-            with open(results_path / f"{prefix}_eval_result.csv", "w") as f:
-                f.write("trial,fitness\n")
-                for i, fitness in enumerate(fts_list):
-                    f.write(f"{i},{fitness}\n")
+        if multiple_evaluators:
+            for i, evaluator in enumerate(evaluators):
+                fts_list, avg_fts, std_fts, behv = evaluator.evaluate(genome=lrule, num_trials=num_evals)
+                prefix_i = prefix + "_" + f"env-{i+1:02d}"
+                if save_results:
+                    with open(results_path / f"{prefix_i}_eval_result.csv", "w") as f:
+                        f.write("trial,fitness\n")
+                        for i, fitness in enumerate(fts_list):
+                            f.write(f"{i},{fitness}\n")
+        else:
+            fts_list, avg_fts, std_fts, behv = evaluator.evaluate(genome=lrule, num_trials=num_evals)
+            if save_results:
+                with open(results_path / f"{prefix}_eval_result.csv", "w") as f:
+                    f.write("trial,fitness\n")
+                    for i, fitness in enumerate(fts_list):
+                        f.write(f"{i},{fitness}\n")
         
         # fits = []
         # for _ in range(num_evals):
@@ -225,11 +261,7 @@ def eval(results_path: Path | str = None, *, config_path: str | Path = None, num
 
     # Plotting
     if save_plots or show_plots:
-        # evaluator.setup_trial(trial_count=0)
-        simulator = evaluator.simulator
-        simulator.reset()
-        simulator.run(num_steps=evaluator.max_steps, num_eps=evaluator.max_episodes)
-        fitness = simulator.get_fitness()
+
         # Plot fitness
         try:
             if (results_path / "fitness_per_indiv.csv").exists():
@@ -253,68 +285,6 @@ def eval(results_path: Path | str = None, *, config_path: str | Path = None, num
                                                   show=False, savepath=results_path / "solution_rank_gen.png")
         except Exception as e:
             print(f"Error plotting fitness: {e}")
-        # Plot spike raster
-        try:
-            snn_plot.plot_spikes(simulator, x_eps=2, x_range=200,
-                                savepath=Path(results_path, f"{prefix}_spikes.png") if save_plots else None, show=show_plots)
-        except Exception as e:
-            print(f"Error plotting spikes: {e}")
-        # Plot membranes and threshold
-        try:
-            snn_plot.plot_membranes(simulator, plot_inputs=False, x_scale=0.3, y_scale=3, layout=None, x_range=200,
-                                    savepath=Path(results_path, f"{prefix}_membranes.png") if save_plots else None, show=show_plots)
-        except Exception as e:
-            print(f"Error plotting membranes: {e}")
-        # Plot static weight at end of simulation
-        try:
-            snn_plot.plot_weights(simulator, env=evaluator.env, bounded_weights=False, y_scale=1.0, x_scale=1.0,
-                                savepath=Path(results_path, f"{prefix}_weights.png") if save_plots else None, show=show_plots)
-        except Exception as e:
-            print(f"Error plotting weights: {e}")
-        # Plot weight changes as line plots
-        try:
-            snn_plot.plot_weight_over_time(simulator, synapse_layer=0,
-                                        savepath=Path(results_path, f"{prefix}_weight_over_time.png") if save_plots else None, show=show_plots)
-        except Exception as e:
-            print(f"Error plotting weight over time: {e}")
-        # Plot weight changes as horizontal heatmap
-        # try:
-        #     snn_plot.plot_weight_heatmap(simulator, log_scale=False, t_range=500, synapse_layer=0,
-        #                                  savepath=Path(results_path, f"{prefix}_weight_heatmap.png") if save_plots else None, show=show_plots)
-        # except Exception as e:
-        #     print(f"Error plotting weight heatmap: {e}")
-        # Plot environment weights: all actions
-        try:
-            snn_plot.plot_env_weight_actions(simulator,
-                                             savepath=Path(results_path, f"{prefix}_env_weight_actions.png") if save_plots else None, show=show_plots)
-        except Exception as e:
-            print(f"Error plotting environment weight actions: {e}")
-        # Plot environment weights: greedy actions
-        try:
-            snn_plot.plot_env_weight_greedy(simulator,
-                                            savepath=Path(results_path, f"{prefix}_env_weight_greedy.png") if save_plots else None, show=show_plots)
-        except Exception as e:
-            print(f"Error plotting environment weight greedy: {e}")
-        # Plot pre-post and post-pre eligibility traces
-        if simulator.record_eligibility_pre:
-            try:
-                snn_plot.plot_eligibility_traces(simulator, etype="pre", synapse_layer=0, 
-                                                 savepath=Path(results_path, f"{prefix}_eligibility_pre_traces.png") if save_plots else None, show=show_plots)
-            except Exception as e:
-                print(f"Error plotting eligibility pre traces: {e}")
-        if simulator.record_eligibility_post:
-            try:
-                snn_plot.plot_eligibility_traces(simulator, etype="post", synapse_layer=0, 
-                                                savepath=Path(results_path, f"{prefix}_eligibility_post_traces.png") if save_plots else None, show=show_plots)
-            except Exception as e:
-                print(f"Error plotting eligibility post traces: {e}")
-        # Plot intermediate fitness within simulation
-        try:
-            snn_plot.plot_intermediate_fitness(simulator, window_size=20, plot_exploration=True, figsize=(20, 10),
-                                            savepath=Path(results_path, f"{prefix}_intermediate_fitness.png") if save_plots else None, show=show_plots)
-        except Exception as e:
-            print(f"Error plotting intermediate fitness: {e}")
-        
         
         # Plot Learning Rule Response for each rule in save_best
         try:
@@ -326,17 +296,102 @@ def eval(results_path: Path | str = None, *, config_path: str | Path = None, num
                 # Load the best ANN learning rule
                 lrule = read_learning_rule(results_path / rule_id_name, config_path=results_path / "config.yaml")
                 prefix = f"eval_rule_{rule_id:02d}"
-                snn_plot.plot_learning_rule(lrule, simulator, 
+                snn_plot.plot_learning_rule(lrule, 
                                             savepath=Path(results_path, f"{prefix}_learning_rule.png") if save_plots else None, show=show_plots)
         except Exception as e:
             print(f"Error plotting learning rule: {e}")
+
+        # Plot which rely on simulation
+        if multiple_evaluators:
+            for i, evaluator in enumerate(evaluators):
+                prefix_i = prefix + "_" + f"env-{i+1:02d}"
+
+                simulator = evaluator.simulator
+                simulator.reset()
+                simulator.run(num_steps=evaluator.max_steps, num_eps=evaluator.max_episodes)
+                fitness = simulator.get_fitness()
+                
+                plot_eval_results(simulator, results_path, prefix_i, save_plots, show_plots)
+        else:
+            simulator = evaluator.simulator
+            simulator.reset()
+            simulator.run(num_steps=evaluator.max_steps, num_eps=evaluator.max_episodes)
+            fitness = simulator.get_fitness()
+            
+            plot_eval_results(simulator, results_path, prefix, save_plots, show_plots)
+
 
     if not return_evaluator and eval_results:
         return avg_fts, std_fts
     else:
         # Return the evaluator object if requested
-        return evaluator
+        return evaluator if not multiple_evaluators else evaluators
     # return mean_fts, std_fts
+
+
+def plot_eval_results(simulator, results_path, prefix, save_plots, show_plots):
+    # Plot spike raster
+    try:
+        snn_plot.plot_spikes(simulator, x_eps=2, x_range=200,
+                            savepath=Path(results_path, f"{prefix}_spikes.png") if save_plots else None, show=show_plots)
+    except Exception as e:
+        print(f"Error plotting spikes: {e}")
+    # Plot membranes and threshold
+    try:
+        snn_plot.plot_membranes(simulator, plot_inputs=False, x_scale=0.3, y_scale=3, layout=None, x_range=200,
+                                savepath=Path(results_path, f"{prefix}_membranes.png") if save_plots else None, show=show_plots)
+    except Exception as e:
+        print(f"Error plotting membranes: {e}")
+    # Plot static weight at end of simulation
+    try:
+        snn_plot.plot_weights(simulator, env=simulator.env, bounded_weights=False, y_scale=1.0, x_scale=1.0,
+                            savepath=Path(results_path, f"{prefix}_weights.png") if save_plots else None, show=show_plots)
+    except Exception as e:
+        print(f"Error plotting weights: {e}")
+    # Plot weight changes as line plots
+    try:
+        snn_plot.plot_weight_over_time(simulator, synapse_layer=0,
+                                    savepath=Path(results_path, f"{prefix}_weight_over_time.png") if save_plots else None, show=show_plots)
+    except Exception as e:
+        print(f"Error plotting weight over time: {e}")
+    # Plot weight changes as horizontal heatmap
+    # try:
+    #     snn_plot.plot_weight_heatmap(simulator, log_scale=False, t_range=500, synapse_layer=0,
+    #                                  savepath=Path(results_path, f"{prefix}_weight_heatmap.png") if save_plots else None, show=show_plots)
+    # except Exception as e:
+    #     print(f"Error plotting weight heatmap: {e}")
+    # Plot environment weights: all actions
+    try:
+        snn_plot.plot_env_weight_actions(simulator,
+                                            savepath=Path(results_path, f"{prefix}_env_weight_actions.png") if save_plots else None, show=show_plots)
+    except Exception as e:
+        print(f"Error plotting environment weight actions: {e}")
+    # Plot environment weights: greedy actions
+    try:
+        snn_plot.plot_env_weight_greedy(simulator,
+                                        savepath=Path(results_path, f"{prefix}_env_weight_greedy.png") if save_plots else None, show=show_plots)
+    except Exception as e:
+        print(f"Error plotting environment weight greedy: {e}")
+    # Plot pre-post and post-pre eligibility traces
+    if simulator.record_eligibility_pre:
+        try:
+            snn_plot.plot_eligibility_traces(simulator, etype="pre", synapse_layer=0, 
+                                                savepath=Path(results_path, f"{prefix}_eligibility_pre_traces.png") if save_plots else None, show=show_plots)
+        except Exception as e:
+            print(f"Error plotting eligibility pre traces: {e}")
+    if simulator.record_eligibility_post:
+        try:
+            snn_plot.plot_eligibility_traces(simulator, etype="post", synapse_layer=0, 
+                                            savepath=Path(results_path, f"{prefix}_eligibility_post_traces.png") if save_plots else None, show=show_plots)
+        except Exception as e:
+            print(f"Error plotting eligibility post traces: {e}")
+    # Plot intermediate fitness within simulation
+    try:
+        snn_plot.plot_intermediate_fitness(simulator, window_size=20, plot_exploration=True, figsize=(20, 10),
+                                        savepath=Path(results_path, f"{prefix}_intermediate_fitness.png") if save_plots else None, show=show_plots)
+    except Exception as e:
+        print(f"Error plotting intermediate fitness: {e}")
+
 
 if __name__ == "__main__":
     # Argument parser

@@ -1,3 +1,15 @@
+v1.2.2 (2026-06-26)
+- `run_rl.eval()`
+    - Added multiple evaluator loop during eval_results and plotting
+    - Refactor plotting that requires simulation into its own function (for easier code reuse)
+- Manager:
+    - New arguments: log_trial_fts, log_trial_info, log_genome, log_indiv
+    - Controls how Evaluator(s) log their info during run() -> evaluator.setup_logger()
+- RL_Evaluator:
+    - Removed log_level argument
+    - Can control which information is logged by passing in appropriate filenames during `setup_logger()`
+    - Ensure that write_trial logged headers and info appropriately when no intermediate fitness is being recorded
+
 v1.2.1 (2026-06-24)
 - RL_Evaluator:
     - Ensure a new learning rule is created with each call to `evaluate()`

@@ -26,6 +26,8 @@ class EvoManager:
                  max_generations: int = None, max_stagnation: int = None,
                  use_target_fitness: bool = None, target_fitness: float = None, tolerance: float = 1e-6, 
                  record_classes: bool = False, save_best: int = 1,
+                 log_trial_fts: bool = True, log_trial_info: bool = True, 
+                 log_genome: bool = True, log_indiv: bool = True,
                 #  update_inputs: bool = True,  # Whether to update input classes for each generation
                  **kwargs):
         self.multiple_evaluators = multiple_evaluators
@@ -61,7 +63,7 @@ class EvoManager:
                 with open(file) as f:
                     env_config = yaml.safe_load(f)
                     env_config = env_config.get("env_params", env_config)
-                envs_params["envs"] = env_config
+                envs_params["envs"].append(env_config)
                 evaluator: Evaluator = RL_Evaluator(
                     params=config,
                     env_params=env_config,
@@ -102,6 +104,11 @@ class EvoManager:
         # self.update_inputs = update_inputs
         self.record_classes = record_classes
 
+        self.log_trial_fts = log_trial_fts
+        self.log_trial_info = log_trial_info
+        self.log_genome = log_genome
+        self.log_indiv = log_indiv
+
         # Termination control
         self.max_generations = max(max_generations, 1) # Ensure non-zero and non-negative
         self.target_fitness = target_fitness
@@ -133,10 +140,23 @@ class EvoManager:
         # Setup logging for each component
         self._setup_logger()
         if self.multiple_evaluators:
-            for evaluator in self.evaluators:
-                evaluator.setup_logger(self.results_path)
+            for i, evaluator in enumerate(self.evaluators, start=1):
+                evaluator.setup_logger(
+                    self.results_path,
+                    logfile_name = f"log_trials_env-{i:02d}.log" if self.log_trial_info else None,
+                    logger_name = f"SNN_Evaluator_{i:02d}" if self.log_trial_info else None,
+                    fits_trial_file = f"fitness_per_trial_env-{i:02d}.csv" if self.log_trial_fts else None, 
+                    fits_indiv_file = f"fitness_per_indiv_env-{i:02d}.csv" if self.log_indiv else None, 
+                    genome_file = f"genome_env-{i:02d}.csv" if (self.log_genome and (i == 1)) else None
+                )
         else:
-            self.evaluator.setup_logger(self.results_path)
+            self.evaluator.setup_logger(
+                    self.results_path,
+                    logfile_name = "log_trials.log" if self.log_trial_info else None,
+                    fits_trial_file = "fitness_per_trial.csv" if self.log_trial_fts else None, 
+                    fits_indiv_file = "fitness_per_indiv.csv" if self.log_indiv else None, 
+                    genome_file = "genome.csv" if self.log_genome else None
+            )
         self.solver.setup_logger(self.results_path)
 
         if self.max_generations is None:
