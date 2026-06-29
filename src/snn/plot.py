@@ -25,6 +25,7 @@ def plot_spikes(simulator: 'SNNSimulator' = None, values: List[np.ndarray] = Non
                 y_eps: float = 0.5, x_eps: float | int = 1, spk_eps: float = 0.25, 
                 title: str = None, cmap = None, color: str = "black", cmap_range: tuple = (0, 1),
                 linewidth=2, x_min = None, x_max = None, x_range: int = 100,
+                figsize: tuple = None, dpi: int = 100,
                 savepath: str | Path = None, show: bool = True, **kwargs):
     """
     Plot spike trains with time on x-axis and neuron index on y-axis.
@@ -51,9 +52,10 @@ def plot_spikes(simulator: 'SNNSimulator' = None, values: List[np.ndarray] = Non
     else:
         cm = mpl.colormaps[cmap]        
 
-    fig_size = ((x_max - x_min) * x_scale, sum(layer_sizes) * y_scale)
+    if figsize is None:
+        figsize = ((x_max - x_min) * x_scale, sum(layer_sizes) * y_scale)
     fig, axs = plt.subplots(num_layers, 1, gridspec_kw={"hspace": 0.0}, sharex=True, height_ratios=layer_sizes[::-1], 
-                            figsize=fig_size, layout="constrained")
+                            figsize=figsize, dpi=dpi, layout="constrained")
     for i, layer_spikes in enumerate(reversed(values)):
         ax = axs[i]
         n_neurons = layer_spikes.shape[0]
@@ -85,7 +87,7 @@ def plot_spikes(simulator: 'SNNSimulator' = None, values: List[np.ndarray] = Non
     fig.supylabel("Neuron Index")
     if savepath is not None:
         print(f"Saving plot to {savepath}")
-        plt.savefig(savepath)
+        plt.savefig(savepath, dpi=dpi)
     if show:
         plt.show()
     # plt.close(fig)
@@ -95,6 +97,7 @@ def plot_traces(simulator: 'SNNSimulator', x_scale: float = 0.2, y_scale: float 
                 y_eps: float = 0.1, x_eps: int | float = 1, trace_scale: float = 0.8, x_min = None, x_max = None, x_range: int = 100,
                 drawstyle: str = 'steps-post',
                 title: str = None, cmap = None, color: str = "black", cmap_range: tuple = (0, 1),
+                figsize: tuple = None, dpi: int = 100,
                 savepath: str | Path = None, show: bool = True, **kwargs):
     """
     Plot traces
@@ -114,9 +117,10 @@ def plot_traces(simulator: 'SNNSimulator', x_scale: float = 0.2, y_scale: float 
 
     num_layers = simulator.network.num_layers
     layer_sizes = simulator.network.layer_sizes
-    fig_size = ((x_max - x_min) * x_scale, sum(layer_sizes) * y_scale)
+    if figsize is None:
+        figsize = ((x_max - x_min) * x_scale, sum(layer_sizes) * y_scale)
     fig, axs = plt.subplots(num_layers, 1, gridspec_kw={"hspace": 0.0}, sharex=True, height_ratios=layer_sizes[::-1], 
-                            figsize=fig_size, layout="constrained")
+                            figsize=figsize, dpi=dpi, layout="constrained")
     for i, layer_traces in enumerate(reversed(simulator.trace_recorder.values)):
         ax = axs[i]
         n_neurons = layer_traces.shape[0]
@@ -146,7 +150,7 @@ def plot_traces(simulator: 'SNNSimulator', x_scale: float = 0.2, y_scale: float 
     fig.supylabel("Neuron Index")
     if savepath is not None:
         print(f"Saving plot to {savepath}")
-        plt.savefig(savepath)
+        plt.savefig(savepath, dpi=dpi)
     if show:
         plt.show()
     # plt.close(fig)
@@ -157,6 +161,7 @@ def plot_membranes(simulator: 'SNNSimulator' = None, values: List[np.ndarray] = 
                    x_scale: float = 0.2, y_scale: float = 3.0, title: str = None, plot_inputs: bool = False, 
                    color: str = "blue", cmap: str = None, cmap_range: tuple = (0, 1), layout: str = "constrained",
                    x_min = None, x_max = None, x_range: int = 100,
+                   figsize: tuple = None, dpi: int = 100,
                    savepath: str | Path = None, show: bool = True):
     """
     Plot membrane potentials of all neurons in the network.
@@ -200,7 +205,9 @@ def plot_membranes(simulator: 'SNNSimulator' = None, values: List[np.ndarray] = 
         layer_sizes = layer_sizes[1:]
     nrows = max(layer_sizes)
     ncols = len(layer_sizes)
-    fig, axs = plt.subplots(figsize=(x_scale*ncols*(x_max - x_min), y_scale*nrows), layout=layout)
+    if figsize is None:
+        figsize=(x_scale*ncols*(x_max - x_min), y_scale*nrows)
+    fig, axs = plt.subplots(figsize=figsize, dpi=dpi, layout=layout)
     axs.remove()
     gs = fig.add_gridspec(nrows, ncols)
 
@@ -232,8 +239,8 @@ def plot_membranes(simulator: 'SNNSimulator' = None, values: List[np.ndarray] = 
     fig.text(s=title if title is not None else "Membrane Potentials", fontsize=20, x=0.5, y=1.05)
     
     if savepath is not None:
-        plt.savefig(savepath)
-
+        print(f"Saving plot to {savepath}")
+        plt.savefig(savepath, dpi=dpi)
     if show:
         plt.show()
     # plt.close(fig)
@@ -355,7 +362,7 @@ def _plot_spikes_single(ax: Axes, tf_spikes: np.ndarray, x_max: int, label: str 
 
 def plot_weights(simulator: "SNNSimulator" = None, values: List[np.ndarray] = None, *, env = None,
                  x_scale: float = 1.0, y_scale: float = 1.0, cmap: str = "viridis", bounded_weights: bool = True,
-                 color_scale: str = "linear",
+                 color_scale: str = "linear", figsize=None, dpi: int = 100,
                  savepath: str | Path = None, show: bool = True):
     """
     Plot the current synaptic weights of all layers in the SNN, as a heatmap.
@@ -374,7 +381,11 @@ def plot_weights(simulator: "SNNSimulator" = None, values: List[np.ndarray] = No
     neurons_out = [w.shape[1] for w in values]
     width = sum(neurons_out) * x_scale * 1.5
     height = max(neurons_in) * y_scale
-    fig, axs = plt.subplots(1, num_layers, figsize=(width, height), squeeze=False, layout="constrained", gridspec_kw={"hspace": 0, "wspace": 0})
+
+    if figsize is None:
+        figsize=(width, height)
+    fig, axs = plt.subplots(1, num_layers, figsize=figsize, dpi=dpi,
+                            squeeze=False, layout="constrained", gridspec_kw={"hspace": 0, "wspace": 0})
     wmin = min([np.min(w) for w in values])
     if bounded_weights:
         wmin = min(wmin, 0)
@@ -403,15 +414,18 @@ def plot_weights(simulator: "SNNSimulator" = None, values: List[np.ndarray] = No
     fig.text(x=0.5, y=0.99, s="SNN Synaptic Weights", fontsize=20, ha='center')
     if savepath is not None:
         print(f"Saving plot to {savepath}")
-        plt.savefig(savepath)
+        plt.savefig(savepath, dpi=dpi)
     if show:
         plt.show()
     # plt.close(fig)
 
 
-def plot_weight_over_time(simulator: 'SNNSimulator' = None, values: List[np.ndarray] = None, *, title: str = None, x_min=None, x_max=None,
+def plot_weight_over_time(simulator: 'SNNSimulator' = None, values: List[np.ndarray] = None, *, 
+                          pre_id: int | List[int] = None, post_id: int | List[int] = None,
+                          figsize=None, dpi: int = 100,
+                          title: str = None, x_min=None, x_max=None,
                           synapse_layer: int = 0, 
-                          savepath=None, show=True, ):
+                          savepath=None, show=True, line_kw={}):
     if simulator is not None:
         assert simulator.record_weights, "Weight recording is not enabled."
     values = simulator.weight_recorder.values if simulator is not None else values
@@ -421,33 +435,48 @@ def plot_weight_over_time(simulator: 'SNNSimulator' = None, values: List[np.ndar
     L = synapse_layer if synapse_layer < len(values) else 0
     dt = f"{simulator.dt} s" if simulator is not None else "1 unit"
 
-    nrow, ncol = values[L].shape[:2]
     w_mat = values[L]
+    if pre_id is not None:
+        if not isinstance(pre_id, Sequence):
+            pre_id = [pre_id]
+        w_mat = np.take(w_mat, indices=pre_id, axis=0) # Slice along input neurons
+    else:
+        pre_id = [*range(w_mat.shape[0])]
+    if post_id is not None:
+        if not isinstance(post_id, Sequence):
+            post_id = [post_id]
+        w_mat = np.take(w_mat, indices=post_id, axis=1) # Slice along input neurons
+    else:
+        post_id = [*range(w_mat.shape[1])]
+
+    nrow, ncol = w_mat.shape[:2]
     wmax = max(np.max(w_mat), 1)
     wmin = min(np.min(w_mat), 0)
 
-    fig, axs = plt.subplots(nrow, ncol, figsize=(5*ncol, 3*nrow), sharex=True, sharey=True, gridspec_kw={"hspace": 0, "wspace": 0},
+    figsize=(5*ncol, 3*nrow) if figsize is None else figsize
+    fig, axs = plt.subplots(nrow, ncol, figsize=figsize, dpi=dpi,
+                            sharex=True, sharey=True, gridspec_kw={"hspace": 0, "wspace": 0},
                             squeeze=False)
-    for i in range(nrow):
-        for j in range(ncol):
+    for i, pre in enumerate(pre_id):
+        for j, post in enumerate(post_id):
             ax = axs[i, j]
-            ax.plot(w_mat[i, j, :])
+            ax.plot(w_mat[i, j, :], **line_kw)
             ax.set_ylim(wmin, wmax)
             ax.set_xlim(x_min, x_max)
             if i == 0:
-                ax.text(0.5, 1.05, f"Post Neuron {j}", transform=ax.transAxes, fontsize=16, ha="center")
+                ax.text(0.5, 1.05, f"Post Neuron {post}", transform=ax.transAxes, fontsize=16, ha="center")
             if j == ncol - 1:
-                ax.text(1.05, 0.5, f"Pre Neuron {i}", transform=ax.transAxes, fontsize=16, rotation=-90, va="center")
+                ax.text(1.05, 0.5, f"Pre Neuron {pre}", transform=ax.transAxes, fontsize=16, rotation=-90, va="center")
     plt.tight_layout()
     # plt.suptitle(title, y=0.9)
     # Labelling
-    fig.text(s=f"Time ({dt})", fontsize=12, x=0.5, y=-0.005, ha='center')
-    fig.text(s="Weight Value", fontsize=12, ha='center', x=-0.005, y=0.5, rotation=90, va='center')
+    fig.text(s=f"Time ({dt})", fontsize=15, x=0.5, y=0.005, ha='center')
+    fig.text(s="Weight", fontsize=15, ha='center', x=0.005, y=0.5, rotation=90, va='center')
     fig.text(s=title if title is not None else "SNN Weight over Time", fontsize=20, x=0.5, y=1.00, ha='center')
 
     if savepath is not None:
         print(f"Saving plot to {savepath}")
-        plt.savefig(savepath)
+        plt.savefig(savepath, dpi=dpi)
     if show:
         plt.show()
     # plt.close(fig)
@@ -456,6 +485,7 @@ def plot_weight_over_time(simulator: 'SNNSimulator' = None, values: List[np.ndar
 def plot_weight_heatmap(simulator: 'SNNSimulator', *, x_scale: float = 0.2, y_scale: float = 0.8,
                         synapse_layer: int = 0, t_min: int = None, t_max: int = None, t_range: int = 100,
                         log_scale: bool = False, cmap: str = "viridis",
+                        figsize=None, dpi: int = 100,
                        savepath: str | Path = None, show: bool = True):
     if simulator.record_weights is False:
         raise ValueError("Weight recording is not enabled. Please enable it in the simulator configuration.")
@@ -468,8 +498,9 @@ def plot_weight_heatmap(simulator: 'SNNSimulator', *, x_scale: float = 0.2, y_sc
     w_mat = simulator.weight_recorder.values[synapse_layer]
     num_outputs = simulator.network.output_size
     num_inputs = simulator.network.input_size
-    fig_size = ((t_max - t_min) * x_scale, num_outputs * num_inputs * y_scale)
-    fig, axs = plt.subplots(num_outputs, 1, figsize=fig_size, sharex=True, gridspec_kw={"hspace": 0.0}, squeeze=False)
+    if figsize is None:
+        figsize = ((t_max - t_min) * x_scale, num_outputs * num_inputs * y_scale)
+    fig, axs = plt.subplots(num_outputs, 1, figsize=figsize, dpi=dpi, sharex=True, gridspec_kw={"hspace": 0.0}, squeeze=False)
     axs: List[Axes]
     for i in range(num_outputs):
         ax = axs[i, 0]
@@ -482,19 +513,21 @@ def plot_weight_heatmap(simulator: 'SNNSimulator', *, x_scale: float = 0.2, y_sc
     fig.text(0.5, 1.02, f"Synapse Layer {synapse_layer}", fontsize=12)
     if savepath is not None:
         print(f"Saving plot to {savepath}")
-        plt.savefig(savepath)
+        plt.savefig(savepath, dpi=dpi)
     if show:
         plt.show()
     # plt.close(fig)
 
 
-def plot_env_weight_actions(simulator: 'SNNSimulator', *,
+def plot_env_weight_actions(simulator: 'SNNSimulator', *, dpi: int = 100, figsize=None,
                             savepath=None, show=True):
     # Extract objects
     network = simulator.network
     env = simulator.env
 
-    fig, axs = plt.subplots(2, 2, figsize=(env.width, env.height))
+    if figsize is None:
+        figsize=(env.width, env.height)
+    fig, axs = plt.subplots(2, 2, figsize=figsize, dpi=dpi)
     cmap = plt.get_cmap("viridis").with_extremes(bad="white")
 
     w = network.weights[0]
@@ -520,18 +553,22 @@ def plot_env_weight_actions(simulator: 'SNNSimulator', *,
 
     if savepath is not None:
         print(f"Saving plot to {savepath}")
-        plt.savefig(savepath)
+        plt.savefig(savepath, dpi=dpi)
     if show:
         plt.show()
 
 
-def plot_env_weight_greedy(simulator: 'SNNSimulator', *, tolerance: float = 1e-10,
+def plot_env_weight_greedy(simulator: 'SNNSimulator', *, arrowcolors = ("white", "black"),
+                           threshold: float = 0.5,
+                           tolerance: float = 1e-10, dpi: int = 100, figsize=None,
                             savepath=None, show=True):
     # Extract objects
     network = simulator.network
     env = simulator.env
 
-    fig, ax = plt.subplots(1, 1, figsize=(env.width, env.height))
+    if figsize is None:
+        figsize=(env.width, env.height)
+    fig, ax = plt.subplots(1, 1, figsize=figsize, dpi=dpi)
     cmap = plt.get_cmap("viridis").with_extremes(bad="white")
 
     w = network.weights[0]
@@ -546,6 +583,9 @@ def plot_env_weight_greedy(simulator: 'SNNSimulator', *, tolerance: float = 1e-1
     ma_maze = np.ma.array(emp_maze, mask=(w_maze == 0))
     img = ax.imshow(ma_maze, extent=(0, env.width, 0, env.height), cmap=cmap)
 
+    # Normalize the threshold to the images color range.
+    threshold = img.norm(ma_maze.max())*np.clip(threshold, 0, 1)
+
     for state, pos in env._state_pos_dict.items():
         cnt = pos + 0.5
         act_vals = w[state, :]
@@ -553,7 +593,9 @@ def plot_env_weight_greedy(simulator: 'SNNSimulator', *, tolerance: float = 1e-1
         for act, val in enumerate(act_vals):
             if np.abs(val - v_max) < tolerance:
                 direction = env.action_map[act] * 0.5
-                ax.annotate('', xy=(cnt[1]+direction[1], env.height - (cnt[0]+direction[0])), xytext=(cnt[1], env.height - cnt[0]), arrowprops=dict(arrowstyle="->"))
+                color = arrowcolors[int(img.norm(ma_maze[*pos]) > threshold)]
+                ax.annotate('', xy=(cnt[1]+direction[1], env.height - (cnt[0]+direction[0])), xytext=(cnt[1], env.height - cnt[0]), 
+                            arrowprops=dict(arrowstyle="->", edgecolor=color))
 
     ax.set_xticks(np.arange(0, env.width, 1), labels=[])
     ax.set_yticks(np.arange(0, env.height, 1), labels=[])
@@ -563,7 +605,7 @@ def plot_env_weight_greedy(simulator: 'SNNSimulator', *, tolerance: float = 1e-1
 
     if savepath is not None:
         print(f"Saving plot to {savepath}")
-        plt.savefig(savepath)
+        plt.savefig(savepath, dpi=dpi)
     if show:
         plt.show()
 
@@ -572,7 +614,7 @@ def plot_eligibility_traces(simulator: 'SNNSimulator' = None, values: np.ndarray
                             synapse_layer: int = 0, etype: Literal["pre", "post"] = "pre",
                             x_scale: float = 0.2, y_scale: float = 0.8,
                             t_min: int = None, t_max: int = None, t_range: int = 100,
-                            cmap: str = "viridis", 
+                            cmap: str = "viridis", figsize=None, dpi: int = 100,
                             savepath: str | Path = None, show: bool = True):
     if simulator is not None:
         if etype == "pre":
@@ -602,8 +644,9 @@ def plot_eligibility_traces(simulator: 'SNNSimulator' = None, values: np.ndarray
     emin = np.min(etrace)
     emax = np.max(etrace)
 
-    fig_size = ((t_max - t_min) * x_scale, num_outputs * num_inputs * y_scale)
-    fig, axs = plt.subplots(num_outputs, 1, figsize=fig_size, sharex=True, layout="constrained", gridspec_kw={"hspace": 0.0},
+    if figsize is None:
+        figsize = ((t_max - t_min) * x_scale, num_outputs * num_inputs * y_scale)
+    fig, axs = plt.subplots(num_outputs, 1, figsize=figsize, dpi=dpi, sharex=True, layout="constrained", gridspec_kw={"hspace": 0.0},
                             squeeze=False)
 
     for i, j in enumerate(reversed(range(num_outputs))):
@@ -617,7 +660,7 @@ def plot_eligibility_traces(simulator: 'SNNSimulator' = None, values: np.ndarray
     fig.suptitle(f"Eligibility Traces\nSynapse Layer {synapse_layer}", fontsize=16)
     if savepath is not None:
         print(f"Saving plot to {savepath}")
-        plt.savefig(savepath)
+        plt.savefig(savepath, dpi=dpi)
     if show:
         plt.show()
     # plt.close(fig)
@@ -627,7 +670,8 @@ def plot_intermediate_fitness(simulator: 'SNN_Simulator' = None, values: np.ndar
                               use_cutoff: bool = False,
                               num_steps: int = None, timestamps: np.ndarray = None,
                               x_scale: float = 0.01, y_scale: float = 1.0, x_eps: int = 1,
-                              t_min: int = None, t_max: int = None, t_range: int = None, window_size: int = 10, figsize: tuple = None,
+                              t_min: int = None, t_max: int = None, t_range: int = None, window_size: int = 10, 
+                              figsize: tuple = None, dpi: int = 100,
                               savepath: str | Path = None, show: bool = True):
     if simulator is not None:
         fts = simulator.get_intermediate_fitness(use_cutoff=use_cutoff)
@@ -662,9 +706,10 @@ def plot_intermediate_fitness(simulator: 'SNN_Simulator' = None, values: np.ndar
     if t_min is None:
         t_min = max(0, t_max - t_range)
 
-    figsize = (((t_max - t_min) * x_scale, 10 * y_scale * (int(plot_exploration) + 1))) if figsize is None else figsize
-    fig, axs = plt.subplots(1 + int(plot_exploration), 1, figsize=figsize, layout="constrained",
-                            squeeze=False)
+    if figsize is None:
+        figsize = (((t_max - t_min) * x_scale, 10 * y_scale * (int(plot_exploration) + 1)))
+    fig, axs = plt.subplots(1 + int(plot_exploration), 1, figsize=figsize, dpi=dpi,
+                            layout="constrained", squeeze=False)
     ax = axs[0, 0]
     ax.plot(
         ts, fts,
@@ -700,7 +745,7 @@ def plot_intermediate_fitness(simulator: 'SNN_Simulator' = None, values: np.ndar
     fig.text(0.5, 1.02, f"{agg_func.title()} Fitness: {ft:.2f}", ha='center', fontsize=14)
     if savepath is not None:
         print(f"Saving plot to {savepath}")
-        plt.savefig(savepath)
+        plt.savefig(savepath, dpi=dpi)
     if show:
         plt.show()
     # plt.close(fig)
@@ -724,8 +769,9 @@ def plot_learning_rule_4D(rule: 'base.LearningRule', simulator: 'SNNSimulator' =
                           custom_bounds: dict[str, tuple] = None,
                           n_bins: int = 100, n_cols: int = 5, n_rows: int = 5,
                           var_col: str = "reward", var_row: str = "weights",
-                          cmap: str = "RdBu", figsize: tuple = (20, 20), aspect="auto",
+                          cmap: str = "RdBu", aspect="auto",
                           rule_name: str = None,
+                          figsize: tuple = (20, 20), dpi: int = 100,
                           savepath: str | Path = None, show: bool = True,
                           **kwargs) -> None:
     # DONE: Fix format to be generic like plot_learning_rule_1D
@@ -800,7 +846,7 @@ def plot_learning_rule_4D(rule: 'base.LearningRule', simulator: 'SNNSimulator' =
     colorizer.set_clim(vmin, vmax)
 
     # Values are ready, plots can be made
-    fig, axs = plt.subplots(n_rows, n_cols, figsize=figsize)
+    fig, axs = plt.subplots(n_rows, n_cols, figsize=figsize, dpi=dpi)
     for xj in range(n_rows):
         for xi in range(n_cols):
             ax: Axes = axs[xj, xi]
@@ -829,7 +875,7 @@ def plot_learning_rule_4D(rule: 'base.LearningRule', simulator: 'SNNSimulator' =
 
     if savepath is not None:
         print(f"Saving plot to {savepath}")
-        plt.savefig(savepath)
+        plt.savefig(savepath, dpi=dpi)
     if show:
         plt.show()
     plt.close(fig)
@@ -838,7 +884,7 @@ def plot_learning_rule_4D(rule: 'base.LearningRule', simulator: 'SNNSimulator' =
 def plot_learning_rule_3D(rule: 'base.LearningRule', simulator: 'SNNSimulator' = None, *, 
                           custom_bounds: dict[str, tuple] = None,
                           n_bins: int = 100, n_cols: int = 5, var_col: str = "reward",
-                          cmap: str = "RdBu", figsize: tuple = (20, 10), aspect="auto",
+                          cmap: str = "RdBu", figsize: tuple = (20, 5), aspect="auto", dpi: int = 100,
                           rule_name: str = None,
                           savepath: str | Path = None, show: bool = True,
                           **kwargs) -> None:
@@ -899,7 +945,7 @@ def plot_learning_rule_3D(rule: 'base.LearningRule', simulator: 'SNNSimulator' =
     colorizer.set_clim(vmin, vmax)
 
     # Values are ready, plots can be made
-    fig, axs = plt.subplots(1, n_cols, figsize=figsize)
+    fig, axs = plt.subplots(1, n_cols, figsize=figsize, dpi=dpi)
     for xi in range(n_cols):
         ax: Axes = axs[xi]
         val_xi = xii[i_col][xi]
@@ -922,7 +968,7 @@ def plot_learning_rule_3D(rule: 'base.LearningRule', simulator: 'SNNSimulator' =
 
     if savepath is not None:
         print(f"Saving plot to {savepath}")
-        plt.savefig(savepath)
+        plt.savefig(savepath, dpi=dpi)
     if show:
         plt.show()
     plt.close(fig)
@@ -931,7 +977,7 @@ def plot_learning_rule_3D(rule: 'base.LearningRule', simulator: 'SNNSimulator' =
 def plot_learning_rule_2D(rule: base.LearningRule, simulator: 'SNNSimulator' = None, *, 
                           transpose: bool = False, custom_bounds: dict[str, tuple] = None,
                           xmin: float = 0.0, xmax: float = 1.0, ymin: float = 0.0, ymax: float = 1.0,
-                          num_mesh: int = 100, cmap: str = "RdBu", figsize: tuple = (10, 10),
+                          num_mesh: int = 100, cmap: str = "RdBu", figsize: tuple = (10, 10), dpi: int = 100,
                           rule_name: str = None,
                           savepath: str | Path = None, show: bool = True,
                           **kwargs):
@@ -988,7 +1034,7 @@ def plot_learning_rule_2D(rule: base.LearningRule, simulator: 'SNNSimulator' = N
     if transpose:
         vv = vv.T
 
-    fig, axs = plt.subplots(1, 1, figsize=figsize, squeeze=False)
+    fig, axs = plt.subplots(1, 1, figsize=figsize, squeeze=False, dpi=dpi)
 
     ax: Axes = axs[0, 0]
     extents = [xmin, xmax, ymin, ymax] if not transpose else [ymin, ymax, xmin, xmax]
@@ -1011,7 +1057,7 @@ def plot_learning_rule_2D(rule: base.LearningRule, simulator: 'SNNSimulator' = N
 
     if savepath is not None:
         print(f"Saving plot to {savepath}")
-        plt.savefig(savepath)
+        plt.savefig(savepath, dpi=dpi)
     if show:
         plt.show()
     plt.close(fig)
@@ -1021,7 +1067,7 @@ def plot_learning_rule_2D(rule: base.LearningRule, simulator: 'SNNSimulator' = N
 
 def plot_fitness_generation(file_path: str | Path, *, estimator: str = "mean", errorband: str | tuple = ("pi", 100),
                             linecolor_best: str = "black", linecolor_est: str = "blue", pointcolor: str = "gray",
-                            sns_style: str = "whitegrid", sns_palette: str = "muted", figsize: tuple = None,
+                            sns_style: str = "whitegrid", sns_palette: str = "muted", figsize: tuple = None, dpi: int = 100,
                             title: str = None, subtitle: str = None, comment: str = None,
                             x_eps: int = 2, x_scale: float = 0.3, y_scale: float = 1.3, y_size: float = 10,
                             savepath: str | Path = None, show: bool = True):
@@ -1038,7 +1084,9 @@ def plot_fitness_generation(file_path: str | Path, *, estimator: str = "mean", e
     best_fts = res["best_fitness"].max()
     fts_range = res["avg_fitness"].max() - res["avg_fitness"].min()
 
-    fig, ax = plt.subplots(1, 1, figsize=(num_gens * x_scale, y_size) if figsize is None else figsize)
+    if figsize is None:
+        figsize=(num_gens * x_scale, y_size) 
+    fig, ax = plt.subplots(1, 1, figsize=figsize, dpi=dpi)
     # sns.set_theme(palette=sns_palette, style=sns_style)
     # Fitness per individual
     sns.stripplot(data=res, x="gen", y="avg_fitness",  size=5, ax=ax, alpha=0.5, color=pointcolor)
@@ -1063,7 +1111,7 @@ def plot_fitness_generation(file_path: str | Path, *, estimator: str = "mean", e
 
     if savepath is not None:
         print(f"Saving plot to {savepath}")
-        plt.savefig(savepath, bbox_inches='tight')
+        plt.savefig(savepath, bbox_inches='tight', dpi=dpi)
     if show:
         plt.show()
     # plt.close(fig)
@@ -1072,7 +1120,7 @@ def plot_fitness_generation(file_path: str | Path, *, estimator: str = "mean", e
 def plot_solution_generation(solution_file: str | Path = None, var: Literal["global_fitness", "local_fitness", "novelty_dist", "rank"] = "global_fitness", df: pd.DataFrame = None, *, 
                              estimator: str = "mean", errorband: str | tuple = ("pi", 100),
                             linecolor_best: str = "black", linecolor_est: str = "blue", point_cmap: str = 'dark:gray',
-                            sns_style: str = "whitegrid", sns_palette: str = "muted", figsize: tuple = None,
+                            sns_style: str = "whitegrid", sns_palette: str = "muted", figsize: tuple = None, dpi: int = 100,
                             title: str = None, subtitle: str = None, comment: str = None,
                             x_eps: int = 2, x_scale: float = 0.3, y_scale: float = 1.3, y_size: float = 10,
                             savepath: str | Path = None, show: bool = True):
@@ -1114,7 +1162,7 @@ def plot_solution_generation(solution_file: str | Path = None, var: Literal["glo
     # fts_range = res[var].max() - res[var].min()
     var_pretty = var.replace('_', ' ').title()
 
-    fig, ax = plt.subplots(1, 1, figsize=(num_gens * x_scale, y_size) if figsize is None else figsize)
+    fig, ax = plt.subplots(1, 1, figsize=(num_gens * x_scale, y_size) if figsize is None else figsize, dpi=dpi)
     # sns.set_theme(palette=sns_palette, style=sns_style)
     # Fitness per individual
     sns.stripplot(data=res, x="gen", y=var, hue="indiv_type", size=5, ax=ax, alpha=0.5, palette=point_cmap)
@@ -1139,7 +1187,7 @@ def plot_solution_generation(solution_file: str | Path = None, var: Literal["glo
 
     if savepath is not None:
         print(f"Saving plot to {savepath}")
-        plt.savefig(savepath, bbox_inches='tight')
+        plt.savefig(savepath, bbox_inches='tight', dpi=dpi)
     if show:
         plt.show()
     plt.close(fig)

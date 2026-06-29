@@ -1,3 +1,11 @@
+v1.2.3 (2026-06-29)
+- Improved plotting `snn.plot`
+    - Added `dpi=, figsize=` arguments consistently to every plot functions
+    - Allowed arrows in `plot_env_weight_greedy()` to change color based on brightness of weight values:
+        customisable via `threshold=` argument
+    - `plot_weight_over_time` allows selecting certain pre- and post- neuron ids to plot instead of the whole
+        weight matrix
+
 v1.2.2 (2026-06-26)
 - `run_rl.eval()`
     - Added multiple evaluator loop during eval_results and plotting
