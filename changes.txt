@@ -1,3 +1,9 @@
+v1.2.4.1 (2026-06-30)
+- Refactor all `run_*.py` scripts into `run` module
+- Moved `parse_config_overrides()`, `update_dictionary()` from `run_rl` to `common.utils`
+- Moved `evaluate_and_plot()` from `run.run_rl` to `run.evaluate`
+- Removed redundant comments in `run_rl` and `run.evaluate`
+
 v1.2.4 (2026-06-30)
 - Changes in run_rl.eval and plotting for smoother run
 - Added back in RL_Evaluator._log_info to prevent error

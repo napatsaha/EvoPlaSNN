@@ -274,5 +274,32 @@ def create_learning_rule(type_: str = None, **kwargs) -> LearningRule:
     return instance
 
 
+def parse_config_overrides(overrides: list[str]) -> dict:
+    """Parse key-value pairs for configuration overrides."""
+    config_updates = {}
+    for override in overrides:
+        keys, value = override.split("=")
+        keys = keys.split(".")
+        current = config_updates
+        for key in keys[:-1]:
+            current = current.setdefault(key, {})
+        current[keys[-1]] = yaml.safe_load(value)  # Convert value to appropriate type
+    return config_updates
+
+
+def update_dictionary(config: dict, overrides: dict) -> dict:
+    """Update a configuration dictionary with overrides."""
+    for key in overrides.keys():
+        if key in config:
+            if isinstance(config[key], dict) and isinstance(overrides[key], dict):
+                config[key] = update_dictionary(config[key], overrides[key])
+            else:
+                config[key] = overrides[key]
+        else:
+            config[key] = overrides[key]
+
+    return config
+
+
 
 

@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 import scipy
 from scipy import stats
-import run_evo_lrule, eval_group
+import run.run_evo_lrule as run_evo_lrule, run.eval_group as eval_group
 # from .run_evo_lrule import main, eval
 from pathlib import Path
 import yaml
