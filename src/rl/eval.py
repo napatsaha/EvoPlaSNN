@@ -48,7 +48,7 @@ class RL_Evaluator(Evaluator):
         #     else:
         #         raise ValueError("Either 'simulator_params.num_steps' or ('env_params.max_steps' and 'simulator_params.num_episodes') must be specified in params.")
         self.results_path: Path = None
-        # self._log_info = int(log_level)
+        self._log_info = int(log_level)
         self.record_info = bool(record_info)
         self.record_inter_fitness = record_inter_fitness
         self.precision = precision if not record_inter_fitness else 1

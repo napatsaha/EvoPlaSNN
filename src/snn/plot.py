@@ -611,7 +611,7 @@ def plot_env_weight_greedy(simulator: 'SNNSimulator', *, arrowcolors = ("white",
 
 
 def plot_eligibility_traces(simulator: 'SNNSimulator' = None, values: np.ndarray = None, *, 
-                            synapse_layer: int = 0, etype: Literal["pre", "post"] = "pre",
+                            synapse_layer: int = 0, etype: Literal["pre", "post", "stdp"] = "pre",
                             x_scale: float = 0.2, y_scale: float = 0.8,
                             t_min: int = None, t_max: int = None, t_range: int = 100,
                             cmap: str = "viridis", figsize=None, dpi: int = 100,
@@ -620,15 +620,21 @@ def plot_eligibility_traces(simulator: 'SNNSimulator' = None, values: np.ndarray
         if etype == "pre":
             assert simulator.record_eligibility_pre, "Pre-synaptic eligibility trace recording is not enabled."
             etrace = simulator.eligibility_pre_recorder.values[synapse_layer]
-        else:
+        elif etype == "pre":
             assert simulator.record_eligibility_post, "Post-synaptic eligibility trace recording is not enabled."
             etrace = simulator.eligibility_post_recorder.values[synapse_layer]
+        elif etype == "stdp":
+            assert simulator.record_eligibility_stdp, "STDP eligibility trace recording is not enabled."
+            etrace = simulator.eligibility_stdp_recorder.values[synapse_layer]
+        else:
+            raise ValueError(f"Eligiblity trace type: {etype} not supported.")
         
         num_inputs = simulator.network.input_size
         num_outputs = simulator.network.output_size
         num_steps = simulator.num_steps
     elif values is not None:
         etrace = values
+        etype = None
         num_inputs = etrace.shape[0]
         num_outputs = etrace.shape[1]
         num_steps = etrace.shape[2]
@@ -657,7 +663,7 @@ def plot_eligibility_traces(simulator: 'SNNSimulator' = None, values: np.ndarray
 
     fig.colorbar(m, label='Eligibility Traces', ax=axs)
     axs[-1, 0].set_xlabel("Time steps")
-    fig.suptitle(f"Eligibility Traces\nSynapse Layer {synapse_layer}", fontsize=16)
+    fig.suptitle(f"Eligibility Traces: {etype}\nSynapse Layer {synapse_layer}", fontsize=16)
     if savepath is not None:
         print(f"Saving plot to {savepath}")
         plt.savefig(savepath, dpi=dpi)
@@ -1065,15 +1071,23 @@ def plot_learning_rule_2D(rule: base.LearningRule, simulator: 'SNNSimulator' = N
 ### Plotting functions for Evolutionary Results ###
 
 
-def plot_fitness_generation(file_path: str | Path, *, estimator: str = "mean", errorband: str | tuple = ("pi", 100),
+def plot_fitness_generation(file_path: str | Path = None, res: pd.DataFrame = None, *, estimator: str = "mean", errorband: str | tuple = ("pi", 100),
+                            hue_var: str = None, run_name: str = None, merge_avg: bool = False,
                             linecolor_best: str = "black", linecolor_est: str = "blue", pointcolor: str = "gray",
                             sns_style: str = "whitegrid", sns_palette: str = "muted", figsize: tuple = None, dpi: int = 100,
                             title: str = None, subtitle: str = None, comment: str = None,
                             x_eps: int = 2, x_scale: float = 0.3, y_scale: float = 1.3, y_size: float = 10,
                             savepath: str | Path = None, show: bool = True):
-    assert os.path.exists(file_path), f"File {file_path} does not exist."
-    res = pd.read_csv(f"{file_path}")
-    run_name = Path(file_path).parent.stem
+    if file_path is not None:
+        assert os.path.exists(file_path), f"File {file_path} does not exist."
+        res = pd.read_csv(f"{file_path}")
+        run_name = Path(file_path).parent.stem
+    if res is not None:
+        res = res
+        run_name = None if run_name is None else run_name
+
+    if hue_var is not None:
+        assert hue_var in res.columns, f"Hue variable to plot ({hue_var}) must be in DataFrame."
 
     # Calulate best all-time fitness
     best_fts = res.groupby("gen")["avg_fitness"].max().cummax()
@@ -1089,11 +1103,19 @@ def plot_fitness_generation(file_path: str | Path, *, estimator: str = "mean", e
     fig, ax = plt.subplots(1, 1, figsize=figsize, dpi=dpi)
     # sns.set_theme(palette=sns_palette, style=sns_style)
     # Fitness per individual
-    sns.stripplot(data=res, x="gen", y="avg_fitness",  size=5, ax=ax, alpha=0.5, color=pointcolor)
+    if hue_var is None:
+        sns.stripplot(data=res, x="gen", y="avg_fitness", size=5, ax=ax, alpha=0.5, color=pointcolor)
+    else:
+        sns.stripplot(data=res, x="gen", y="avg_fitness", hue=hue_var, size=5, ax=ax, alpha=0.5, palette=sns_palette)
     # Best cumulative fitness
     sns.lineplot(data=res, x="gen", y="best_fitness", color=linecolor_best, linewidth=2, ax=ax, label="Best Fitness")
     # Average fitness for each generation
-    sns.lineplot(data=res, x="gen", y="avg_fitness", estimator=estimator, errorbar=errorband, ax=ax, color=linecolor_est, linewidth=2, label=f"{estimator.title()} Fitness")
+    if hue_var is None or merge_avg:
+        sns.lineplot(data=res, x="gen", y="avg_fitness", estimator=estimator, errorbar=errorband, ax=ax,
+                    color=linecolor_est, linewidth=2, label=f"{estimator.title()} Fitness")
+    else:
+        sns.lineplot(data=res, x="gen", y="avg_fitness", estimator=estimator, errorbar=errorband, ax=ax, hue=hue_var,
+                    palette=sns_palette, linewidth=2)
     ax.set_xlim(0-x_eps, num_gens+x_eps)
     ax.xaxis.set_major_locator(plt.MultipleLocator(5))
     ax.set_xlabel("Generation", fontsize=12)

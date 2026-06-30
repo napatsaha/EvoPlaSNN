@@ -1,3 +1,19 @@
+v1.2.4 (2026-06-30)
+- Changes in run_rl.eval and plotting for smoother run
+- Added back in RL_Evaluator._log_info to prevent error
+- Renamed `run_rl.eval()` to `evaluate_and_plot()`:
+    - Allow passing in plot_params to control what to plot, plus a 
+        `default_plot_flag` for easier setting of arguments not on plot_params
+    - Plotting "offspring_fitness_gen.png" possible when there are two 2 files. 
+        DataFrame concatenation happens within here, and result df passed into snn_plot.plot_fitness_generation
+    - Ensure learning_rule is set appropriately on simulation trial for plotting
+    - Added logic for plotting STDP eligibility traces 
+- snn.plot:
+    - `plot_fitness_generation()` allow passing in DataFrame instead of results_path.
+        - Allow passing in `hue_var` to color scatter points by certain variable present in DataFrame
+        - `merge_avg` controls whether estimator line should be separated between each hue_var category
+    - Added `etype='stdp'` option to `plot_eligibility_traces()`
+
 v1.2.3 (2026-06-29)
 - Improved plotting `snn.plot`
     - Added `dpi=, figsize=` arguments consistently to every plot functions
