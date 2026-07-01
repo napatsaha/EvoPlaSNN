@@ -204,12 +204,35 @@ def get_boundaries_for_lrule_inputs(simulator: 'SNNSimulator', input_var: str) -
         warnings.warn(f"Got exception: {exc}")
     return min_, max_
 
+# def assymetric_min_max_normalise(a, center=0):
+#     upper_bound = np.max(a)
+#     lower_bound = np.min(a)
+#     upper_range = upper_bound - center
+#     lower_range = center - lower_bound
+#     return np.where(a >= center, (a - center) / upper_range, (a - center) / lower_range)
+
 def assymetric_min_max_normalise(a, center=0):
-    upper_bound = np.max(a)
-    lower_bound = np.min(a)
+    upper_bound = max(center, np.max(a))
+    lower_bound = min(center, np.min(a))
     upper_range = upper_bound - center
     lower_range = center - lower_bound
-    return np.where(a >= center, (a - center) / upper_range, (a - center) / lower_range)
+    if upper_range > 0:
+        a = np.where(a > center, (a - center) / upper_range, a)
+    if lower_range > 0:
+        a = np.where(a < center, (a - center) / lower_range, a)
+    return a
+
+def symetric_min_max_normalise(a, center=0):
+    upper_bound = max(center, np.max(a))
+    lower_bound = min(center, np.min(a))
+    upper_range = upper_bound - center
+    lower_range = center - lower_bound
+    denom = max(upper_range, lower_range)
+    if upper_range > 0:
+        a = np.where(a > center, (a - center) / denom, a)
+    if lower_range > 0:
+        a = np.where(a < center, (a - center) / denom, a)
+    return a
 
 def make_input_grid(bounds, N):
     xii = [np.linspace(low, upp, N) for low, upp in bounds]

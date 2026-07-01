@@ -9,7 +9,7 @@ from common.utils import create_solver
 from evo.manager import EvoManager
 
 
-ROOT = Path(__file__).parent.parent
+ROOT = Path(__file__).parent.parent.parent
 
 
 def main(config_file: str | Path | dict, *, config_overrides: dict = None, parent_run: str = None, default_dir: str = "binary_es") -> Path:

@@ -1,3 +1,8 @@
+v1.2.4.2 (2026-07-01)
+- Minor fix in calling ROOT parents of `run.run_rl`
+- More robust `assymetric_min_max_normalise` when all inputs are zeros
+- Added `symetric_min_max_normalise()` to `common.utils` to use same range for positive/negative denominator
+
 v1.2.4.1 (2026-06-30)
 - Refactor all `run_*.py` scripts into `run` module
 - Moved `parse_config_overrides()`, `update_dictionary()` from `run_rl` to `common.utils`
