@@ -1071,7 +1071,9 @@ def plot_learning_rule_2D(rule: base.LearningRule, simulator: 'SNNSimulator' = N
 ### Plotting functions for Evolutionary Results ###
 
 
-def plot_fitness_generation(file_path: str | Path = None, res: pd.DataFrame = None, *, estimator: str = "mean", errorband: str | tuple = ("pi", 100),
+def plot_fitness_generation(file_path: str | Path = None, res: pd.DataFrame = None, *, 
+                            x_var: str = "gen", y_var: str = "avg_fitness",
+                            estimator: str = "mean", errorband: str | tuple = ("pi", 100),
                             hue_var: str = None, run_name: str = None, merge_avg: bool = False,
                             linecolor_best: str = "black", linecolor_est: str = "blue", pointcolor: str = "gray",
                             sns_style: str = "whitegrid", sns_palette: str = "muted", figsize: tuple = None, dpi: int = 100,
@@ -1086,17 +1088,19 @@ def plot_fitness_generation(file_path: str | Path = None, res: pd.DataFrame = No
         res = res
         run_name = None if run_name is None else run_name
 
+    assert x_var in res.columns, f"x-axis variable: {x_var} not present in DataFrame columns"
+    assert y_var in res.columns, f"y-axis variable: {y_var} not present in DataFrame columns"
     if hue_var is not None:
         assert hue_var in res.columns, f"Hue variable to plot ({hue_var}) must be in DataFrame."
 
     # Calulate best all-time fitness
-    best_fts = res.groupby("gen")["avg_fitness"].max().cummax()
+    best_fts = res.groupby(x_var)[y_var].max().cummax()
     best_fts.rename("best_fitness", inplace=True)
-    res = res.join(best_fts, on="gen", how="left")
+    res = res.join(best_fts, on=x_var, how="left")
 
-    num_gens = res["gen"].max() + 1
+    num_gens = res[x_var].max() + 1
     best_fts = res["best_fitness"].max()
-    fts_range = res["avg_fitness"].max() - res["avg_fitness"].min()
+    fts_range = res[y_var].max() - res[y_var].min()
 
     if figsize is None:
         figsize=(num_gens * x_scale, y_size) 
@@ -1104,17 +1108,17 @@ def plot_fitness_generation(file_path: str | Path = None, res: pd.DataFrame = No
     # sns.set_theme(palette=sns_palette, style=sns_style)
     # Fitness per individual
     if hue_var is None:
-        sns.stripplot(data=res, x="gen", y="avg_fitness", size=5, ax=ax, alpha=0.5, color=pointcolor)
+        sns.stripplot(data=res, x=x_var, y=y_var, size=5, ax=ax, alpha=0.5, color=pointcolor)
     else:
-        sns.stripplot(data=res, x="gen", y="avg_fitness", hue=hue_var, size=5, ax=ax, alpha=0.5, palette=sns_palette)
+        sns.stripplot(data=res, x=x_var, y=y_var, hue=hue_var, size=5, ax=ax, alpha=0.5, palette=sns_palette)
     # Best cumulative fitness
-    sns.lineplot(data=res, x="gen", y="best_fitness", color=linecolor_best, linewidth=2, ax=ax, label="Best Fitness")
+    sns.lineplot(data=res, x=x_var, y="best_fitness", color=linecolor_best, linewidth=2, ax=ax, label="Best Fitness")
     # Average fitness for each generation
     if hue_var is None or merge_avg:
-        sns.lineplot(data=res, x="gen", y="avg_fitness", estimator=estimator, errorbar=errorband, ax=ax,
+        sns.lineplot(data=res, x=x_var, y=y_var, estimator=estimator, errorbar=errorband, ax=ax,
                     color=linecolor_est, linewidth=2, label=f"{estimator.title()} Fitness")
     else:
-        sns.lineplot(data=res, x="gen", y="avg_fitness", estimator=estimator, errorbar=errorband, ax=ax, hue=hue_var,
+        sns.lineplot(data=res, x=x_var, y=y_var, estimator=estimator, errorbar=errorband, ax=ax, hue=hue_var,
                     palette=sns_palette, linewidth=2)
     ax.set_xlim(0-x_eps, num_gens+x_eps)
     ax.xaxis.set_major_locator(plt.MultipleLocator(5))

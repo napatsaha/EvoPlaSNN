@@ -1,3 +1,10 @@
+v1.2.5 (2026-07-03)
+- Early verion of `run/run_pyribs.py` using RL_Evaluator + EvolutionStrategyEmitter + ProximityArchive
+- `run/evaluate.evaluate_and_plot()`:
+    - Added compatibility fixes for "evaluator_params" and "manager_params" to support new config layout
+- `snn.plot`:
+    - Customisable `x_var` and `y_var` in `plot_fitness_generation()`
+
 v1.2.4.2 (2026-07-01)
 - Minor fix in calling ROOT parents of `run.run_rl`
 - More robust `assymetric_min_max_normalise` when all inputs are zeros

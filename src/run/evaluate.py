@@ -142,11 +142,20 @@ def evaluate_and_plot(results_path: Path | str = None, *, config_path: str | Pat
         rule = learning_rule
         prefix = f"eval_custom_rule"
 
-    config["evo_params"]["evaluator"].update(
+    # For compatibility with newer versions of config without "manager" or "evaluator" in "evo_params"
+    evaluator_params = config.get("evaluator_params") if "evaluator_params" in config else \
+        config["evo_params"]["evaluator"]
+    if "evo_params" in config and "manager" in config["evo_params"]:
+        manager_params = config["evo_params"]["manager"]
+    elif "evo_params" in config:
+        manager_params = config["evo_params"]
+    
+    # Prevent logging
+    evaluator_params.update(
         {"log_level": 0,
          "record_inter_fitness": False}
     )
-    multiple_evaluators = config["evo_params"]["manager"].get("multiple_evaluators", False)
+    multiple_evaluators = manager_params.get("multiple_evaluators", False)
 
     evaluator: Evaluator = None
     evaluators: List[RL_Evaluator] = None
@@ -154,7 +163,7 @@ def evaluate_and_plot(results_path: Path | str = None, *, config_path: str | Pat
         evaluator: Evaluator = RL_Evaluator(
             params=config,
             record_info=True,
-            **config["evo_params"]["evaluator"]
+            **evaluator_params
         )
     else:
         envs_params: dict = config.get("envs_params", {})
@@ -169,7 +178,7 @@ def evaluate_and_plot(results_path: Path | str = None, *, config_path: str | Pat
                 params=config,
                 env_params=env_config,
                 record_info=True,
-                **config["evo_params"]["evaluator"]
+                **evaluator_params
             )
             evaluators.append(evaluator)
 
@@ -204,7 +213,7 @@ def evaluate_and_plot(results_path: Path | str = None, *, config_path: str | Pat
                 if (results_path / "fitness_per_indiv.csv").exists():
                     snn_plot.plot_fitness_generation(results_path / "fitness_per_indiv.csv", savepath=results_path / "offspring_fitness_gen.png", show=False,
                                                     estimator="median", errorband=("pi", 50))
-                elif multiple_evaluators and bool(config.get("evo_params", {}).get("manager", {}).get("log_indiv", False)):
+                elif multiple_evaluators and bool(manager_params.get("log_indiv", False)):
                     res_list = []
                     for fts_file in results_path.glob("fitness_per_indiv*"):
                         res_list.append(pd.read_csv(fts_file))
@@ -244,7 +253,7 @@ def evaluate_and_plot(results_path: Path | str = None, *, config_path: str | Pat
         # Plot Learning Rule Response for each rule in save_best
         if plot_params.get("plot_learning_rule", default_plot_flag):
             try:
-                num_save_best = config.get("evo_params", {}).get("manager", {}).get("save_best", 0)
+                num_save_best = manager_params.get("save_best", 0)
                 for rule_id in range(1, num_save_best+1):
                     rule_id_name = f"best_rule_{rule_id:02d}.txt"
                     if not (results_path / rule_id_name).exists():
