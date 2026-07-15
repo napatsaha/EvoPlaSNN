@@ -19,3 +19,20 @@ __pycache__/
 
 test*
 script.zsh
+
+# Includes for gecco26 branch, and README.md file
+!/media/img/
+
+
+!results/tmaze/exp10/part-a/26-01-25_22-10-53/
+!results/tmaze/exp10/part-a/26-04-01_23-59-54/
+!results/tmaze/exp10/part-b/26-04-04_23-07-24/
+!results/tmaze/exp10/part-b/26-04-04_23-07-24/
+!results/tmaze/exp10/part-c/26-06-09_20-19-51/
+!results/tmaze/exp10/part-c/26-06-11_18-45-06/
+!results/tmaze/exp10/part-d/26-01-25_02-53-24/
+!results/tmaze/exp10/part-d/26-04-06_02-50-48/
+!results/tmaze/exp10/part-e/26-01-23_18-57-30/
+!results/tmaze/exp10/part-e/26-04-07_22-39-05/
+!results/tmaze/exp10/part-f/26-06-07_16-59-14/
+!results/tmaze/exp10/part-f/26-06-10_20-40-09/
