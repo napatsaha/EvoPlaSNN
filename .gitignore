@@ -2,7 +2,7 @@ jupyter/
 *.ipynb
 
 old/
-media/
+# media/
 misc/
 results/
 config/*.ini
