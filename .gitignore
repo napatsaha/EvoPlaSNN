@@ -2,7 +2,7 @@ jupyter/
 *.ipynb
 
 old/
-# media/
+media/
 misc/
 results/
 config/*.ini
@@ -22,7 +22,6 @@ script.zsh
 
 # Includes for gecco26 branch, and README.md file
 !/media/img/
-
 
 !results/tmaze/exp10/part-a/26-01-25_22-10-53/
 !results/tmaze/exp10/part-a/26-04-01_23-59-54/
