@@ -519,7 +519,7 @@ def plot_weight_heatmap(simulator: 'SNNSimulator', *, x_scale: float = 0.2, y_sc
     # plt.close(fig)
 
 
-def plot_env_weight_actions(simulator: 'SNNSimulator', *, dpi: int = 100, figsize=None,
+def plot_env_weight_actions(simulator: 'SNNSimulator', *, dpi: int = 100, figsize=None, comment: str = None,
                             savepath=None, show=True):
     # Extract objects
     network = simulator.network
@@ -551,6 +551,11 @@ def plot_env_weight_actions(simulator: 'SNNSimulator', *, dpi: int = 100, figsiz
         ax.set_title(f"Action {env.action_names[i]}")
     plt.colorbar(img, ax=axs, orientation='horizontal', fraction=0.05, pad=0.1, label="Weights")
 
+    title = f"Overlaid SNN Weights by Action post-neuron"
+    if comment is not None:
+        title += "\n" + comment
+    fig.text(0.5, 0.99, title, fontsize=12, ha='center')
+
     if savepath is not None:
         print(f"Saving plot to {savepath}")
         plt.savefig(savepath, dpi=dpi)
@@ -560,7 +565,7 @@ def plot_env_weight_actions(simulator: 'SNNSimulator', *, dpi: int = 100, figsiz
 
 def plot_env_weight_greedy(simulator: 'SNNSimulator', *, arrowcolors = ("white", "black"),
                            threshold: float = 0.5,
-                           tolerance: float = 1e-10, dpi: int = 100, figsize=None,
+                           tolerance: float = 1e-10, dpi: int = 100, figsize=None, comment: str = None,
                             savepath=None, show=True):
     # Extract objects
     network = simulator.network
@@ -600,7 +605,11 @@ def plot_env_weight_greedy(simulator: 'SNNSimulator', *, arrowcolors = ("white",
     ax.set_xticks(np.arange(0, env.width, 1), labels=[])
     ax.set_yticks(np.arange(0, env.height, 1), labels=[])
     ax.grid(visible=True, color='black', linewidth=0.7)
-    ax.set_title(f"Max Values Across Actions")
+
+    title = f"Overlaid SNN Weights for each input state (maximum across Action neurons)"
+    if comment is not None:
+        title += "\n" + comment
+    ax.set_title(title)
     plt.colorbar(img, ax=ax, orientation='horizontal', fraction=0.05, pad=0.1, label="Weights")
 
     if savepath is not None:
@@ -776,7 +785,7 @@ def plot_learning_rule_4D(rule: 'base.LearningRule', simulator: 'SNNSimulator' =
                           n_bins: int = 100, n_cols: int = 5, n_rows: int = 5,
                           var_col: str = "reward", var_row: str = "weights",
                           cmap: str = "RdBu", aspect="auto",
-                          rule_name: str = None,
+                          rule_name: str = None, title: str = None,
                           figsize: tuple = (20, 20), dpi: int = 100,
                           savepath: str | Path = None, show: bool = True,
                           **kwargs) -> None:
@@ -873,7 +882,7 @@ def plot_learning_rule_4D(rule: 'base.LearningRule', simulator: 'SNNSimulator' =
         comment = "Rule: " + str(rule_name)
         fig.text(0.99, 0.1, comment, ha="right", transform=fig.transFigure, fontsize=15)
     # Title
-    title = "Learning Rule Response to Inputs:\n" + f"f({rule.input_order}) = ΔWeight"
+    title = "Learning Rule Response to Inputs:\n" + f"f({rule.input_order}) = ΔWeight" if title is None else title
     fig.text(0.5, 0.92, title, ha="center", transform=fig.transFigure, fontsize=20)
     # Colorbar for delta weight
     cbar = fig.colorbar(img, ax=axs, fraction=0.05, orientation="horizontal", aspect=100)
@@ -891,7 +900,7 @@ def plot_learning_rule_3D(rule: 'base.LearningRule', simulator: 'SNNSimulator' =
                           custom_bounds: dict[str, tuple] = None,
                           n_bins: int = 100, n_cols: int = 5, var_col: str = "reward",
                           cmap: str = "RdBu", figsize: tuple = (20, 5), aspect="auto", dpi: int = 100,
-                          rule_name: str = None,
+                          rule_name: str = None, title: str = None,
                           savepath: str | Path = None, show: bool = True,
                           **kwargs) -> None:
     # DONE: Fix format to be generic like plot_learning_rule_1D
@@ -958,15 +967,16 @@ def plot_learning_rule_3D(rule: 'base.LearningRule', simulator: 'SNNSimulator' =
         img = ax.imshow(vv[:, :, xi], extent=xy_bounds, aspect=aspect, origin="lower", colorizer=colorizer, **kwargs)
         ax.set_box_aspect(1)
         ax.set_title(f"{var_col} = {val_xi}")
-        ax.set_xlabel(var_names[0])
-        ax.set_ylabel(var_names[1])
+        if xi == 0:
+            ax.set_xlabel(var_names[0])
+            ax.set_ylabel(var_names[1])
 
     # Optionally display rule_path or name
     if rule_name is not None:
         comment = "Rule: " + str(rule_name)
         fig.text(0.99, 0.1, comment, ha="right", transform=fig.transFigure, fontsize=15)
     # Title
-    title = "Learning Rule Response to Inputs:\n" + f"f({rule.input_order}) = ΔWeight"
+    title = "Learning Rule Response to Inputs:\n" + f"f({rule.input_order}) = ΔWeight" if title is None else title
     fig.text(0.5, 0.92, title, ha="center", transform=fig.transFigure, fontsize=20)
     # Colorbar for delta weight
     cbar = fig.colorbar(img, ax=axs, fraction=0.05, orientation="horizontal", aspect=100)
@@ -984,7 +994,7 @@ def plot_learning_rule_2D(rule: base.LearningRule, simulator: 'SNNSimulator' = N
                           transpose: bool = False, custom_bounds: dict[str, tuple] = None,
                           xmin: float = 0.0, xmax: float = 1.0, ymin: float = 0.0, ymax: float = 1.0,
                           num_mesh: int = 100, cmap: str = "RdBu", figsize: tuple = (10, 10), dpi: int = 100,
-                          rule_name: str = None,
+                          rule_name: str = None, title: str = None,
                           savepath: str | Path = None, show: bool = True,
                           **kwargs):
     """
@@ -1055,7 +1065,7 @@ def plot_learning_rule_2D(rule: base.LearningRule, simulator: 'SNNSimulator' = N
         comment = "Rule: " + str(rule_name)
         fig.text(0.99, 0.1, comment, ha="right", transform=fig.transFigure, fontsize=15)
     # Title
-    title = "Learning Rule Response to Inputs:\n" + f"f({rule.input_order}) = ΔWeight"
+    title = "Learning Rule Response to Inputs:\n" + f"f({rule.input_order}) = ΔWeight" if title is None else title
     fig.text(0.5, 0.92, title, ha="center", transform=fig.transFigure, fontsize=20)
     # Colorbar for delta weight
     cbar = fig.colorbar(img, ax=axs, fraction=0.05, orientation="horizontal", aspect=100)
@@ -1077,13 +1087,15 @@ def plot_fitness_generation(file_path: str | Path = None, res: pd.DataFrame = No
                             hue_var: str = None, run_name: str = None, merge_avg: bool = False,
                             linecolor_best: str = "black", linecolor_est: str = "blue", pointcolor: str = "gray",
                             sns_style: str = "whitegrid", sns_palette: str = "muted", figsize: tuple = None, dpi: int = 100,
+                            legend: bool = True, fontscale: float = 1.0,
                             title: str = None, subtitle: str = None, comment: str = None,
                             x_eps: int = 2, x_scale: float = 0.3, y_scale: float = 1.3, y_size: float = 10,
+                            ymin: float = None, ymax: float = None,
                             savepath: str | Path = None, show: bool = True):
     if file_path is not None:
         assert os.path.exists(file_path), f"File {file_path} does not exist."
         res = pd.read_csv(f"{file_path}")
-        run_name = Path(file_path).parent.stem
+        run_name = run_name if run_name is not None else Path(file_path).parent.stem
     if res is not None:
         res = res
         run_name = None if run_name is None else run_name
@@ -1100,7 +1112,8 @@ def plot_fitness_generation(file_path: str | Path = None, res: pd.DataFrame = No
 
     num_gens = res[x_var].max() + 1
     best_fts = res["best_fitness"].max()
-    fts_range = res[y_var].max() - res[y_var].min()
+    ymax = res[y_var].max() if ymax is None else float(ymax)
+    ymin = res[y_var].min() if ymin is None else float(ymin)
 
     if figsize is None:
         figsize=(num_gens * x_scale, y_size) 
@@ -1120,27 +1133,32 @@ def plot_fitness_generation(file_path: str | Path = None, res: pd.DataFrame = No
     else:
         sns.lineplot(data=res, x=x_var, y=y_var, estimator=estimator, errorbar=errorband, ax=ax, hue=hue_var,
                     palette=sns_palette, linewidth=2)
+    
     ax.set_xlim(0-x_eps, num_gens+x_eps)
+    ax.set_ylim(ymin, ymax)
     ax.xaxis.set_major_locator(plt.MultipleLocator(5))
-    ax.set_xlabel("Generation", fontsize=12)
-    ax.set_ylabel("Fitness", fontsize=12)
-    # ax.legend(loc="upper right", fontsize=10)
+    ax.set_xlabel("Generation", fontsize=12*fontscale)
+    ax.set_ylabel("Fitness", fontsize=12*fontscale)
+    if legend:
+        ax.legend(loc="upper left", fontsize=12*fontscale)
+    else:
+        ax.get_legend().remove()
     ax.grid(True, which='both', linestyle='--', linewidth=0.5, alpha=0.5)
 
-    ax.text(num_gens - 1, best_fts, f"{best_fts:.2f}", ha='right', va="bottom", fontsize=16, transform=ax.transData, color=linecolor_best)
+    ax.text(num_gens - 1, best_fts, f"{best_fts:.2f}", ha='right', va="bottom", fontsize=16*fontscale, transform=ax.transData, color=linecolor_best)
     title_main = f"Fitness Over Generations" if title is None else title
     subtitle = f"({estimator.title()} Fitness +/- {errorband[1]} {errorband[0].upper()})" if subtitle is None else subtitle
     comment = f"Run: {run_name}" if comment is None else comment
-    fig.text(0.5, 0.95, title_main, ha='center', fontsize=24)
-    fig.text(0.5, 0.90, subtitle, ha='center', fontsize=16)
-    ax.text(1.00, 1.05, comment, ha='right', fontsize=16, transform=ax.transAxes)
+    fig.text(0.5, 0.95, title_main, ha='center', fontsize=24*fontscale)
+    fig.text(0.5, 0.90, subtitle, ha='center', fontsize=16*fontscale)
+    ax.text(1.00, 1.05, comment, ha='right', fontsize=16*fontscale, transform=ax.transAxes)
 
     if savepath is not None:
         print(f"Saving plot to {savepath}")
         plt.savefig(savepath, bbox_inches='tight', dpi=dpi)
     if show:
         plt.show()
-    # plt.close(fig)
+    plt.close(fig)
 
 
 def plot_solution_generation(solution_file: str | Path = None, var: Literal["global_fitness", "local_fitness", "novelty_dist", "rank"] = "global_fitness", df: pd.DataFrame = None, *, 

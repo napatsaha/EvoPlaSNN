@@ -1,3 +1,9 @@
+v1.2.6 (2026-07-16, committed 2026-07-31)
+- Various plotting improvements:
+    - Customisable 'comments' as inputs in `plot_env_*`
+    - Customisable 'title' in `plot_learning_rule`
+    - ylim in `plot_fitness_generation`
+
 v1.2.5 (2026-07-03)
 - Early verion of `run/run_pyribs.py` using RL_Evaluator + EvolutionStrategyEmitter + ProximityArchive
 - `run/evaluate.evaluate_and_plot()`:
