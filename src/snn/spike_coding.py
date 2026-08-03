@@ -15,7 +15,7 @@ from common.base import SpikeCoder
 import numpy as np
 import gymnasium as gym
 from abc import ABC, abstractmethod
-from typing import Literal
+from typing import Literal, Sequence
 
 
 class BaseSpikeCoder(SpikeCoder, ABC):
@@ -62,17 +62,35 @@ class BaseSpikeCoder(SpikeCoder, ABC):
 
 
 class BaseSpikeEncoder(ABC):
-    def __init__(self, n_channels, n_neurons, window_size, lower_bounds, upper_bounds):
+    def __init__(self, n_channels: int, n_neurons: int | Sequence[int], window_size: int, 
+                 lower_bounds: Sequence | np.ndarray, upper_bounds: Sequence | np.ndarray,
+                 side: str = "left"):
         self.n_channels = n_channels
-        self.n_neurons = n_neurons
+        if isinstance(n_neurons, int):
+            self._n_neurons = [n_neurons for _ in range(self.n_channels)]
+            self._unequal_neurons = False
+        elif isinstance(n_neurons, Sequence) or isinstance(n_neurons, np.ndarray):
+            assert len(n_neurons) == self.n_channels
+            self._n_neurons = [n for n in n_neurons]
+            self._unequal_neurons = True
+        else:
+            raise ValueError(f"'n_neurons' must either be an int or ArrayLike. Got type {type(n_neurons)}")
+        self._n_neurons = np.asarray(self._n_neurons)
+        self._total_neurons = sum(self._n_neurons)
+        # Starting index position for each channel after flattening neuron id
+        self._cumu_index = np.cumsum([0, *(self._n_neurons[:-1])])
+
         self.window_size = window_size
         assert len(lower_bounds) == self.n_channels
         self.lower_bounds = lower_bounds
         assert len(upper_bounds) == self.n_channels
         self.upper_bounds = upper_bounds
 
-        self._empty_array = np.zeros((self.n_channels, self.n_neurons, self.window_size), dtype=np.int8)
-        self._bins = [np.linspace(lw, hg, self.n_neurons) for lw, hg in zip(self.lower_bounds, self.upper_bounds)]
+        self._side = side
+
+        self._empty_array = np.zeros((self._total_neurons, self.window_size), dtype=np.int8)
+        self._bins = [np.linspace(lw, hg, n+1) for lw, hg, n in \
+                      zip(self.lower_bounds, self.upper_bounds, self._n_neurons)]
 
     def _get_neuron_index(self, inp):
         """
@@ -81,11 +99,22 @@ class BaseSpikeEncoder(ABC):
         Args:
             inp (_type_): _description_
         """
-        return [np.digitize(xi, bin_i) for xi, bin_i in zip(inp, self._bins)]
+        idx = [np.searchsorted(bin_i, xi, side=self._side) - 1 \
+                for xi, bin_i in zip(inp, self._bins)]
+        return np.clip(idx, 0, self._n_neurons-1) # To ensure valid neuron index and
+                                                  # and prevent overflowing
 
     @abstractmethod
     def generate_spikes(self, inp):
         pass
+
+    @property
+    def bins(self):
+        return self._bins
+
+    @property
+    def neuron_size(self):
+        return self._total_neurons
 
 
 class BaseSpikeDecoder(ABC):
@@ -102,11 +131,11 @@ class BaseSpikeDecoder(ABC):
 
 
 class SingleSpikeEncoder(BaseSpikeEncoder):
-    def __init__(self, n_channels, n_neurons, window_size, lower_bounds, upper_bounds):
-        super().__init__(n_channels, n_neurons, window_size, lower_bounds, upper_bounds)
-
     def generate_spikes(self, inp):
-        neuron_idx = self._get_neuron_index(inp)
         out_array = self._empty_array.copy()
-        out_array[np.arange(self.n_channels), neuron_idx, 0] = 1
+
+        # Find bin index of each input value and convert to flattened index
+        neuron_idx = self._get_neuron_index(inp)
+        flat_neuron_idx = np.asarray(neuron_idx) + self._cumu_index
+        out_array[flat_neuron_idx, 0] = 1
         return out_array
