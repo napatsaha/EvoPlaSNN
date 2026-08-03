@@ -1,3 +1,19 @@
+v1.3.1
+- Initial commit: New spike coding scheme following Schuman et al 2022 paper
+- Added `snn.spike_coding.py` module containing:
+    - `BaseSpikeCoder`
+    - `BaseSpikeEncoder`
+    - `BaseSpikeDecoder`
+- Only `SingleSpikeEncoder` is available and tested (exploratorily)
+- `BaseSpikeCoder` do not work with encoders or decoders yet, but is meant to be a
+    composite class controlling the flow of both
+- Moved `SpikeCoder` type class from `rl.spike_coding` to `common.base`
+- Renamed `snn.decoding.py` to `snn.decoding_old.py`
+
+---
+v1.3
+---
+
 v1.2.6 (2026-07-16, committed 2026-07-31)
 - Various plotting improvements:
     - Customisable 'comments' as inputs in `plot_env_*`

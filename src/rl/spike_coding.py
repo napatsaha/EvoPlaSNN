@@ -1,35 +1,9 @@
 """
 2025-08-15
 """
+from common.base import SpikeCoder
 import numpy as np
 import gymnasium as gym
-from abc import ABC
-
-
-class SpikeCoder(ABC):
-    """
-    An interface between RL Environment and SNN.
-    """
-    def encode(self, state: int | np.ndarray) -> np.ndarray:
-        raise NotImplementedError
-
-    def decode(self, spikes: np.ndarray) -> int | None:
-        raise NotImplementedError
-
-    def reset(self):
-        raise NotImplementedError
-    
-    @property
-    def ready(self) -> bool:
-        raise NotImplementedError
-
-    @property
-    def input_size(self) -> int:
-        raise NotImplementedError
-    
-    @property
-    def output_size(self) -> int:
-        raise NotImplementedError
 
 
 class StateCoder(SpikeCoder):

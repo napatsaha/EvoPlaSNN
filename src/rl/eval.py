@@ -16,6 +16,7 @@ import snn.spikegen as spkgen
 # import snn.spikegen
 from lrule import LearningRule
 from rl import ENV_DICT, StateCoder, RewardCollector, BaseMaze
+from common.base import SpikeCoder
 
 class RL_Evaluator(Evaluator):
     def __init__(self, 
@@ -70,7 +71,7 @@ class RL_Evaluator(Evaluator):
         self.env: BaseMaze = ENV_DICT.get(env_name)(**env_params)
         # num_states = self.env.observation_space.n
         # num_actions = self.env.action_space.n
-        self.spike_coder = StateCoder(self.env.observation_space, self.env.action_space, **params["spike_coder_params"])
+        self.spike_coder: SpikeCoder = StateCoder(self.env.observation_space, self.env.action_space, **params["spike_coder_params"])
         self.snn = SNN(input_size=self.spike_coder.input_size, output_size=self.spike_coder.output_size, 
                        **params["snn_params"])
         self.reward_collector = RewardCollector(**params["collector_params"])

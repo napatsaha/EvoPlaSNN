@@ -12,9 +12,9 @@ from .snn import SNN
 from .modulation import Modulator, Reward_Modulator, TD_Error_Modulator
 # from lrule import LearningRule
 from .spikegen import BinaryClassGenerator
-from .decoding import get_decoder_class, get_fitnessor_class, BaseDecoder, BaseFitnessor
+from .decoding_old import get_decoder_class, get_fitnessor_class, BaseDecoder, BaseFitnessor
 from .rewarder import create_rewarder, create_collector, RewarderProtocol, CollectorProtocol
-from rl.spike_coding import SpikeCoder
+from common.base import SpikeCoder
 from rl.collector import RewardCollector, TrajectoryCollector
 import gymnasium as gym
 
