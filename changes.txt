@@ -1,3 +1,8 @@
+v1.3.2 (2026-08-04)
+- Basic logic workflow of paired encoding-decoding calls of BaseSpikeCoder
+- Renamed `BaseSpikeCoder` to `NewSpikeCoder`
+- Placeholders for encoder and decoder once complete
+
 v1.3.1.2 (2026-08-03)
 - Changed to flat index instead of separate dim for channel and neuron, to allow for unequal neuron per channel 
 - Fixed issue with not binning correctly and index overflowing from neuron to neuron
