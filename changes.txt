@@ -1,3 +1,11 @@
+----
+v1.3
+----
+
+v1.3.3 (2026-08-05)
+- Basic Voting Decoder: `SingleVotingDecoder`
+- Multiple, unequal `in_neurons` support for `BaseSpikeDecoder`
+
 v1.3.2 (2026-08-04)
 - Basic logic workflow of paired encoding-decoding calls of BaseSpikeCoder
 - Renamed `BaseSpikeCoder` to `NewSpikeCoder`
@@ -19,9 +27,9 @@ v1.3.1 (2026-08-03)
 - Moved `SpikeCoder` type class from `rl.spike_coding` to `common.base`
 - Renamed `snn.decoding.py` to `snn.decoding_old.py`
 
----
-v1.3
----
+----
+v1.2
+----
 
 v1.2.6 (2026-07-16, committed 2026-07-31)
 - Various plotting improvements:
@@ -101,6 +109,8 @@ v1.2.0 (2026-06-22)
 - RL_Evaluator now take in `env_params` separately from `params`. If not supplied, it will look for
     `'env_params'` item in params
 
+----
+v1.1
 ----
 
 v1.1.25
@@ -365,6 +375,9 @@ v1.1.0
     - `mutate()` now requires rate as positional argument
 - Improved `str` and `repr` methods of the two rules -> shows the parameter array in `repr`
 
+----
+v1.0
+----
 
 v1.0.14
 - Fix Genome.parameter issue in `MuPlusLambda`

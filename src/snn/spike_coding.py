@@ -16,6 +16,7 @@ from abc import ABC, abstractmethod
 from typing import Literal, Sequence
 
 import numpy as np
+from numpy.typing import ArrayLike
 import gymnasium as gym
 
 from common.base import SpikeCoder
@@ -23,6 +24,10 @@ from common.base import SpikeCoder
 
 ENCODER_DICT = {
     "single": 'SingleSpikeEncoder'
+}
+
+DECODER_DICT = {
+    "voting": 'SingleVotingDecoder'
 }
 
 
@@ -34,31 +39,43 @@ def create_spike_encoder(method: str, **kwargs):
     clss = getattr(sys.modules[__name__], clss_name)
     return clss(**kwargs)
 
+def create_spike_decoder(method: str, **kwargs):
+    method = str(method).lower()
+    if method not in DECODER_DICT:
+        raise ValueError(f"Decoder type: {method} not found in supported spike decoding methods")
+    clss_name = DECODER_DICT.get(method)
+    clss = getattr(sys.modules[__name__], clss_name)
+    return clss(**kwargs)
+
 
 class NewSpikeCoder(SpikeCoder, ABC):
     def __init__(self, input_channels, output_channels, window_size, *,
                  encoding_method: Literal["single", "multi", "rate", "temporal"] = 'single',
-                 encoder_params: dict = None,
+                 encoder_params: dict = {},
                  decoding_method: Literal["voting", "weighted-voting", "rate", "rate-div", "temporal", "ttfs"] = 'voting',
-                 decoder_params: dict = None,
+                 decoder_params: dict = {},
                  n_neurons_in=1, 
                  n_neurons_out=None,
                  
                  ):
         super().__init__()
+        self.window_size = window_size
+
+        encoder_params["window_size"] = self.window_size
+        decoder_params["window_size"] = self.window_size
+
         # Create separate Encoder and Decoder based on specifications
-        # self.encoder: BaseSpikeEncoder = create_spike_encoder(method=encoding_method, **encoder_params)
-        # self.decoder: BaseSpikeDecoder
+        self.encoder: BaseSpikeEncoder = create_spike_encoder(method=encoding_method, **encoder_params)
+        self.decoder: BaseSpikeDecoder = create_spike_decoder(method=decoding_method, **decoder_params)
 
-        # self.window_size = self.encoder.window_size
 
-        # self._input_neurons = self.encoder.neuron_size
-        # self._output_neurons = self.decoder.neuron_size
+        self._input_neurons = self.encoder.neuron_size
+        self._output_neurons = self.decoder.neuron_size
 
         ## Remove this after testing
-        self.window_size = window_size
-        self._input_neurons = input_channels
-        self._output_neurons = output_channels
+        # self.window_size = window_size
+        # self._input_neurons = input_channels
+        # self._output_neurons = output_channels
         ##
 
         # Buffer to store encoded spike train to give network at each timestep (input buffer)
@@ -91,12 +108,12 @@ class NewSpikeCoder(SpikeCoder, ABC):
         #   then store in input buffer
         if self._window_start:
             self._validate_input(inp)
-            # spk_train = self.encoder.generate_spikes(inp)
+            spk_train = self.encoder.generate_spikes(inp)
             ## Remove this after testing
-            print(f"Encoding inputs {inp}")
-            spk_train = np.zeros((self._input_neurons, self.window_size), dtype=np.int8)
-            spk_train[::2, ::2] = 1
-            spk_train[1::2, 1::2] = 1
+            # print(f"Encoding inputs {inp}")
+            # spk_train = np.zeros((self._input_neurons, self.window_size), dtype=np.int8)
+            # spk_train[::2, ::2] = 1
+            # spk_train[1::2, 1::2] = 1
             ##
             self._input_buffer = spk_train
             self._window_start = False
@@ -123,10 +140,10 @@ class NewSpikeCoder(SpikeCoder, ABC):
         # If window has ended, decode the output buffer into output values
         outp = None
         if self._window_end:
-            # outp = self.decoder.decode_spikes(self._output_buffer)
+            outp = self.decoder.decode_spikes(self._output_buffer)
             ## Remove this after testing
-            print(f"Decoding output")
-            outp = self._output_buffer.sum(axis=1)
+            # print(f"Decoding output")
+            # outp = self._output_buffer.sum(axis=1)
             ##
             # Reset window start
             self._window_start = True
@@ -148,7 +165,7 @@ class NewSpikeCoder(SpikeCoder, ABC):
         self._output_buffer.fill(0)
 
     def _validate_input(self, inp):
-        pass
+        assert len(inp) == self.encoder.n_channels
 
     @property
     def ready(self):
@@ -162,6 +179,8 @@ class NewSpikeCoder(SpikeCoder, ABC):
     def output_size(self):
         return self._output_neurons
 
+
+#### Encoder ####
 
 class BaseSpikeEncoder(ABC):
     def __init__(self, n_channels: int, n_neurons: int | Sequence[int], window_size: int, 
@@ -219,22 +238,6 @@ class BaseSpikeEncoder(ABC):
         return self._total_neurons
 
 
-class BaseSpikeDecoder(ABC):
-    def __init__(self, n_channels, n_neurons, window_size, lower_bounds, upper_bounds):
-        self.n_channels = n_channels
-        self.n_neurons = n_neurons
-        self.window_size = window_size
-        self.lower_bounds = lower_bounds
-        self.upper_bounds = upper_bounds
-
-    @abstractmethod
-    def decode_spikes(self, inp):
-        pass
-
-    @property
-    def neuron_size(self):
-        return self._total_neurons
-
 class SingleSpikeEncoder(BaseSpikeEncoder):
     def generate_spikes(self, inp):
         out_array = self._empty_array.copy()
@@ -244,3 +247,77 @@ class SingleSpikeEncoder(BaseSpikeEncoder):
         flat_neuron_idx = np.asarray(neuron_idx) + self._cumu_index
         out_array[flat_neuron_idx, 0] = 1
         return out_array
+
+
+#### Decoder ####
+
+class BaseSpikeDecoder(ABC):
+    def __init__(self, out_channels, in_neurons, window_size, lower_bounds=None, upper_bounds=None):
+        self.out_channels = out_channels
+        # self.in_neurons = in_neurons
+
+        if isinstance(in_neurons, int):
+            self.in_neurons = [in_neurons for _ in range(self.out_channels)]
+            self._unequal_neurons = False
+        elif isinstance(in_neurons, Sequence) or isinstance(in_neurons, np.ndarray):
+            assert len(in_neurons) == self.out_channels
+            self.in_neurons = [n for n in in_neurons]
+            self._unequal_neurons = True
+        else:
+            raise ValueError(f"'n_neurons' must either be an int or ArrayLike. Got type {type(in_neurons)}")
+        self.in_neurons = np.asarray(self.in_neurons)
+        self._total_neurons = sum(self.in_neurons)
+        # Starting index position for each channel after flattening neuron id
+        self._start_index = np.cumsum([0, *(self.in_neurons[:-1])])
+
+        self.window_size = int(window_size)
+
+        if lower_bounds is not None:
+            assert len(lower_bounds) == self.out_channels
+            self.lower_bounds = np.asarray(lower_bounds)
+        else:
+            self.lower_bounds = np.zeros(self.out_channels)
+
+        if upper_bounds is not None:
+            assert len(upper_bounds) == self.out_channels
+            self.upper_bounds = np.asarray(upper_bounds)
+        else:
+            self.upper_bounds = np.array([n-1 for n in self.in_neurons])
+
+        self._neuron_values = [np.linspace(lw, hg, num=n) \
+                               for lw, hg, n in zip(self.lower_bounds, self.upper_bounds, self.in_neurons)]
+
+    @abstractmethod
+    def decode_spikes(self, spikes: np.ndarray) -> np.ndarray:
+        pass
+
+    @property
+    def neuron_size(self):
+        return self._total_neurons
+
+
+class SingleVotingDecoder(BaseSpikeDecoder):
+    def __init__(self, out_channels: int, in_neurons: int | Sequence[int], window_size: int, 
+                 lower_bounds: Sequence | np.ndarray = None, upper_bounds: Sequence | np.ndarray = None,
+                ):
+        super().__init__(out_channels, in_neurons, window_size, lower_bounds, upper_bounds)
+
+    def decode_spikes(self, spikes: np.ndarray):
+        assert spikes.shape == (self._total_neurons, self.window_size)
+        voted_idx = self._get_voted_index(spikes)
+        outp = [np.take(vals, ix) for vals, ix in zip(self._neuron_values, voted_idx)]
+        return np.asarray(outp)
+
+    def _get_voted_index(self, spikes: np.ndarray) -> ArrayLike:
+        agg = spikes.sum(axis=1)
+
+        outp = np.zeros((self.out_channels, ), dtype=int)
+        for n in range(self.out_channels):
+            if n < self.out_channels - 1:
+                section = agg[self._start_index[n]: self._start_index[n+1]]
+            else:
+                section = agg[self._start_index[n]: ]
+            # TODO: deal with ties
+            outp[n] = np.argmax(section)
+        return outp
+
