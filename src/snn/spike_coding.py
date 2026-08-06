@@ -252,8 +252,30 @@ class SingleSpikeEncoder(BaseSpikeEncoder):
 #### Decoder ####
 
 class BaseSpikeDecoder(ABC):
-    def __init__(self, out_channels, in_neurons, window_size, lower_bounds=None, upper_bounds=None):
-        self.out_channels = out_channels
+    _total_neurons: int
+    out_channels: int
+    window_size: int
+
+    def __init__(self, out_channels, window_size):
+        super().__init__()
+        self.out_channels = int(out_channels)
+        self.window_size = int(window_size)
+        self._total_neurons = self.out_channels
+
+    @abstractmethod
+    def decode_spikes(self, spikes: np.ndarray) -> np.ndarray:
+        pass
+
+    @property
+    def neuron_size(self):
+        return self._total_neurons
+
+
+class ManyToOneSpikeDecoder(BaseSpikeDecoder):
+    def __init__(self, out_channels: int, in_neurons: int | Sequence[int], window_size: int, 
+                 lower_bounds: Sequence | np.ndarray = None, upper_bounds: Sequence | np.ndarray = None):
+        super().__init__(out_channels, window_size)
+        # self.out_channels = out_channels
         # self.in_neurons = in_neurons
 
         if isinstance(in_neurons, int):
@@ -270,7 +292,7 @@ class BaseSpikeDecoder(ABC):
         # Starting index position for each channel after flattening neuron id
         self._start_index = np.cumsum([0, *(self.in_neurons[:-1])])
 
-        self.window_size = int(window_size)
+        # self.window_size = int(window_size)
 
         if lower_bounds is not None:
             assert len(lower_bounds) == self.out_channels
@@ -287,37 +309,88 @@ class BaseSpikeDecoder(ABC):
         self._neuron_values = [np.linspace(lw, hg, num=n) \
                                for lw, hg, n in zip(self.lower_bounds, self.upper_bounds, self.in_neurons)]
 
-    @abstractmethod
-    def decode_spikes(self, spikes: np.ndarray) -> np.ndarray:
-        pass
 
-    @property
-    def neuron_size(self):
-        return self._total_neurons
-
-
-class SingleVotingDecoder(BaseSpikeDecoder):
+class SingleVotingDecoder(ManyToOneSpikeDecoder):
     def __init__(self, out_channels: int, in_neurons: int | Sequence[int], window_size: int, 
                  lower_bounds: Sequence | np.ndarray = None, upper_bounds: Sequence | np.ndarray = None,
                 ):
         super().__init__(out_channels, in_neurons, window_size, lower_bounds, upper_bounds)
+        self._discrete = False
+        if upper_bounds is None and lower_bounds is None:
+            self._discrete = True
+            self._neuron_values = [vals.astype(int) for vals in self._neuron_values]
 
     def decode_spikes(self, spikes: np.ndarray):
         assert spikes.shape == (self._total_neurons, self.window_size)
-        voted_idx = self._get_voted_index(spikes)
-        outp = [np.take(vals, ix) for vals, ix in zip(self._neuron_values, voted_idx)]
+        outp = self._calculate_output(spikes)
+        # outp = [np.take(vals, ix) for vals, ix in zip(self._neuron_values, voted_idx)]
         return np.asarray(outp)
 
-    def _get_voted_index(self, spikes: np.ndarray) -> ArrayLike:
-        agg = spikes.sum(axis=1)
+    def _calculate_output(self, spikes: np.ndarray) -> ArrayLike:
+        agg = self._aggregate(spikes)
 
-        outp = np.zeros((self.out_channels, ), dtype=int)
-        for n in range(self.out_channels):
+        outp = np.zeros((self.out_channels, ), dtype=np.int32 if self._discrete else np.float64)
+        for n, vals in zip(range(self.out_channels), self._neuron_values):
             if n < self.out_channels - 1:
                 section = agg[self._start_index[n]: self._start_index[n+1]]
             else:
                 section = agg[self._start_index[n]: ]
-            # TODO: deal with ties
-            outp[n] = np.argmax(section)
+            voted_idx = np.where(section == max(section))[0]
+            if len(voted_idx) > 1:
+                voted_idx = np.random.choice(voted_idx)
+            outp[n] = vals[voted_idx]
         return outp
+
+    def _aggregate(self, spikes: np.ndarray):
+        return spikes.sum(axis=1)
+
+
+class WeightedVotingDecoder(ManyToOneSpikeDecoder):
+
+    def decode_spikes(self, spikes: np.ndarray):
+        assert spikes.shape == (self._total_neurons, self.window_size)
+        outp = self._calculate_output(spikes)
+        return np.asarray(outp)
+
+    def _calculate_output(self, spikes: np.ndarray) -> ArrayLike:
+        agg = spikes.sum(axis=1)
+
+        outp = np.zeros((self.out_channels, ), dtype=np.float64)
+        for n, vals in zip(range(self.out_channels), self._neuron_values):
+            if n < self.out_channels - 1:
+                section_count = agg[self._start_index[n]: self._start_index[n+1]]
+            else:
+                section_count = agg[self._start_index[n]: ]
+            wg_val = sum(section_count * vals) / sum(section_count)
+            outp[n] = wg_val
+        return outp
+
+
+class TimeToFirstSpikeDecoder(ManyToOneSpikeDecoder):
+    def __init__(self, out_channels, in_neurons, window_size, lower_bounds = None, upper_bounds = None):
+        super().__init__(out_channels, in_neurons, window_size, lower_bounds, upper_bounds)
+
+    def decode_spikes(self, spikes: np.ndarray):
+        assert spikes.shape == (self._total_neurons, self.window_size)
+        outp = self._calculate_output(spikes)
+        return np.asarray(outp)
+
+    def _calculate_output(self, spikes: np.ndarray) -> ArrayLike:
+        agg = self._aggregate(spikes)
+
+        outp = np.zeros((self.out_channels, ), dtype=np.float64)
+        for n, vals in zip(range(self.out_channels), self._neuron_values):
+            if n < self.out_channels - 1:
+                section = agg[self._start_index[n]: self._start_index[n+1]]
+            else:
+                section = agg[self._start_index[n]: ]
+            voted_idx = np.where(section == min(section))[0]
+            if len(voted_idx) > 1:
+                voted_idx = np.random.choice(voted_idx)
+            outp[n] = vals[int(voted_idx)]
+        return outp
+
+    def _aggregate(self, spikes: np.ndarray):
+        agg = np.where(np.sum(spikes, axis=1) == 0, np.inf, np.argmax(spikes, axis=1))
+        return agg
 

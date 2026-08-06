@@ -2,6 +2,13 @@
 v1.3
 ----
 
+v1.3.4 (2026-08-06)
+- Weighted Voting Decoder and TTFS (Time to First Spike) Decoder
+- Restructured `BaseSpikeDecoder` class into a `ManyToOneSpikeDecoder` \
+    for Voting-based decoders with multiple neurons per channel
+- Renamed `._get_voted_idx()` in `SingleVotingDecoder` to a combined `_calculate_output()`
+- `_neuron_values` in `SingleVotingDecoder` will be integers if no lower and upper bounds are passed in
+
 v1.3.3 (2026-08-05)
 - Basic Voting Decoder: `SingleVotingDecoder`
 - Multiple, unequal `in_neurons` support for `BaseSpikeDecoder`
