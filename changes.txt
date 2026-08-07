@@ -2,6 +2,16 @@
 v1.3
 ----
 
+v1.3.5 (2026-08-07)
+- Three new Encoders (added to ENCODER_DICT):
+    - `TemporalEncoder`
+    - `MultiSpikeEncoder`
+    - `RateEncoder`
+- Rewrote `BaseSpikeEncoder._get_neuron_index()` to return both bin index and scale of value within bin
+    using for loop instead of `np.searchsorted`
+- Refactor input validation to parent's `.generate_spikes()`
+- Additional attributes `_side_left` and `_side_right` based on str `_side`
+
 v1.3.4.1 (2026-08-06)
 - `OneToOneSpikeDecoder` including:
     - `RateDecoder` (for continuous values)

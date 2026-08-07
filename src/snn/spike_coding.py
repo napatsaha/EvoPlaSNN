@@ -13,7 +13,7 @@ https://doi.org/10.1145/3546790.3546792
 
 import sys
 from abc import ABC, abstractmethod
-from typing import Literal, Sequence
+from typing import Literal, Sequence, Tuple
 
 import numpy as np
 from numpy.typing import ArrayLike
@@ -23,7 +23,10 @@ from common.base import SpikeCoder
 
 
 ENCODER_DICT = {
-    "single": 'SingleSpikeEncoder'
+    "single": 'SingleSpikeEncoder',
+    "temporal": 'TemporalEncoder',
+    "rate": 'RateEncoder',
+    "multi": 'MultiSpikeEncoder'
 }
 
 DECODER_DICT = {
@@ -212,27 +215,57 @@ class BaseSpikeEncoder(ABC):
         assert len(upper_bounds) == self.n_channels
         self.upper_bounds = upper_bounds
 
-        self._side = side
+        self._side = str(side).lower()
+        assert self._side in ("left", "right")
+        self._side_left = side == "left"
+        self._side_right = side == "right"
 
         self._empty_array = np.zeros((self._total_neurons, self.window_size), dtype=np.int8)
         self._bins = [np.linspace(lw, hg, n+1) for lw, hg, n in \
                       zip(self.lower_bounds, self.upper_bounds, self._n_neurons)]
 
-    def _get_neuron_index(self, inp):
+    # def _get_neuron_index(self, inp):
+    #     """
+    #     Get index of corresponding neuron for each channel based on defined bins
+
+    #     Args:
+    #         inp (_type_): _description_
+    #     """
+    #     idx = [np.searchsorted(bin_i, xi, side=self._side) - 1 \
+    #             for xi, bin_i in zip(inp, self._bins)]
+    #     return np.clip(idx, 0, self._n_neurons-1) # To ensure valid neuron index and
+    #                                               # and prevent overflowing
+
+    def _get_neuron_index(self, inp: np.ndarray, calc_scale: bool = True) -> Tuple[np.ndarray, np.ndarray]:
         """
-        Get index of corresponding neuron for each channel based on defined bins
+        Get index of corresponding neuron for each channel based on defined bins, 
+        along with scale between [0, 1] of where the value lie within that bin
 
         Args:
-            inp (_type_): _description_
+            inp: np.ndarray
+                Input values with same length as channel
+            calc_scale: bool
+                Whether or not to calculate the scale
         """
-        idx = [np.searchsorted(bin_i, xi, side=self._side) - 1 \
-                for xi, bin_i in zip(inp, self._bins)]
-        return np.clip(idx, 0, self._n_neurons-1) # To ensure valid neuron index and
-                                                  # and prevent overflowing
+        idx = np.zeros(self.n_channels, dtype=int)
+        if calc_scale:
+            scale = np.empty(self.n_channels, dtype=float)
+        else:
+            scale = None
+        for i, (xi, bin_i) in enumerate(zip(inp, self._bins)):
+            for j in range(1, self._n_neurons[i]+1):
+                if self._side_left and (bin_i[j-1] < xi <= bin_i[j]) or \
+                    self._side_right and (bin_i[j-1] <= xi < bin_i[j]):
+                    idx[i] = j - 1
+                    if calc_scale:
+                        scale[i] = (xi - bin_i[j-1]) / (bin_i[j] - bin_i[j-1])
+                    break
+        return idx, scale
 
-    @abstractmethod
     def generate_spikes(self, inp: np.ndarray) -> np.ndarray:
-        pass
+        assert inp.ndim == 1, f"Parallen input encoding not yet supported. Input length must be 1-dimension of the same length as n_channels={self.n_channels}"
+        assert inp.size == self.n_channels, f"Input must have the same length as encoded channels {self.n_channels}. Got input length: {inp.size}"
+        return self._empty_array.copy()
 
     @property
     def bins(self):
@@ -244,14 +277,52 @@ class BaseSpikeEncoder(ABC):
 
 
 class SingleSpikeEncoder(BaseSpikeEncoder):
-    def generate_spikes(self, inp):
-        out_array = self._empty_array.copy()
+    def generate_spikes(self, inp: np.ndarray) -> np.ndarray:
+        out_array = super().generate_spikes(inp)
 
         # Find bin index of each input value and convert to flattened index
-        neuron_idx = self._get_neuron_index(inp)
+        neuron_idx, _ = self._get_neuron_index(inp, calc_scale=False)
         flat_neuron_idx = np.asarray(neuron_idx) + self._cumu_index
         out_array[flat_neuron_idx, 0] = 1
         return out_array
+
+
+class TemporalEncoder(BaseSpikeEncoder):
+    def generate_spikes(self, inp):
+        out_array = super().generate_spikes(inp)
+
+        # Find bin index of each input value and convert to flattened index
+        neuron_idx, scale = self._get_neuron_index(inp, calc_scale=True)
+        spk_loc = (scale * self.window_size).astype(int)
+        flat_neuron_idx = np.asarray(neuron_idx) + self._cumu_index
+        out_array[flat_neuron_idx, spk_loc] = 1
+        return out_array
+
+
+class MultiSpikeEncoder(BaseSpikeEncoder):
+    def generate_spikes(self, inp):
+        out_array = super().generate_spikes(inp)
+
+        # Find bin index of each input value and convert to flattened index
+        neuron_idx, scale = self._get_neuron_index(inp, calc_scale=True)
+        spk_loc = (scale * self.window_size).astype(int)
+        flat_neuron_idx = np.asarray(neuron_idx) + self._cumu_index
+        for idx, loc in zip(flat_neuron_idx, spk_loc):
+            out_array[idx, :loc] = 1
+        return out_array
+
+
+class RateEncoder(BaseSpikeEncoder):
+    def generate_spikes(self, inp):
+        out_array = super().generate_spikes(inp)
+
+        # Find bin index of each input value and convert to flattened index
+        neuron_idx, scale = self._get_neuron_index(inp, calc_scale=True)
+        flat_neuron_idx = np.asarray(neuron_idx) + self._cumu_index
+        for idx, sc in zip(flat_neuron_idx, scale):
+            out_array[idx, :] = np.random.binomial(1, p=sc, size=(self.window_size,))
+        return out_array
+
 
 # ------------------------------------------------ #
 #### Decoder ####
