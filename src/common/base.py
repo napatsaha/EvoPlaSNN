@@ -372,24 +372,27 @@ class SpikeCoder(ABC):
     An interface between RL Environment and SNN.
     """
     def encode(self, state: int | np.ndarray) -> np.ndarray:
-        raise NotImplementedError
+        raise NotImplementedError()
 
     def decode(self, spikes: np.ndarray) -> int | None:
-        raise NotImplementedError
+        raise NotImplementedError()
 
     def reset(self):
-        raise NotImplementedError
+        raise NotImplementedError()
 
     @property
     def ready(self) -> bool:
-        raise NotImplementedError
+        raise NotImplementedError()
 
     @property
     def input_size(self) -> int:
-        raise NotImplementedError
+        raise NotImplementedError()
 
     @property
     def output_size(self) -> int:
-        raise NotImplementedError
+        raise NotImplementedError()
 
+    @property
+    def window_size(self) -> int:
+        raise NotImplementedError()
 

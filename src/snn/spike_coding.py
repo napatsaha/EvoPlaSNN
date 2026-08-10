@@ -56,26 +56,24 @@ def create_spike_decoder(method: str, **kwargs):
     return clss(**kwargs)
 
 
-class NewSpikeCoder(SpikeCoder, ABC):
+class CompositeSpikeCoder(SpikeCoder, ABC):
     def __init__(self, input_channels, output_channels, window_size, *,
                  encoding_method: Literal["single", "multi", "rate", "temporal"] = 'single',
                  encoder_params: dict = {},
                  decoding_method: Literal["voting", "weighted-voting", "rate", "rate-div", "temporal", "ttfs"] = 'voting',
                  decoder_params: dict = {},
-                 n_neurons_in=1, 
-                 n_neurons_out=None,
-                 
                  ):
         super().__init__()
-        self.window_size = window_size
+        self._window_size = window_size
 
         encoder_params["window_size"] = self.window_size
         decoder_params["window_size"] = self.window_size
 
         # Create separate Encoder and Decoder based on specifications
-        self.encoder: BaseSpikeEncoder = create_spike_encoder(method=encoding_method, **encoder_params)
-        self.decoder: BaseSpikeDecoder = create_spike_decoder(method=decoding_method, **decoder_params)
-
+        self.encoder: BaseSpikeEncoder = create_spike_encoder(method=encoding_method, n_channels=input_channels,
+                                                              **encoder_params)
+        self.decoder: BaseSpikeDecoder = create_spike_decoder(method=decoding_method, out_channels=output_channels,
+                                                              **decoder_params)
 
         self._input_neurons = self.encoder.neuron_size
         self._output_neurons = self.decoder.neuron_size
@@ -186,6 +184,49 @@ class NewSpikeCoder(SpikeCoder, ABC):
     @property
     def output_size(self):
         return self._output_neurons
+
+    @property
+    def window_size(self):
+        return self._window_size
+
+
+class SpikeCoderEnvWrapper(CompositeSpikeCoder):
+    def __init__(self, observation_space: gym.Space, action_space: gym.Space, window_size: int, *, 
+                 encoding_method: Literal["single", "multi", "rate", "temporal"] = 'single',
+                encoder_params: dict = {},
+                decoding_method: Literal["voting", "weighted-voting", "rate", "rate-div", "temporal", "ttfs"] = 'voting',
+                decoder_params: dict = {}
+                ):
+        self._obs_space = observation_space
+        self._action_space = action_space
+
+        input_channels, low, high = self.get_env_info(self._obs_space)
+        encoder_params.update(dict(lower_bounds=low, upper_bounds=high))
+        output_channels, low, high= self.get_env_info(self._action_space)
+        decoder_params.update(dict(lower_bounds=low, upper_bounds=high))
+
+        super().__init__(input_channels, output_channels, window_size, 
+                         encoding_method=encoding_method, encoder_params=encoder_params, 
+                         decoding_method=decoding_method, decoder_params=decoder_params)
+
+    def get_env_info(self, space: gym.Space) -> Tuple[int, ArrayLike, ArrayLike]:
+        if isinstance(space, gym.spaces.Box):
+            n_channels = sum(space.shape)
+            lower_bounds = space.low
+            upper_bounds = space.high
+        elif isinstance(space, gym.spaces.Discrete):
+            n_channels = 1
+            n_neurons = space.n
+            lower_bounds = np.zeros((n_channels, ), dtype=int)
+            upper_bounds = np.full((n_channels, ), fill_value=space.n-1)
+        elif isinstance(space, gym.spaces.MultiDiscrete):
+            n_channels = sum(space.shape)
+            n_neurons = space.nvec
+            lower_bounds = np.zeros((n_channels, ), dtype=int)
+            upper_bounds = np.asarray(space.nvec) - 1
+        else:
+            raise ValueError(f"Space type {type(space)} not yet supported. Please use CompositeSpikeCoder class directly")
+        return n_channels, lower_bounds, upper_bounds
 
 
 #### Encoder ####
@@ -332,7 +373,7 @@ class BaseSpikeDecoder(ABC):
     out_channels: int
     window_size: int
 
-    def __init__(self, out_channels, window_size, output_type: Literal["discrete", "continuous"]):
+    def __init__(self, out_channels: int, window_size: int, output_type: Literal["discrete", "continuous"]):
         super().__init__()
         self.out_channels = int(out_channels)
         self.window_size = int(window_size)

@@ -236,7 +236,7 @@ class SNNSimulator:
             max_steps_per_eps = getattr(self.env, "max_steps", None)
             if max_steps_per_eps is None:
                 raise ValueError("Environment does not have max_steps attribute. num_steps must be specified.")
-            num_steps = num_eps * max_steps_per_eps * self.spike_coder.input_delay
+            num_steps = num_eps * max_steps_per_eps * self.spike_coder.window_size
         self._setup_run(num_steps)
         # _new_sample = True
         state, info = self.env.reset()

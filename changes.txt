@@ -2,6 +2,12 @@
 v1.3
 ----
 
+v1.3.6 (2026-08-10)
+- Renamed `NewSpikeCoder` to `CompositeSpikeCoder`
+- Added a `window_size` property to all `SpikeCoder` subclasses
+- Gym Env Wrapper to creating CompositeSpikeCoder using observation_space and action_space
+    - WARNING: When action_space is Discrete, the Decoder is still not properly designed to handle discrete output
+
 v1.3.5 (2026-08-07)
 - Three new Encoders (added to ENCODER_DICT):
     - `TemporalEncoder`

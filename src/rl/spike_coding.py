@@ -104,6 +104,10 @@ class StateCoder(SpikeCoder):
     def output_size(self) -> int:
         return self.num_actions
 
+    @property
+    def window_size(self):
+        return self.input_delay
+
 
 class ObservationCoder(SpikeCoder):
     """
@@ -184,4 +188,8 @@ class ObservationCoder(SpikeCoder):
     @property
     def output_size(self) -> int:
         return self.num_actions
+    
+    @property
+    def window_size(self):
+        return self.time_window
     
