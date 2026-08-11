@@ -2,6 +2,13 @@
 v1.3
 ----
 
+v1.3.7 (2026-08-11)
+- update_condition = 'on-timestep'
+- Added unsupervised STDP_Rule in `lrule.stdp` module, that uses spikes and traces of pre- and post-neurons
+- Added "spike_pre" and "spike_post" in position 2 and 3 in `BaseLearningRule` input_order
+- Decoder will only simply output to scalar if the output_type is discrete.
+
+
 v1.3.6.2 (2026-08-11)
 - Fixed issue with discrete action space
 - Made every decoder init accept 'output_type', 'lower_bounds' and 'upper_bounds'

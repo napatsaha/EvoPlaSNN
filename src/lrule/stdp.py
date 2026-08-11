@@ -10,7 +10,8 @@ from .base import BaseLearningRule
 
 class R_STDP_Rule(BaseLearningRule):
     """
-    A quick and simple R-STDP which multiples reward with either one of the eligibility traces.
+    Reward-modulated STDP where the reward is multiplied with either one of the eligibility traces. 
+    Meant to be used with update-condition = 'on-reward' or 'on-end'
     """
 
     def __init__(self, parameters = None, *, 
@@ -33,7 +34,6 @@ class R_STDP_Rule(BaseLearningRule):
             use_eligibility_stdp=use_eligibility_stdp
         )
 
-
     def forward(self, inp):
         reward = inp[:, 0]
         etrace = inp[:, 1]
@@ -46,6 +46,33 @@ class R_STDP_Rule(BaseLearningRule):
     @property
     def parameters(self):
         return None
+
+
+class STDP_Rule(BaseLearningRule):
+    """
+    Unsupervised STDP_Rule that just depends on pre-/post- traces and spike presence. 
+    Update-condition should be "on-timestep".
+    """
+    def __init__(self, coef_ltp: float = 1.0, coef_ltd: float = -1.0, *, 
+                learning_rate: float = 1.0, learning_rate_thr: float = 0.1, threshold_agg_func: Literal["max", "min", "mean", "sum"] = "mean",
+                delta_weight: bool = True, delta_threshold: bool = False,
+                **kwargs):
+        super().__init__(learning_rate=learning_rate, learning_rate_thr=learning_rate_thr, threshold_agg_func=threshold_agg_func, 
+                         delta_weight=delta_weight, delta_threshold=delta_threshold, 
+                         use_trace_pre=True, use_trace_post=True, use_spike_pre=True, use_spike_post=True,
+                         use_weights=False, use_reward=False, 
+                         use_eligibility=False, use_eligibility_pre=False, use_eligibility_post=False, use_eligibility_stdp=False, 
+                         **kwargs)
+        self.coef_ltp = coef_ltp
+        self.coef_ltd = coef_ltd
+
+    def forward(self, inp: np.ndarray):
+        spk_pre = inp[:, 2]
+        spk_post = inp[:, 3]
+        trace_pre = inp[:, 0]
+        trace_post = inp[:, 1]
+        dw = self.coef_ltp * spk_post * trace_pre + self.coef_ltd * spk_pre * trace_post
+        return dw
 
 
 # class STDP_Rule(LearningRule):

@@ -439,8 +439,8 @@ class OneToOneSpikeDecoder(BaseSpikeDecoder, ABC):
         outp = self._calculate_output(spikes)
         if self.is_discrete():
             outp = np.astype(outp, dtype=int)
-        if self.out_channels == 1:
-            outp = outp.item()
+            if self.out_channels == 1:
+                outp = outp.item()
         return outp
 
     @abstractmethod
@@ -547,8 +547,8 @@ class ManyToOneSpikeDecoder(BaseSpikeDecoder, ABC):
         outp = self._calculate_output(spikes)
         if self.is_discrete():
             outp = np.astype(outp, int)
-        if self.out_channels == 1:
-            outp = outp.item()
+            if self.out_channels == 1:
+                outp = outp.item()
         return outp
 
     def _calculate_output(self):

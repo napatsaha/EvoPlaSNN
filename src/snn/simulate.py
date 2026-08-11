@@ -310,7 +310,10 @@ class SNNSimulator:
                 episode_done = False
                 reward = None
 
-
+            # Apply learning rule at every timestep
+            if update and self.update_condition == "on-timestep":
+                signal = self.modulator.signal(locals=locals()) if self._modulation else reward
+                self.network.update_synapses(reward=signal)
 
             # Update softmax temperature / exploration rate
             if episode_done and self._explore:
