@@ -2,6 +2,12 @@
 v1.3
 ----
 
+v1.3.6.1 (2026-08-11)
+- Changed external call to `env.get_agent_state()` to instead get attribute 'current_state' from 'info' dict,
+    in order to make it compatible with gym.Env interface
+- Also added getattr calls to '_max_episode_steps' in addition to 'max_steps' to fit with some gym Env 
+    (tested with 'MountainCarContinuous-v0')
+
 v1.3.6 (2026-08-10)
 - Renamed `NewSpikeCoder` to `CompositeSpikeCoder`
 - Added a `window_size` property to all `SpikeCoder` subclasses

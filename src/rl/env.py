@@ -356,6 +356,8 @@ class BaseMaze(gym.Env):
         state = self.get_observation()
         info = {
             'step_count': self._step_count,
+            'current_state': self.get_agent_state(),
+            'agent_position': self.get_agent_position(),
             # 'reward_position': self.get_reward_position()
         }
         if self._check_closest_distance:
@@ -367,7 +369,11 @@ class BaseMaze(gym.Env):
 
     def step(self, action: int) -> Tuple[int, float | None, bool, bool, dict]:
         self._step_count += 1
-        info = {'step_count': self._step_count}
+        info = {
+            'step_count': self._step_count, 
+            'current_state': self.get_agent_state(),
+            'agent_position': self.get_agent_position(),
+        }
         truncated = self._step_count >= self.max_steps
         reward, info = self._take_action(action, info)
         terminated = info.get('terminated', None)

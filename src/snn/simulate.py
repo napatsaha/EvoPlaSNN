@@ -233,14 +233,14 @@ class SNNSimulator:
         if num_steps is None and num_eps is None:
             raise ValueError("Either num_steps or num_eps must be specified.")
         if num_steps is None and num_eps is not None:
-            max_steps_per_eps = getattr(self.env, "max_steps", None)
+            max_steps_per_eps = getattr(self.env, "max_steps", getattr(self.env, "_max_episode_steps", None))
             if max_steps_per_eps is None:
-                raise ValueError("Environment does not have max_steps attribute. num_steps must be specified.")
+                raise ValueError("When only 'num_eps' is specified, Environment must have a 'max_steps' or '_max_episode_steps' attribute. Otherwise, 'num_steps' must be specified.")
             num_steps = num_eps * max_steps_per_eps * self.spike_coder.window_size
         self._setup_run(num_steps)
         # _new_sample = True
         state, info = self.env.reset()
-        starting_state = self.env.get_agent_state()
+        starting_state = info.get("current_state", None)
         episode_done = False
         episode_count = 0
         for t in range(t_start, self.num_steps):
@@ -265,7 +265,7 @@ class SNNSimulator:
                 # Optional: Record step data
                 if self.trajectory_collector is not None:
                     self.trajectory_collector.collect(
-                        state=self.env.get_agent_state() if hasattr(self.env, "get_agent_state") else None,
+                        state=info.get("current_state", None) if hasattr(self.env, "get_agent_state") else None,
                         observation=state,
                         action=action,
                         reward=reward,
@@ -302,7 +302,7 @@ class SNNSimulator:
                             truncated=truncated)
                     # self.env.reset()
                     state, info = self.env.reset()
-                    starting_state = self.env.get_agent_state()
+                    starting_state = info.get("current_state", None)
                     episode_count += 1
                 else:
                     state = next_state
