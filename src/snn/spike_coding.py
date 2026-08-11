@@ -200,33 +200,41 @@ class SpikeCoderEnvWrapper(CompositeSpikeCoder):
         self._obs_space = observation_space
         self._action_space = action_space
 
-        input_channels, low, high = self.get_env_info(self._obs_space)
+        input_channels, n_neurons, low, high, dtype = self.get_env_info(self._obs_space)
         encoder_params.update(dict(lower_bounds=low, upper_bounds=high))
-        output_channels, low, high= self.get_env_info(self._action_space)
-        decoder_params.update(dict(lower_bounds=low, upper_bounds=high))
+        if n_neurons is not None:
+            encoder_params.update(dict(n_neurons=n_neurons))
+        output_channels, n_neurons, low, high, dtype = self.get_env_info(self._action_space)
+        decoder_params.update(dict(lower_bounds=low, upper_bounds=high, output_type=dtype))
+        if dtype == "discrete" and n_neurons is not None:
+            decoder_params.update(dict(in_neurons=n_neurons))
 
         super().__init__(input_channels, output_channels, window_size, 
                          encoding_method=encoding_method, encoder_params=encoder_params, 
                          decoding_method=decoding_method, decoder_params=decoder_params)
 
-    def get_env_info(self, space: gym.Space) -> Tuple[int, ArrayLike, ArrayLike]:
+    def get_env_info(self, space: gym.Space) -> Tuple[int, int, ArrayLike, ArrayLike, str]:
         if isinstance(space, gym.spaces.Box):
             n_channels = sum(space.shape)
+            n_neurons = None
             lower_bounds = space.low
             upper_bounds = space.high
+            dtype = "continuous"
         elif isinstance(space, gym.spaces.Discrete):
             n_channels = 1
             n_neurons = space.n
             lower_bounds = np.zeros((n_channels, ), dtype=int)
             upper_bounds = np.full((n_channels, ), fill_value=space.n-1)
+            dtype = "discrete"
         elif isinstance(space, gym.spaces.MultiDiscrete):
             n_channels = sum(space.shape)
             n_neurons = space.nvec
             lower_bounds = np.zeros((n_channels, ), dtype=int)
             upper_bounds = np.asarray(space.nvec) - 1
+            dtype = "discrete"
         else:
             raise ValueError(f"Space type {type(space)} not yet supported. Please use CompositeSpikeCoder class directly")
-        return n_channels, lower_bounds, upper_bounds
+        return n_channels, n_neurons, lower_bounds, upper_bounds, dtype
 
 
 #### Encoder ####
@@ -236,10 +244,10 @@ class BaseSpikeEncoder(ABC):
                  lower_bounds: Sequence | np.ndarray, upper_bounds: Sequence | np.ndarray,
                  side: str = "left"):
         self.n_channels = n_channels
-        if isinstance(n_neurons, int):
+        if isinstance(n_neurons, int | np.int_):
             self._n_neurons = [n_neurons for _ in range(self.n_channels)]
             self._unequal_neurons = False
-        elif isinstance(n_neurons, Sequence) or isinstance(n_neurons, np.ndarray):
+        elif isinstance(n_neurons, Sequence | np.ndarray):
             assert len(n_neurons) == self.n_channels
             self._n_neurons = [n for n in n_neurons]
             self._unequal_neurons = True
@@ -392,7 +400,7 @@ class BaseSpikeDecoder(ABC):
         return self._total_neurons
 
     @property
-    def output_type(self) -> str:
+    def output_type(self) -> Literal["discrete", "continuous"]:
         return self._output_type
     @output_type.setter
     def output_type(self, value: Literal["discrete", "continuous"]):
@@ -429,7 +437,11 @@ class OneToOneSpikeDecoder(BaseSpikeDecoder, ABC):
     def decode_spikes(self, spikes):
         assert spikes.shape == (self._total_neurons, self.window_size)
         outp = self._calculate_output(spikes)
-        return np.asarray(outp)
+        if self.is_discrete():
+            outp = np.astype(outp, dtype=int)
+        if self.out_channels == 1:
+            outp = outp.item()
+        return outp
 
     @abstractmethod
     def _calculate_output(self, spikes):
@@ -437,11 +449,15 @@ class OneToOneSpikeDecoder(BaseSpikeDecoder, ABC):
 
 
 class RateDivDecoder(OneToOneSpikeDecoder):
-    def __init__(self, out_channels: int, window_size: int, n_classes: int, rate_division: int | float = None):
+    def __init__(self, out_channels: int, window_size: int, n_classes: int, rate_division: int | float = None,
+                 lower_bounds: Sequence | np.ndarray = None, upper_bounds: Sequence | np.ndarray = None,
+                 output_type: Literal["discrete", "continuous"] = "discrete",):
         self.n_classes = int(n_classes)
-        lower_bounds = np.zeros((out_channels, ), dtype=int)
-        upper_bounds = np.full((out_channels, ), fill_value=n_classes-1, dtype=int)
-        super().__init__(out_channels, window_size, lower_bounds, upper_bounds, output_type="discrete")
+        if lower_bounds is None:
+            lower_bounds = np.zeros((out_channels, ), dtype=int)
+        if upper_bounds is None:
+            upper_bounds = np.full((out_channels, ), fill_value=n_classes-1, dtype=int)
+        super().__init__(out_channels, window_size, lower_bounds, upper_bounds, output_type=output_type)
         self.rate_division = rate_division if rate_division is not None else \
             self.window_size / self.n_classes
         assert self.rate_division > 0, f"Rate division must be a positive integer. Got {self.rate_division}"
@@ -456,8 +472,9 @@ class RateDivDecoder(OneToOneSpikeDecoder):
 
 class RateDecoder(OneToOneSpikeDecoder):
     def __init__(self, out_channels: int, window_size: int,
-                 lower_bounds: Sequence | np.ndarray, upper_bounds: Sequence | np.ndarray):
-        super().__init__(out_channels, window_size, lower_bounds, upper_bounds, output_type="continuous")
+                 lower_bounds: Sequence | np.ndarray, upper_bounds: Sequence | np.ndarray,
+                 output_type: Literal["discrete", "continuous"] = "continuous",):
+        super().__init__(out_channels, window_size, lower_bounds, upper_bounds, output_type)
 
     def _calculate_output(self, spikes: np.ndarray):
         agg = spikes.sum(axis=1)
@@ -467,8 +484,9 @@ class RateDecoder(OneToOneSpikeDecoder):
 
 
 class TemporalDecoder(OneToOneSpikeDecoder):
-    def __init__(self, out_channels, window_size, lower_bounds, upper_bounds):
-        super().__init__(out_channels, window_size, lower_bounds, upper_bounds, output_type="continuous")
+    def __init__(self, out_channels, window_size, lower_bounds, upper_bounds,
+                 output_type: Literal["discrete", "continuous"] = "continuous",):
+        super().__init__(out_channels, window_size, lower_bounds, upper_bounds, output_type)
 
     def _calculate_output(self, spikes: np.ndarray):
         ttfs = self._aggregate(spikes)
@@ -484,15 +502,15 @@ class TemporalDecoder(OneToOneSpikeDecoder):
 class ManyToOneSpikeDecoder(BaseSpikeDecoder, ABC):
     def __init__(self, out_channels: int, in_neurons: int | Sequence[int], window_size: int, 
                  output_type: Literal["discrete", "continuous"],
-                 lower_bounds: Sequence | np.ndarray = None, upper_bounds: Sequence | np.ndarray = None,):
+                 lower_bounds: Sequence | np.ndarray, upper_bounds: Sequence | np.ndarray,):
         super().__init__(out_channels, window_size, output_type)
         # self.out_channels = out_channels
         # self.in_neurons = in_neurons
 
-        if isinstance(in_neurons, int):
+        if isinstance(in_neurons, int | np.int_):
             self.in_neurons = [in_neurons for _ in range(self.out_channels)]
             self._unequal_neurons = False
-        elif isinstance(in_neurons, Sequence) or isinstance(in_neurons, np.ndarray):
+        elif isinstance(in_neurons, Sequence | np.ndarray):
             assert len(in_neurons) == self.out_channels
             self.in_neurons = [n for n in in_neurons]
             self._unequal_neurons = True
@@ -509,33 +527,47 @@ class ManyToOneSpikeDecoder(BaseSpikeDecoder, ABC):
             assert len(lower_bounds) == self.out_channels
             self.lower_bounds = np.asarray(lower_bounds)
         else:
+            # raise ValueError(f"'lower_bounds' must be specified")
             self.lower_bounds = np.zeros(self.out_channels)
 
         if upper_bounds is not None:
             assert len(upper_bounds) == self.out_channels
             self.upper_bounds = np.asarray(upper_bounds)
         else:
+            # raise ValueError(f"'upper_bounds' must be specified")
             self.upper_bounds = np.array([n-1 for n in self.in_neurons])
 
         self._neuron_values = [np.linspace(lw, hg, num=n) \
                                for lw, hg, n in zip(self.lower_bounds, self.upper_bounds, self.in_neurons)]
-
-
-class SingleVotingDecoder(ManyToOneSpikeDecoder):
-    def __init__(self, out_channels: int, in_neurons: int | Sequence[int], window_size: int, 
-                 lower_bounds: Sequence | np.ndarray = None, upper_bounds: Sequence | np.ndarray = None,
-                ):
-        super().__init__(out_channels, in_neurons, window_size, output_type="continuous", 
-                         lower_bounds=lower_bounds, upper_bounds=upper_bounds)
-        if upper_bounds is None and lower_bounds is None:
-            self.output_type = "discrete"
+        if self.output_type == "discrete":
             self._neuron_values = [vals.astype(int) for vals in self._neuron_values]
 
     def decode_spikes(self, spikes: np.ndarray):
         assert spikes.shape == (self._total_neurons, self.window_size)
         outp = self._calculate_output(spikes)
-        # outp = [np.take(vals, ix) for vals, ix in zip(self._neuron_values, voted_idx)]
-        return np.asarray(outp)
+        if self.is_discrete():
+            outp = np.astype(outp, int)
+        if self.out_channels == 1:
+            outp = outp.item()
+        return outp
+
+    def _calculate_output(self):
+        pass
+    
+
+class SingleVotingDecoder(ManyToOneSpikeDecoder):
+    def __init__(self, out_channels: int, in_neurons: int | Sequence[int], window_size: int, 
+                 output_type: Literal["discrete", "continuous"] = "continuous",
+                 lower_bounds: Sequence | np.ndarray = None, upper_bounds: Sequence | np.ndarray = None,
+                ):
+        super().__init__(out_channels, in_neurons, window_size, output_type=output_type, 
+                         lower_bounds=lower_bounds, upper_bounds=upper_bounds)
+
+    # def decode_spikes(self, spikes: np.ndarray):
+    #     assert spikes.shape == (self._total_neurons, self.window_size)
+    #     outp = self._calculate_output(spikes)
+    #     # outp = [np.take(vals, ix) for vals, ix in zip(self._neuron_values, voted_idx)]
+    #     return np.asarray(outp)
 
     def _calculate_output(self, spikes: np.ndarray) -> ArrayLike:
         agg = self._aggregate(spikes)
@@ -558,13 +590,14 @@ class SingleVotingDecoder(ManyToOneSpikeDecoder):
 
 class WeightedVotingDecoder(ManyToOneSpikeDecoder):
     def __init__(self, out_channels: int, in_neurons: int | Sequence[int], window_size: int, 
+                 output_type: Literal["discrete", "continuous"] = "continuous",
                  lower_bounds: Sequence | np.ndarray = None, upper_bounds: Sequence | np.ndarray = None,):
-        super().__init__(out_channels, in_neurons, window_size, "continuous", lower_bounds, upper_bounds)
+        super().__init__(out_channels, in_neurons, window_size, output_type, lower_bounds, upper_bounds)
 
-    def decode_spikes(self, spikes: np.ndarray):
-        assert spikes.shape == (self._total_neurons, self.window_size)
-        outp = self._calculate_output(spikes)
-        return np.asarray(outp)
+    # def decode_spikes(self, spikes: np.ndarray):
+    #     assert spikes.shape == (self._total_neurons, self.window_size)
+    #     outp = self._calculate_output(spikes)
+    #     return np.asarray(outp)
 
     def _calculate_output(self, spikes: np.ndarray) -> ArrayLike:
         agg = spikes.sum(axis=1)
@@ -582,13 +615,14 @@ class WeightedVotingDecoder(ManyToOneSpikeDecoder):
 
 class TimeToFirstSpikeDecoder(ManyToOneSpikeDecoder):
     def __init__(self, out_channels: int, in_neurons: int | Sequence[int], window_size: int, 
+                 output_type: Literal["discrete", "continuous"] = "continuous",
                  lower_bounds: Sequence | np.ndarray = None, upper_bounds: Sequence | np.ndarray = None,):
-        super().__init__(out_channels, in_neurons, window_size, "continuous", lower_bounds, upper_bounds)
+        super().__init__(out_channels, in_neurons, window_size, output_type, lower_bounds, upper_bounds)
 
-    def decode_spikes(self, spikes: np.ndarray):
-        assert spikes.shape == (self._total_neurons, self.window_size)
-        outp = self._calculate_output(spikes)
-        return np.asarray(outp)
+    # def decode_spikes(self, spikes: np.ndarray):
+    #     assert spikes.shape == (self._total_neurons, self.window_size)
+    #     outp = self._calculate_output(spikes)
+    #     return np.asarray(outp)
 
     def _calculate_output(self, spikes: np.ndarray) -> ArrayLike:
         agg = self._aggregate(spikes)
