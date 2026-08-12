@@ -2,12 +2,24 @@
 v1.3
 ----
 
+v1.3.8 (2026-08-12)
+- Added `delta_eligibility` to `BaseLearningRule` + Added to 3rd position in `OUTPUT_ORDER`
+- LearningRule's `update()` and `.prepare_output()` will now always return a tuple with same length, 
+    regardless of which output the rule is set to calculate.
+    -> This is to ensure consistency in interface and usage
+- Added `eligibility_custom` to `SynapseLayer` which depends on outputs of LearningRule with `delta_eligibility`
+    - The decay part of `eligibility_custom` still happens automatically during `update_eligibility_trace` (assume only step-wise method)
+    - Also added associated private attributes `_use_elig_custom`, `_etrace_custom`, `_out_eligibility`
+- Added `e_min` to control lower bound of all eligibility traces
+    - Convert all `np.minimum` ceiling operations to `np.clip` (although whether this will slow down simulation or not is uncertain)
+    - For `eligibility_custom`, this clipping only happens during `.update()`, while for other e-traces, this happens during `.update_eligibility_trace()`
+        because the 'rise' part only happens when applying learning rule
+
 v1.3.7 (2026-08-11)
 - update_condition = 'on-timestep'
 - Added unsupervised STDP_Rule in `lrule.stdp` module, that uses spikes and traces of pre- and post-neurons
 - Added "spike_pre" and "spike_post" in position 2 and 3 in `BaseLearningRule` input_order
 - Decoder will only simply output to scalar if the output_type is discrete.
-
 
 v1.3.6.2 (2026-08-11)
 - Fixed issue with discrete action space

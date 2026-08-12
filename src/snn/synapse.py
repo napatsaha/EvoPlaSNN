@@ -29,7 +29,7 @@ class SynapseLayer(SynapseLayerProtocol):
                  learning_rule: LearningRule = None,
                  eligibility_trace: bool = False, eligibility_pre: bool = False, eligibility_post: bool = False,
                  eligibility_stdp: bool = False, ltd_coef: float = 1.0,
-                 e_max: float = None,
+                 e_max: float = None, e_min: float = None,
                  tau_syn: float = None, dt: float = 1e-3,
                  synaptic_delay: int = 0,
                  sim_method: Literal["event-driven", "step-wise"] = "step-wise",
@@ -82,6 +82,12 @@ class SynapseLayer(SynapseLayerProtocol):
             elif self._event_driven:
                 self._elast_stdp = np.zeros((self.pre_layer.size, self.post_layer.size), dtype=np.float32)
                 self._etssp_stdp = np.full((self.pre_layer.size, self.post_layer.size), np.inf, dtype=np.float32)
+        # Custom Eligibility trace (for rule-controlled e-trace)
+        self._use_elig_custom = self._out_eligibility
+        if self._use_elig_custom:
+            # For the sake of simplicity, only step-wise method of updating custom eligibility will be used
+            self._etrace_custom = np.zeros((self.pre_layer.size, self.post_layer.size), dtype=np.float32)
+
         
         # Constants for etraces
         if tau_syn is not None and isinstance(tau_syn, int):
@@ -89,6 +95,7 @@ class SynapseLayer(SynapseLayerProtocol):
         self.tau_syn = tau_syn if tau_syn is not None else dt
         self.beta_syn = np.exp(-self.dt / self.tau_syn)  # Decay rate for eligibility trace
         self.e_max = e_max if e_max is not None else np.inf
+        self.e_min = e_min if e_min is not None else -np.inf
         
         # Initialize weights
         if weight_init not in ['uniform', 'normal', 'constant']:
@@ -160,6 +167,8 @@ class SynapseLayer(SynapseLayerProtocol):
             elif self._event_driven:
                 self._etssp_stdp.fill(np.inf)
                 self._elast_stdp.fill(0.0)
+        if self._use_elig_custom:
+            self._etrace_custom.fill(0.0)
 
         if self._apply_delay:
             self.current_buffer.reset()
@@ -192,8 +201,8 @@ class SynapseLayer(SynapseLayerProtocol):
                     pre_trace = self.pre_layer.get_trace()
                     pre_trace, post_spike = self._tile(pre_trace, post_spike)
                     rise = pre_trace * post_spike
-                # TODO: Insert ceiling operation here
-                self._etrace_pre = np.minimum(self._etrace_pre * self.beta_syn + rise, self.e_max)
+                # Insert ceiling operation here
+                self._etrace_pre = np.clip(self._etrace_pre * self.beta_syn + rise, self.e_min, self.e_max)
             # Event-driven method:
             # Updates latest peak whenever new spike comes in. Actual trace value calculated when called.
             # (Actually more expensive since updating peaks require knowing current value and hence exponential calculation as well)
@@ -213,9 +222,9 @@ class SynapseLayer(SynapseLayerProtocol):
                     decay = self._elast_pre[:, idx_spike] * np.exp(-self._etssp_pre[:, idx_spike] * self.dt / self.tau_syn) # Shape: [pre_size, num_post_spikes]
                         # Update last peak based on trace of pre-neuron
                     pre_trace = self.pre_layer.get_trace() # Shape: [pre_size,]
-                    # TODO: Insert ceiling operation here
+                    # Clipping operation
                     rise = pre_trace[:, np.newaxis]
-                    self._elast_pre[:, idx_spike] = np.minimum(rise + decay, self.e_max)
+                    self._elast_pre[:, idx_spike] = np.clip(rise + decay, self.e_min, self.e_max)
                         # Update tssp for post-neurons that spiked
                     self._etssp_pre[:, idx_spike] = 0
         # Eligibility trace: post-before-pre
@@ -230,7 +239,7 @@ class SynapseLayer(SynapseLayerProtocol):
                     post_trace = self.post_layer.get_trace()
                     pre_spike, post_trace = self._tile(pre_spike, post_trace)
                     rise = post_trace * pre_spike
-                self._etrace_post = np.minimum(self._etrace_post * self.beta_syn + rise, self.e_max)
+                self._etrace_post = np.clip(self._etrace_post * self.beta_syn + rise, self.e_min, self.e_max)
             elif self._event_driven:
                 # self._update_etrace_event(self.pre_layer, self.post_layer, self._elast_post, self._etssp_post)
                 self._etssp_post += 1
@@ -244,7 +253,7 @@ class SynapseLayer(SynapseLayerProtocol):
                         # Update last peak
                     post_trace = self.post_layer.get_trace() # Shape: [post_size,]
                     rise = post_trace[np.newaxis, :]
-                    self._elast_post[idx_spike, :] = np.minimum(rise + decay, self.e_max)
+                    self._elast_post[idx_spike, :] = np.clip(rise + decay, self.e_min, self.e_max)
                         # Update tssp
                     self._etssp_post[idx_spike, :] = 0
         # Eligibility trace: combined STDP
@@ -260,7 +269,7 @@ class SynapseLayer(SynapseLayerProtocol):
                     pre_trace = self.pre_layer.get_trace()
                     pre_trace, post_trace = self._tile(pre_trace, post_trace)
                     rise = pre_trace * post_spike - self.ltd_coef * post_trace * pre_spike
-                self._etrace_stdp = np.minimum(self._etrace_stdp * self.beta_syn + rise, self.e_max)
+                self._etrace_stdp = np.clip(self._etrace_stdp * self.beta_syn + rise, self.e_min, self.e_max)
             elif self._event_driven:
                 self._etssp_stdp += 1
                 pre_spike = self.pre_layer.spike
@@ -281,10 +290,13 @@ class SynapseLayer(SynapseLayerProtocol):
 
                     rise = rise_ltp - self.ltd_coef * rise_ltd
 
-                    self._elast_stdp[idx_spike] = np.minimum(decay + rise[idx_spike], self.e_max)
+                    self._elast_stdp[idx_spike] = np.clip(decay + rise[idx_spike], self.e_min, self.e_max)
 
                     self._etssp_stdp[idx_spike] = 0
-
+        # Custom eligiblity trace (for learning rule use only)
+        if self._use_elig_custom:
+            # only the decay part is updated here, the 'rise' part will be added when learning_rule is called
+            self._etrace_custom = self._etrace_custom * self.beta_syn
 
     # def _update_etrace_step(self, spike_layer: NeuronLayerProtocol, trace_layer: NeuronLayerProtocol, etrace):
     #     spike = spike_layer.spike
@@ -313,13 +325,21 @@ class SynapseLayer(SynapseLayerProtocol):
 
     def update(self, reward=None) -> None:
         """
-        Update the synaptic weights based on the learning rule.
+        Update the synaptic information by applying the stored learning rule.  
+
+        Possible changes may include (depending on outputs of learning rule):
+        - weight
+        - threshold (of post-synaptic layer) 
+        - eligibility trace (to 'eligibility_custom')
         """
-        dw, dth = self._learning_rule.update(self, reward=reward, always_return_tuple=True)
+        dw, dth, delig = self._learning_rule.update(self, reward=reward, always_return_tuple=True)
         if self._out_weights:
             self.weights += dw
         if self._out_thresholds: 
             self.post_layer.update_thresholds(dth)
+        if self._out_eligibility:
+            self._etrace_custom = self._etrace_custom + delig
+            self._etrace_custom = np.clip(self._etrace_custom, self.e_min, self.e_max) # Not sure if using np.clip or max(min()) is faster
         
         # Clip the weights
         self._clip_weights()
@@ -378,6 +398,13 @@ class SynapseLayer(SynapseLayerProtocol):
             return None
 
     @property
+    def eligibility_custom(self) -> np.ndarray:
+        if self._use_elig_custom:
+            return self._etrace_custom
+        else:
+            return None
+
+    @property
     def learning_rule(self):
         return self._learning_rule
     
@@ -386,6 +413,7 @@ class SynapseLayer(SynapseLayerProtocol):
         self._learning_rule = rule
         self._out_weights = getattr(rule, "delta_weight", False)
         self._out_thresholds = getattr(rule, "delta_threshold", False)
+        self._out_eligibility = getattr(rule, "delta_eligibility", False)
 
     def has_elig_pre(self):
         return self._use_elig_pre

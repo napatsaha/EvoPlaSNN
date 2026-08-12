@@ -1,3 +1,4 @@
+import warnings
 from typing import Literal, Union
 import numpy as np
 from common.base import LearningRule, SynapseLayerProtocol
@@ -21,7 +22,7 @@ class Empty_Rule(LearningRule):
 
 class BaseLearningRule(LearningRule):
     INPUT_ORDER = ("trace_pre", "trace_post", "spike_pre", "spike_post", "weights", "reward", "eligibility_pre", "eligibility_post", "eligibility_stdp")
-    OUTPUT_ORDER = ("weight", "threshold")
+    OUTPUT_ORDER = ("weight", "threshold", "eligibility")
     AGG_DICT = {
                 "max": np.max,
                 "min": np.min,
@@ -30,7 +31,7 @@ class BaseLearningRule(LearningRule):
                 }
     def __init__(self, *, 
                 learning_rate: float = 1.0, learning_rate_thr: float = 0.1, threshold_agg_func: Literal["max", "min", "mean", "sum"] = "mean",
-                delta_weight: bool = True, delta_threshold: bool = False,
+                delta_weight: bool = True, delta_threshold: bool = False, delta_eligibility: bool = False,
                 use_trace_pre: bool = False, use_trace_post: bool = False, use_spike_pre: bool = False, use_spike_post: bool = False,
                 use_weights: bool = True, use_reward: bool = False, 
                 use_eligibility: bool = False, use_eligibility_pre: bool = False, use_eligibility_post: bool = False, use_eligibility_stdp: bool = False,
@@ -61,11 +62,13 @@ class BaseLearningRule(LearningRule):
         # Learning rule outputs
         self.delta_weight = delta_weight
         self.delta_threshold = delta_threshold
-        if not (self.delta_weight or self.delta_threshold):
-            raise ValueError("At least one of delta_weight or delta_threshold must be True.")
-        self.output_size = int(self.delta_weight) + int(self.delta_threshold)
-        self.output_order = [item for item in self.OUTPUT_ORDER if getattr(self, f"delta_{item}")]
+        self.delta_eligibility = delta_eligibility
 
+        self.output_order = [item for item in self.OUTPUT_ORDER if getattr(self, f"delta_{item}")]
+        self.output_size = len(self.output_order)
+        if self.output_size == 0:
+            raise ValueError(f"At least one output must be selected, from {self.OUTPUT_ORDER}")
+        
     def prepare_inputs(self, synapse: SynapseLayerProtocol, reward: float, w_shape: tuple):
         inp = []
         # 1, 2 = trace pre, post
@@ -103,44 +106,57 @@ class BaseLearningRule(LearningRule):
         inp = np.concatenate(inp, axis=1)
         return inp
         
-    def prepare_output(self, out: np.ndarray, always_return_tuple: bool = False) -> Union[tuple, np.ndarray]:
+    def prepare_output(self, out: np.ndarray, always_return_tuple: bool = True) -> Union[tuple, np.ndarray]:
+        idx = 0 # Output column index counter
+        dw, dth, delig = None, None, None # Default values
         if self.delta_weight:
-            idx = 0
+            # idx = 0
             dw = out[..., idx]
             dw *= self.learning_rate
+            idx += 1
         if self.delta_threshold:
-            idx = 1 if self.delta_weight else 0
+            # idx = 1 if self.delta_weight else 0
             dth = out[..., idx]
             dth = self._thr_agg(dth, axis=0) # Aggregate threshold deltas for each post-synaptic neuron
             dth *= self.learning_rate_thr
+            idx += 1
+        if self.delta_eligibility:
+            delig = out[..., idx]
+            idx += 1
 
-        # Return values
-        if self.delta_weight and self.delta_threshold:
-            return dw, dth
-        elif self.delta_weight and not self.delta_threshold:
-            if always_return_tuple:
-                return dw, None
-            else:
-                return dw
-        elif self.delta_threshold and not self.delta_weight:
-            if always_return_tuple:
-                return None, dth
-            else:
-                return dth
-        else:
-            raise RuntimeError("At least one of delta_weight or delta_threshold must be True.")
+        # Return values -- always return tuples for consistency
+        if not always_return_tuple:
+            raise DeprecationWarning("Using LearningRule.update with 'always_return_tuple=False' is no longer supported." + \
+                                     f"For consistency, all outputs will be a tuple of length {len(self.OUTPUT_ORDER)}")
+        return dw, dth, delig
+        # if self.delta_weight and self.delta_threshold:
+        #     return dw, dth
+        # elif self.delta_weight and not self.delta_threshold:
+        #     if always_return_tuple:
+        #         return dw, None
+        #     else:
+        #         return dw
+        # elif self.delta_threshold and not self.delta_weight:
+        #     if always_return_tuple:
+        #         return None, dth
+        #     else:
+        #         return dth
+        # else:
+        #     raise RuntimeError("At least one of delta_weight or delta_threshold must be True.")
         
-    def update(self, synapse: SynapseLayerProtocol, reward: float = None, always_return_tuple: bool = False) -> np.ndarray: 
+    def update(self, synapse: SynapseLayerProtocol, reward: float = None, always_return_tuple: bool = None) -> np.ndarray: 
         """
         Apply the ANN Rule to an external set of weights.
         """
+        if always_return_tuple is None:
+            warnings.warn(f"For consistency, all outputs of future 'LearningRule.update()' will always be a tuple of length {len(self.OUTPUT_ORDER)}")
         w_shape = synapse.weights.shape
 
         inp = self.prepare_inputs(synapse, reward, w_shape)
         out = self.forward(inp)
         out = out.reshape(*w_shape, -1)
 
-        return self.prepare_output(out, always_return_tuple=always_return_tuple)
+        return self.prepare_output(out, always_return_tuple=True if always_return_tuple is None else always_return_tuple)
     
     def forward(self, inp: np.ndarray) -> np.ndarray:
         raise NotImplementedError("Each Learning Rule needs to implement its own forward method")
