@@ -1,6 +1,6 @@
 from copy import copy
 import sys
-from typing import Any, Literal, Sequence
+from typing import Any, Literal, Sequence, Dict
 from dataclasses import dataclass
 
 import numpy as np
@@ -20,7 +20,9 @@ class GeneSpec:
     kind: str
     length: int = 1
     default: Any = None
-    
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {key: val for key, val in self.__dict__.items()}
 
 
 def create_param(kind, **kwargs) -> Parameter:

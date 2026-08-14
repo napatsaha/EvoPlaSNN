@@ -1,6 +1,9 @@
 import warnings
 from typing import Literal, Union
+
 import numpy as np
+from numpy.typing import ArrayLike
+
 from common.base import LearningRule, SynapseLayerProtocol
 from lrule.utils import tile_array
 
@@ -192,3 +195,4 @@ class BaseLearningRule(LearningRule):
     # def parameters(self):
     #     raise NotImplementedError("Subclasses should implement getter and setter for internal parameters")
     
+

@@ -2,6 +2,16 @@
 v1.3
 ----
 
+v1.3.9.1 (2026-08-14)
+- Slight changes to `EvolvableLearningRule`:
+    - `genes_to_encode` is now an override params dict that will be used to create genes Parameter
+    - The default is to use `GeneSpec`
+    - `gene_order` will be overwritten by the order of gene names in `genes_to_encode` if given
+    - When values are not given (e.g. in `_random_genes()`), the default of the GeneSpec will be used.
+        To get truly random genes, use default = None
+    - Removed methods `_update_gene_specs`, `_genes_from_templates`
+- Added `to_dict` method of `GeneSpec`
+
 v1.3.9 (2026-08-13)
 - New class `EvolvableLearningRule` in genome.genome
     - Handles various encodings as was previously done in ANN_Rule for (weights, learning_rate, etc)

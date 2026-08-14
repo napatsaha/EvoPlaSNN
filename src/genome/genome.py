@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Literal, Sequence, Tuple
+from typing import Any, Dict, List, Literal, Sequence, Tuple, Optional
 
 from genome import parameter as param
 from genome.parameter import GeneSpec
@@ -159,9 +159,10 @@ class EvolvableLearningRule(Genome):
 
         # Read gene specs from universal and rule-specific genes
         self._specs = self._get_gene_specs()
-        self._gene_params = self._normalise_gene_params(genes_to_encode)
-        self._specs = self._update_gene_specs(self._specs, self._gene_params)
+        self._gene_params, self.gene_order = self._build_gene_params(self._specs, genes_to_encode)
+        # self._specs = self._update_gene_specs(self._specs, self._gene_params)
 
+        # TODO: Add system for setting which gene should be enabled
         # self.encode_learning_rate = encode_learning_rate
         # self.encode_tau_syn = encode_tau_syn
 
@@ -177,8 +178,8 @@ class EvolvableLearningRule(Genome):
         elif genes is not None:
             self._genes, self._values = self._genes_from_objects(genes)
         # CASE 3 -> Sample from gene spec
-        elif genes_to_encode is not None:
-            self._genes, self._values = self._genes_from_templates(genes_to_encode)
+        # elif genes_to_encode is not None:
+        #     self._genes, self._values = self._genes_from_templates(genes_to_encode)
         # CASE 4 -> Fallback, randomising from default specs
         else:
             self._genes, self._values = self._random_genes()
@@ -200,28 +201,34 @@ class EvolvableLearningRule(Genome):
         # specs.extend(self.rule_specific_gene_specs())
         return specs
 
-    def _normalise_gene_params(self, genes_to_encode: List[Dict]) -> Dict[str, Dict[str, Any]]:
+    def _build_gene_params(self, specs: Dict[str, GeneSpec], genes_to_encode: Optional[List[Dict]]) -> Tuple[Dict[str, Dict[str, Any]], List[str]]:
         """
-        Convert config of gene_params to easier format of Dict[name: Dict[params]]
+        Convert config of gene_params to easier format of Dict[name: Dict[params]]. 
+        A new order will be read from the list order of `genes_to_encode` if its name field is present,
+        otherwise the default class attribute `gene_order` will be used.
         """
-        if genes_to_encode is None:
-            return {}
-
         params = {}
-        for i, item in enumerate(genes_to_encode):
-            g_dict = dict(item)
-            name = g_dict.pop("name")
-            if name is None:
-                raise ValueError(f"Name must be defined in entry #{i} of genes_to_encode")
-            params[name] = g_dict
-        return params
+        order = []
+        if genes_to_encode is None:
+            order = self.gene_order
+            params = {name: specs[name].to_dict() for name in order}
+            return params, order
+
+        else:
+
+            for i, item in enumerate(genes_to_encode):
+                new_params = dict(item)
+                name = new_params.pop("name")
+                if name is None:
+                    raise ValueError(f"Name must be defined in entry #{i} of genes_to_encode")
+                existing_params = specs.get(name).to_dict()
+                new_params.update(existing_params)
+                params[name] = new_params
+                order.append(name)
+        return params, order
 
     def rule_specific_gene_specs(self):
         return []
-
-    def _update_gene_specs(self, specs: Dict[str, GeneSpec], params: Dict[str, Dict[str, Any]]) -> Dict[str, GeneSpec]:
-        # TODO: Override specs using params
-        return specs
 
     def _genes_from_parameters(self, parameters: ArrayLike) -> Tuple[List[Parameter], Dict[str, Any]]:
         genes = []
@@ -229,12 +236,15 @@ class EvolvableLearningRule(Genome):
         i = 0
 
         for gene_name in self.gene_order:
-            gene_spec = self._specs[gene_name]
-            l = gene_spec.length
+            gene_params = self._gene_params[gene_name]
+            l = gene_params.get("length")
             value = parameters[i:(i+l)]
+            kind = gene_params.pop("kind")
+            gene_params.pop("default")
+            gene_params.pop("name")
             # value = self._simplify_value(value, length=l)
-            kwargs = {key: val for key, val in gene_spec.__dict__.items() if key != "kind"}
-            gene = param.create_param(kind=gene_spec.kind, value=value, **kwargs)
+            # kwargs = {key: val for key, val in gene_spec.__dict__.items() if key != "kind"}
+            gene = param.create_param(kind=kind, value=value, **gene_params)
 
             values[gene_name] = value
             i += l
@@ -247,7 +257,7 @@ class EvolvableLearningRule(Genome):
         values = {}
         i = 0
         for gene_name in self.gene_order:
-            gene_spec = self._specs[gene_name]
+            # gene_params = self._gene_params[gene_name]
             new_gene = new_genes[i]
             # value = self._simplify_value(new_gene.value, gene_spec.length)
             value = new_gene.value
@@ -260,21 +270,25 @@ class EvolvableLearningRule(Genome):
 
         return genes, values
 
-    def _genes_from_templates(self, genes_to_encode: List[Dict]) -> Tuple[List[Parameter], Dict[str, Any]]:
-        return [], {}
+    # def _genes_from_templates(self, genes_to_encode: List[Dict]) -> Tuple[List[Parameter], Dict[str, Any]]:
+    #     return [], {}
 
     def _random_genes(self, ) -> Tuple[List[Parameter], Dict[str, Any]]:
         genes = []
         values = {}
         i = 0
         for gene_name in self.gene_order:
-            gene_spec = self._specs[gene_name]
-            kwargs = {key: val for key, val in gene_spec.__dict__.items() if key != "kind"}
-            gene = param.create_param(kind=gene_spec.kind, **kwargs)
+            gene_params = self._gene_params[gene_name]
+            # kwargs = {key: val for key, val in gene_spec.__dict__.items() if key != "kind"}
+            kind = gene_params.pop("kind")
+            value = gene_params.pop("default")
+            gene_params.pop("name")
+            gene = param.create_param(kind=kind, value=value, **gene_params)
             value = gene.value
             values[gene_name] = value
             i += 1
             genes.append(gene)
+        return genes, values
 
     def _simplify_value(self, value, length):
         return value[0] if length == 1 and isinstance(value, np.ndarray | Sequence) and len(value) == 1 else value
