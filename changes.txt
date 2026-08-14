@@ -2,6 +2,16 @@
 v1.3
 ----
 
+v1.3.9 (2026-08-13)
+- New class `EvolvableLearningRule` in genome.genome
+    - Handles various encodings as was previously done in ANN_Rule for (weights, learning_rate, etc)
+    - Potentially supports flexible gene encodings of its subclass
+    - Handles various inputs (as a flat array, a list of parameters, and/or a dict of gene specs)
+    - Contains a default gene_order for reading in gene info
+    - TODO: Still needs a lot of work to make it consistent: validation, gene spec overrides, encodings flag
+- A new data class `GeneSpec` in genome.parameter to store default gene parameter information
+- Added 'name' as a base attribute of 'Parameter`
+
 v1.3.8 (2026-08-12)
 - Added `delta_eligibility` to `BaseLearningRule` + Added to 3rd position in `OUTPUT_ORDER`
 - LearningRule's `update()` and `.prepare_output()` will now always return a tuple with same length, 

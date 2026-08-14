@@ -326,6 +326,7 @@ class Parameter(ABC):
     """
     length: int
     value: np.typing.ArrayLike
+    name: str
 
     @abstractmethod
     def mutate(self, flags: bool | List | ArrayLike, method: Literal["resample", "perturb"], scale: float) -> 'Parameter':

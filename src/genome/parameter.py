@@ -1,6 +1,7 @@
 from copy import copy
 import sys
 from typing import Any, Literal, Sequence
+from dataclasses import dataclass
 
 import numpy as np
 from numpy.typing import ArrayLike
@@ -13,6 +14,15 @@ PARAM_DICT = {
     "discrete": "DiscreteParam"
 }
 
+@dataclass
+class GeneSpec:
+    name: str
+    kind: str
+    length: int = 1
+    default: Any = None
+    
+
+
 def create_param(kind, **kwargs) -> Parameter:
     name = PARAM_DICT.get(kind)
     param_class = getattr(sys.modules[__name__], name)
@@ -22,8 +32,9 @@ def create_param(kind, **kwargs) -> Parameter:
 class BaseParameter(Parameter):
     length: int
     value: np.typing.ArrayLike
+    name: str
 
-    def __init__(self, value, length: int = 1):
+    def __init__(self, value, length: int = 1, name: str = None):
         super().__init__()
         if value is None:
             length = max(1, length)
@@ -44,6 +55,7 @@ class BaseParameter(Parameter):
 
         self._value = value
         self._length = length
+        self._name = name if name is not None else ""
 
     def _generate(self, size) -> ArrayLike:
         raise NotImplementedError()
@@ -127,10 +139,18 @@ class BaseParameter(Parameter):
     def length(self):
         return self._length
 
+    @property
+    def name(self):
+        return self._name
+    @name.setter
+    def name(self, value: str):
+        assert isinstance(value, str)
+        self._name = value
+
 
 class RealParam(BaseParameter):
     _supported_dist = ("uniform", "normal")
-    def __init__(self, value=None, length=1, *,
+    def __init__(self, value=None, length=1, name: str = None, *,
                  low=None, high=None, dist_params: dict = {},
                  dist: Literal["uniform", "normal"] = "uniform",
                  **kwargs):
@@ -163,7 +183,7 @@ class RealParam(BaseParameter):
             # self.loc = loc if loc is not None else 0
             # self.scale = scale if scale is not None else 1
 
-        super().__init__(value, length)
+        super().__init__(value, length, name)
 
     def _generate(self, size):
         if self._uniform:
@@ -211,7 +231,8 @@ class RealParam(BaseParameter):
 
 class DiscreteParam(BaseParameter):
     # DONE: Add n for number of possible values
-    def __init__(self, value=None, length=1, low=None, high=None, n=None):
+    def __init__(self, value=None, length=1, name: str = None, *, 
+                 low=None, high=None, n=None):
         # Make sure no value is missing assignment for some reason
         self.low = low
         self.high = high
@@ -248,7 +269,7 @@ class DiscreteParam(BaseParameter):
             else:
                 raise AssertionError("Insufficient information. Either one of 'n' or 'high' or both of 'high' and 'low' must be passed through.")
 
-        super().__init__(value, length)
+        super().__init__(value, length, name)
 
         # self._value = self._value.astype(np.int_)
 
