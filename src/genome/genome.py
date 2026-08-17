@@ -1,4 +1,5 @@
 from typing import Any, Dict, List, Literal, Sequence, Tuple, Optional
+import warnings
 
 from genome import parameter as param
 from genome.parameter import GeneSpec
@@ -147,28 +148,29 @@ class CompositeGenome(Genome):
 
 class EvolvableLearningRule(Genome):
     genome: Genome
-    _specs: Dict[str, GeneSpec]
-    universal_gene_specs = [
-        GeneSpec("learning_rate", kind="real", length=1, default=1.0),
-    ]
-    gene_order = ("learning_rate", )
+    _specs: Dict[str, Dict[str, Any]]
+    default_gene_specs = {
+        "learning_rate": dict(kind="real", length=1, low=0),
+    }
+    default_gene_order = ("learning_rate", )
 
-    def __init__(self, *, parameters: ArrayLike = None, genes: List[Parameter] = None, genes_to_encode: List[Dict] = None,
+    def __init__(self, *, parameters: ArrayLike = None, genes: List[Parameter] = None, 
+                 genes_to_encode: List[Dict] = None, gene_order: Sequence[str] = None,
                  **kwargs):
         super().__init__()
 
-        # Read gene specs from universal and rule-specific genes
-        self._specs = self._get_gene_specs()
-        self._gene_params, self.gene_order = self._build_gene_params(self._specs, genes_to_encode)
-        # self._specs = self._update_gene_specs(self._specs, self._gene_params)
+        # Build specs based on default class GeneSpec
+        # Specs control what encodings are possible by default in this subclass 
+        self._specs = self._build_gene_specs()
+        # Build gene order based on either 'gene_order', the order within genes_to_encode or default order
+        # Gene order controls how values in genome or list of genes should be read or written
+        self._gene_order = self._build_gene_order(gene_order, genes_to_encode)
+        # Build gene params from 'genes_to_encode' or, if absent, class GeneSpec
+        # gene_params contain kwargs for each gene Parameter 
+        genes_to_encode = self._normalise_gene_params(genes_to_encode)
+        self._gene_params = self._build_gene_params(genes_to_encode)
 
-        # TODO: Add system for setting which gene should be enabled
-        # self.encode_learning_rate = encode_learning_rate
-        # self.encode_tau_syn = encode_tau_syn
-
-        # self.encodings = [self.encode_learning_rate, self.encode_tau_syn]
-
-        # Build genes from input data
+        # Build genes and encoded values from input data depending on what is passed in
         self._genes: List[Parameter] = []
         self._values: Dict[str, Any] = {}
         # CASE 1 -> Reconstruct from flat genome
@@ -192,40 +194,62 @@ class EvolvableLearningRule(Genome):
         # Apply genes
         self._apply_gene_values()
 
-    def add_encodings(self, genes_to_encode: List):
-        pass
-
-    def _get_gene_specs(self) -> Dict[str, GeneSpec]:
+    def _build_gene_specs(self) -> Dict[str, GeneSpec]:
         specs = {}
-        specs.update({spec.name: spec for spec in self.universal_gene_specs})
+        specs.update(self.default_gene_specs.items())
         # specs.extend(self.rule_specific_gene_specs())
         return specs
 
-    def _build_gene_params(self, specs: Dict[str, GeneSpec], genes_to_encode: Optional[List[Dict]]) -> Tuple[Dict[str, Dict[str, Any]], List[str]]:
+    def _build_gene_order(self, gene_order: Sequence[str] = None, genes_to_encode: List[Dict] = None) -> List[str]:
+        if gene_order is not None:
+            for gene in gene_order:
+                if gene not in self._specs:
+                    raise RuntimeError(f"Gene: {gene} not supported by this class")
+            return tuple(gene_order)
+        elif genes_to_encode is not None:
+            order = []
+            if not isinstance(genes_to_encode, List):
+                warnings.warn(f"The passed-in 'genes_to_encode' is not a List, so 'gene_order' cannot be read from it.")
+                return tuple(self.default_gene_order)
+            for item in genes_to_encode:
+                name = item.get("name")
+                if name is not None:
+                    order.append(name)
+                else:
+                    raise ValueError(f"Name field must be defined for each entry in genes_to_encode")
+            return tuple(order)
+        else:
+            return tuple(self.default_gene_order)
+
+    def _normalise_gene_params(self, genes_to_encode: List[Dict] | Dict[str, Dict] = None) -> Dict[str, Dict[str, Any]] | None:
         """
         Convert config of gene_params to easier format of Dict[name: Dict[params]]. 
-        A new order will be read from the list order of `genes_to_encode` if its name field is present,
-        otherwise the default class attribute `gene_order` will be used.
         """
-        params = {}
-        order = []
         if genes_to_encode is None:
-            order = self.gene_order
-            params = {name: specs[name].to_dict() for name in order}
-            return params, order
-
-        else:
-
-            for i, item in enumerate(genes_to_encode):
-                new_params = dict(item)
-                name = new_params.pop("name")
-                if name is None:
-                    raise ValueError(f"Name must be defined in entry #{i} of genes_to_encode")
-                existing_params = specs.get(name).to_dict()
-                new_params.update(existing_params)
-                params[name] = new_params
-                order.append(name)
-        return params, order
+            return None
+        if isinstance(genes_to_encode, Dict):
+            # genes_to_encode is already in Dict format. No need to convert
+            return genes_to_encode
+        params = {}
+        for i, item in enumerate(genes_to_encode):
+            assert isinstance(item, Dict), "Each entry within 'genes_to_encode' must be a dictionary"
+            assert "name" in item, f"Entry #{i} of genes_to_encode does not have a 'name' field"
+            name = item.pop("name")
+            params[name] = dict(item)
+        return params
+    
+    def _build_gene_params(self, genes_to_encode: Optional[Dict[str, Dict[str, Any]]]) -> Dict[str, Dict[str, Any]]:
+        params = {}
+        for gene_name in self._gene_order:
+            default_params = self._specs.get(gene_name).copy()
+            if "name" in default_params:
+                default_params.pop("name") # Redundant information
+            # Override existing params with user-input params
+            if genes_to_encode is not None:
+                new_params = genes_to_encode.get(gene_name)
+                default_params.update(new_params)
+            params[gene_name] = default_params
+        return params
 
     def rule_specific_gene_specs(self):
         return []
@@ -235,15 +259,14 @@ class EvolvableLearningRule(Genome):
         values = {}
         i = 0
 
-        for gene_name in self.gene_order:
-            gene_params = self._gene_params[gene_name]
+        for gene_name in self._gene_order:
+            gene_params = self._gene_params[gene_name].copy()
             l = gene_params.get("length")
             value = parameters[i:(i+l)]
             kind = gene_params.pop("kind")
-            gene_params.pop("default")
-            gene_params.pop("name")
-            # value = self._simplify_value(value, length=l)
-            # kwargs = {key: val for key, val in gene_spec.__dict__.items() if key != "kind"}
+            # gene_params.pop("default")
+            # gene_params.pop("name")
+            # TODO: Validate value with gene_params
             gene = param.create_param(kind=kind, value=value, **gene_params)
 
             values[gene_name] = value
@@ -256,13 +279,13 @@ class EvolvableLearningRule(Genome):
         genes = []
         values = {}
         i = 0
-        for gene_name in self.gene_order:
-            # gene_params = self._gene_params[gene_name]
+        for gene_name in self._gene_order:
+            gene_params = self._gene_params[gene_name]
             new_gene = new_genes[i]
             # value = self._simplify_value(new_gene.value, gene_spec.length)
             value = new_gene.value
             values[gene_name] = value
-            # TODO: Validate gene
+            # TODO: Validate gene with gene_params
             # Do something with gene_spec and new_gene
             new_gene.name = gene_name
             genes.append(new_gene)
@@ -277,13 +300,13 @@ class EvolvableLearningRule(Genome):
         genes = []
         values = {}
         i = 0
-        for gene_name in self.gene_order:
-            gene_params = self._gene_params[gene_name]
+        for gene_name in self._gene_order:
+            gene_params = self._gene_params[gene_name].copy()
             # kwargs = {key: val for key, val in gene_spec.__dict__.items() if key != "kind"}
             kind = gene_params.pop("kind")
-            value = gene_params.pop("default")
-            gene_params.pop("name")
-            gene = param.create_param(kind=kind, value=value, **gene_params)
+            # value = gene_params.pop("default")
+            # gene_params.pop("name")
+            gene = param.create_param(kind=kind, **gene_params)
             value = gene.value
             values[gene_name] = value
             i += 1
@@ -295,12 +318,14 @@ class EvolvableLearningRule(Genome):
 
     def _apply_gene_values(self):
         # TODO: Extract universal gene values
+        if "learning_rate" in self._gene_order:
+            self.learning_rate = self._values.get("learning_rate")
 
         # Apply gene values to rule-specific scenarios
-        self._apply_specific_gene_values()
+        # self._apply_specific_gene_values()
 
-    def _apply_specific_gene_values(self):
-        pass
+    # def _apply_specific_gene_values(self):
+    #     pass
 
     def mutate(self, rate, scale, method, **kwargs):
         raise NotImplementedError()
@@ -308,3 +333,6 @@ class EvolvableLearningRule(Genome):
     def crossover(self, other, rate):
         raise NotImplementedError()
     
+    @property
+    def parameters(self) -> np.ndarray:
+        return self.genome.parameters

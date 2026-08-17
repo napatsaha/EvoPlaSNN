@@ -2,6 +2,20 @@
 v1.3
 ----
 
+v.1.3.9.2 (2026-08-17)
+- Changed the structure gene_order is assumed from inputs:
+    - If 'gene_order' is passed in, then that ordering is used
+    - If 'genes_to_encode' is a list of dictionaries, the ordering of params is used
+    - Otherwise, the class attribute "default_gene_order" is used
+- specs is now a dictionary of dictionary (no longer GeneSpec, since the args are limited)
+- Reintroduce `_normalise_gene_params()` to convert "genes_to_encode" to dict of dict
+- "gene_params" will only be built based on what's available in "gene_order"
+- Removed all "name" and "default" fields from "gene_params"
+- specs and gene_params will only be passed as copies to prevent unintended effect of class attributes being modified
+- Hard-coded learning_rate in `._apply_gene_values()`
+- Made the `__init__` of `EvolvableLearningRule` more structurally easier to read
+- Added `parameters` property (since it's an argument, and the class is a Genome)
+
 v1.3.9.1 (2026-08-14)
 - Slight changes to `EvolvableLearningRule`:
     - `genes_to_encode` is now an override params dict that will be used to create genes Parameter
