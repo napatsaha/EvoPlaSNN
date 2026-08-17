@@ -1,4 +1,4 @@
-from typing import Callable, Dict, Iterable, List, Literal, Tuple
+from typing import Any, Callable, Dict, Iterable, List, Literal, Sequence, Tuple
 import yaml
 
 import numpy as np
@@ -6,7 +6,7 @@ from numpy.typing import ArrayLike
 
 from common.utils import solve_hidden, calculate_size
 from common.base import Genome, Parameter
-from genome.genome import CompositeGenome
+from genome.genome import CompositeGenome, EvolvableLearningRule
 from genome import parameter as param
 
 from .base import BaseLearningRule
@@ -295,29 +295,30 @@ class ANN:
         return s
 
 
-class ANN_Rule(BaseLearningRule, Genome):
+class ANN_Rule(BaseLearningRule, EvolvableLearningRule):
     """
     A Learning Rule that represents a black box ANN function that converts synapse-related information to weight updates.
     """
-    INPUT_ORDER = ("trace_pre", "trace_post", "weights", "reward", "eligibility_pre", "eligibility_post", "eligibility_stdp")
-    OUTPUT_ORDER = ("weight", "threshold")
-    AGG_DICT = {
-                "max": np.max,
-                "min": np.min,
-                "mean": np.mean,
-                "sum": np.sum
-                }
+    # INPUT_ORDER = ("trace_pre", "trace_post", "weights", "reward", "eligibility_pre", "eligibility_post", "eligibility_stdp")
+    # OUTPUT_ORDER = ("weight", "threshold")
+    # AGG_DICT = {
+    #             "max": np.max,
+    #             "min": np.min,
+    #             "mean": np.mean,
+    #             "sum": np.sum
+    #             }
     GENE_ORDER = ("weights", "learning_rate", "hidden_activation", "output_activation")
     ACTIVATION_FUNC_ORDER = ("linear", "relu", "sigmoid", "tanh")
 
     genome: Genome
 
 
-    def __init__(self, parameters: ArrayLike = None, genes: List[Parameter] = None, genes_to_encode: List[Dict] = None, *, 
+    def __init__(self, parameters: ArrayLike = None, genes: List[Parameter] = None, 
+                 genes_to_encode: List[Dict] | Dict[str, Dict] = None, gene_order: Sequence[str] = None, *, 
                  # Which gene to encode
-                 encode_learning_rate: bool = False,
-                 encode_hidden_activation: bool = False, 
-                 encode_output_activation: bool = False,
+                 encode_learning_rate: bool = None,
+                 encode_hidden_activation: bool = None, 
+                 encode_output_activation: bool = None,
                  # ANN params
                  hidden_size: List | int = None, bias: bool = True,
                  hidden_activation: str = None, output_activation: str = None,
@@ -329,207 +330,243 @@ class ANN_Rule(BaseLearningRule, Genome):
                  use_eligibility: bool = False, use_eligibility_pre: bool = False, use_eligibility_post: bool = False, use_eligibility_stdp: bool = False,
                  **kwargs):
         
-        super().__init__(learning_rate=learning_rate, learning_rate_thr=learning_rate_thr, threshold_agg_func=threshold_agg_func, 
+        BaseLearningRule.__init__(self, learning_rate=learning_rate, learning_rate_thr=learning_rate_thr, threshold_agg_func=threshold_agg_func, 
                         delta_weight=delta_weight, delta_threshold=delta_threshold, 
                         use_trace_pre=use_trace_pre, use_trace_post=use_trace_post, use_weights=use_weights, use_reward=use_reward, 
                         use_eligibility=use_eligibility, use_eligibility_pre=use_eligibility_pre, 
                         use_eligibility_post=use_eligibility_post, use_eligibility_stdp=use_eligibility_stdp, 
                         **kwargs)
 
-        self.encode_weights = True # Weights is always encoded
-        self.encode_learning_rate = encode_learning_rate
-        self.encode_hidden_activation = encode_hidden_activation
-        self.encode_output_activation = encode_output_activation
+        self._weight_size = calculate_size(self.input_size, hidden_size, self.output_size, bias)
+        self._num_hidden_layers = len(solve_hidden(hidden_size))
+        if self._num_hidden_layers < 1:
+            encode_hidden_activation = False
 
-        self.genes_to_encode = genes_to_encode
-        self._genes_params = {}
-        # TODO: Verify that list of encodings passed through is compatible with as self.encodings
-        if self.genes_to_encode is not None:
-            # Convert to easier format of Dict[name: Dict[params]]
-            self._genes_params = {}
-            for i, g_dict in enumerate(self.genes_to_encode):
-                g_dict = g_dict.copy()
-                name = g_dict.pop("name")
-                if name is None:
-                    raise ValueError(f"Name must be defined in entry {i} of genes_to_encode")
-                self._genes_params[name] = g_dict
+        if gene_order is None and genes_to_encode is None:
+            encodings = {"hidden_activation": encode_hidden_activation,
+                         "output_activation": encode_output_activation,
+                         "learning_rate": encode_learning_rate,
+                         "weights": True}
+            gene_order = [gene for gene in self.GENE_ORDER if encodings.get(gene)]
 
-        # Prevents a case where both parameters and genes are passed through
-        if (parameters is not None) and (genes is not None):
-            raise ValueError("Only one of 'parameters' or 'genes' can be passed, not both.")
+        EvolvableLearningRule.__init__(self, parameters=parameters, genes=genes, genes_to_encode=genes_to_encode, gene_order=gene_order)
 
-        weight_size = calculate_size(self.input_size, hidden_size, self.output_size, bias)
-        num_hidden_layers = len(solve_hidden(hidden_size))
-        if num_hidden_layers < 1:
-            self.encode_hidden_activation = False
+        weights = self._values.get("weights", None)
+        if "hidden_activation" in self._gene_order:
+            hidden_activation = np.take(self.ACTIVATION_FUNC_ORDER, self._values.get("hidden_activation"))
+        if "output_activation" in self._gene_order:
+            output_activation = np.take(self.ACTIVATION_FUNC_ORDER, self._values.get("output_activation")).item()
+
+        weight_dist = [getattr(gene, "dist") for gene, name in zip(self._genes, self._gene_order) if name == "weights"][0]
+
+        self.ann = ANN(input_size=self.input_size, output_size=self.output_size, parameters=weights, 
+                            hidden_size=hidden_size, hidden_activation=hidden_activation, output_activation=output_activation,
+                            bias=bias, weight_dist=weight_dist,
+                            **kwargs)
+
+        # self.encode_weights = True # Weights is always encoded
+        # self.encode_learning_rate = encode_learning_rate
+        # self.encode_hidden_activation = encode_hidden_activation
+        # self.encode_output_activation = encode_output_activation
+
+        # self.genes_to_encode = genes_to_encode
+        # self._genes_params = {}
+        # # TODO: Verify that list of encodings passed through is compatible with as self.encodings
+        # if self.genes_to_encode is not None:
+        #     # Convert to easier format of Dict[name: Dict[params]]
+        #     self._genes_params = {}
+        #     for i, g_dict in enumerate(self.genes_to_encode):
+        #         g_dict = g_dict.copy()
+        #         name = g_dict.pop("name")
+        #         if name is None:
+        #             raise ValueError(f"Name must be defined in entry {i} of genes_to_encode")
+        #         self._genes_params[name] = g_dict
+
+        # # Prevents a case where both parameters and genes are passed through
+        # if (parameters is not None) and (genes is not None):
+        #     raise ValueError("Only one of 'parameters' or 'genes' can be passed, not both.")
+
+        # weight_size = calculate_size(self.input_size, hidden_size, self.output_size, bias)
+        # num_hidden_layers = len(solve_hidden(hidden_size))
+        # if num_hidden_layers < 1:
+        #     self.encode_hidden_activation = False
             
-        # TODO: Ensure ordering matches self.GENE_ORDER
-        self.encodings = [self.encode_weights, self.encode_learning_rate, self.encode_hidden_activation, self.encode_output_activation]
+        # # TODO: Ensure ordering matches self.GENE_ORDER
+        # self.encodings = [self.encode_weights, self.encode_learning_rate, self.encode_hidden_activation, self.encode_output_activation]
 
-        # CASE 1: An array of parameters is passed through
-        # Create genes from parameters according to gene_params (if present)
-        if parameters is not None:
-            genes = []
-            i = 0
-            for enc_flag, enc_type in zip(self.encodings, self.GENE_ORDER):
-                if not enc_flag:
-                    continue
-                if enc_type == "weights":
-                    # Extract positions from full genome
-                    val = parameters[0:weight_size]
-                    if enc_type in self._genes_params:
-                        gene_params = self._genes_params.get(enc_type).copy()
-                        kind = gene_params.pop("kind")
-                        gene = param.create_param(kind=kind, length=weight_size, value=val, **gene_params)
-                    else:
-                        gene = param.RealParam(value=val, length=weight_size, dist=weight_dist)
-                    weights = gene.value
-                    weight_dist = getattr(gene, "dist", None)
-                    i += gene.length
-                    genes.append(gene)
-                elif enc_type == "learning_rate":
-                    val = parameters[i:(i+1)]
-                    if enc_type in self._genes_params:
-                        gene_params = self._genes_params.get(enc_type).copy()
-                        kind = gene_params.pop("kind")
-                        gene = param.create_param(kind=kind, length=1, value=val, **gene_params)
-                    else:
-                        gene = param.RealParam(value=val, dist="normal", low=0)
-                    learning_rate = gene.value
-                    i += gene.length
-                    genes.append(gene)
-                elif enc_type == "hidden_activation":
-                    val = parameters[i:(i+num_hidden_layers)]
-                    if enc_type in self._genes_params:
-                        gene_params = self._genes_params.get(enc_type).copy()
-                        kind = gene_params.pop("kind")
-                        gene = param.create_param(kind=kind, length=num_hidden_layers, value=val, **gene_params)
-                    else:
-                        gene = param.DiscreteParam(value=val, length=num_hidden_layers, n=len(self.GENE_ORDER))
-                    hidden_activation = np.take(self.ACTIVATION_FUNC_ORDER, gene.value)
-                    i += gene.length
-                    genes.append(gene)
-                elif enc_type == "output_activation":
-                    val = parameters[i:(i+1)]
-                    if enc_type in self._genes_params:
-                        gene_params = self._genes_params.get(enc_type).copy()
-                        kind = gene_params.pop("kind")
-                        gene = param.create_param(kind=kind, length=1, value=val, **gene_params)
-                    else:
-                        gene = param.DiscreteParam(value=val, length=1, n=len(self.GENE_ORDER))
-                    output_activation = np.take(self.ACTIVATION_FUNC_ORDER, gene.value).item() # Enforce scalar value
-                    i += gene.length
-                    genes.append(gene)
-                else:
-                    raise NotImplementedError(f"Encoding for {enc_type} not supported yet.")
+        # # CASE 1: An array of parameters is passed through
+        # # Create genes from parameters according to gene_params (if present)
+        # if parameters is not None:
+        #     genes = []
+        #     i = 0
+        #     for enc_flag, enc_type in zip(self.encodings, self.GENE_ORDER):
+        #         if not enc_flag:
+        #             continue
+        #         if enc_type == "weights":
+        #             # Extract positions from full genome
+        #             val = parameters[0:weight_size]
+        #             if enc_type in self._genes_params:
+        #                 gene_params = self._genes_params.get(enc_type).copy()
+        #                 kind = gene_params.pop("kind")
+        #                 gene = param.create_param(kind=kind, length=weight_size, value=val, **gene_params)
+        #             else:
+        #                 gene = param.RealParam(value=val, length=weight_size, dist=weight_dist)
+        #             weights = gene.value
+        #             weight_dist = getattr(gene, "dist", None)
+        #             i += gene.length
+        #             genes.append(gene)
+        #         elif enc_type == "learning_rate":
+        #             val = parameters[i:(i+1)]
+        #             if enc_type in self._genes_params:
+        #                 gene_params = self._genes_params.get(enc_type).copy()
+        #                 kind = gene_params.pop("kind")
+        #                 gene = param.create_param(kind=kind, length=1, value=val, **gene_params)
+        #             else:
+        #                 gene = param.RealParam(value=val, dist="normal", low=0)
+        #             learning_rate = gene.value
+        #             i += gene.length
+        #             genes.append(gene)
+        #         elif enc_type == "hidden_activation":
+        #             val = parameters[i:(i+num_hidden_layers)]
+        #             if enc_type in self._genes_params:
+        #                 gene_params = self._genes_params.get(enc_type).copy()
+        #                 kind = gene_params.pop("kind")
+        #                 gene = param.create_param(kind=kind, length=num_hidden_layers, value=val, **gene_params)
+        #             else:
+        #                 gene = param.DiscreteParam(value=val, length=num_hidden_layers, n=len(self.GENE_ORDER))
+        #             hidden_activation = np.take(self.ACTIVATION_FUNC_ORDER, gene.value)
+        #             i += gene.length
+        #             genes.append(gene)
+        #         elif enc_type == "output_activation":
+        #             val = parameters[i:(i+1)]
+        #             if enc_type in self._genes_params:
+        #                 gene_params = self._genes_params.get(enc_type).copy()
+        #                 kind = gene_params.pop("kind")
+        #                 gene = param.create_param(kind=kind, length=1, value=val, **gene_params)
+        #             else:
+        #                 gene = param.DiscreteParam(value=val, length=1, n=len(self.GENE_ORDER))
+        #             output_activation = np.take(self.ACTIVATION_FUNC_ORDER, gene.value).item() # Enforce scalar value
+        #             i += gene.length
+        #             genes.append(gene)
+        #         else:
+        #             raise NotImplementedError(f"Encoding for {enc_type} not supported yet.")
 
-        # CASE 2: A list of genes is passed through
-        # Extract values from passed-in genes
-        elif genes is not None:
-            assert isinstance(genes, List), "Genes must be a list of parameters"
-            assert len(genes) == sum(self.encodings), "Length of gene objects must equal number of enabled encoding"
-            i = 0
-            for enc_flag, enc_type in zip(self.encodings, self.GENE_ORDER):
-                if not enc_flag:
-                    continue
-                if enc_type == "weights":
-                    weights = genes[i].value
-                    weight_dist = getattr(genes[i], "dist", None)
-                    assert len(weights) == weight_size, f"Values of {enc_type} must be of length {weight_size}. Got {len(weights)}"
-                    i += 1
-                elif enc_type == "learning_rate":
-                    learning_rate = genes[i].value
-                    assert len(learning_rate) == 1, f"Values of {enc_type} must be of length {1}. Got {len(learning_rate)}"
-                    i += 1
-                elif enc_type == "hidden_activation":
-                    val = genes[i].value
-                    assert len(val) == num_hidden_layers, f"Values of {enc_type} must be of length {num_hidden_layers}. Got {len(val)}"
-                    hidden_activation = np.take(self.ACTIVATION_FUNC_ORDER, val)
-                    i += 1
-                elif enc_type == "output_activation":
-                    val = genes[i].value
-                    assert len(val) == 1, f"Values of {enc_type} must be of length {1}. Got {len(val)}"
-                    output_activation = np.take(self.ACTIVATION_FUNC_ORDER, val).item() # Enforce scalar value
-                    i += 1
-                else:
-                    raise NotImplementedError(f"Encoding for {enc_type} not supported yet.")
+        # # CASE 2: A list of genes is passed through
+        # # Extract values from passed-in genes
+        # elif genes is not None:
+        #     assert isinstance(genes, List), "Genes must be a list of parameters"
+        #     assert len(genes) == sum(self.encodings), "Length of gene objects must equal number of enabled encoding"
+        #     i = 0
+        #     for enc_flag, enc_type in zip(self.encodings, self.GENE_ORDER):
+        #         if not enc_flag:
+        #             continue
+        #         if enc_type == "weights":
+        #             weights = genes[i].value
+        #             weight_dist = getattr(genes[i], "dist", None)
+        #             assert len(weights) == weight_size, f"Values of {enc_type} must be of length {weight_size}. Got {len(weights)}"
+        #             i += 1
+        #         elif enc_type == "learning_rate":
+        #             learning_rate = genes[i].value
+        #             assert len(learning_rate) == 1, f"Values of {enc_type} must be of length {1}. Got {len(learning_rate)}"
+        #             i += 1
+        #         elif enc_type == "hidden_activation":
+        #             val = genes[i].value
+        #             assert len(val) == num_hidden_layers, f"Values of {enc_type} must be of length {num_hidden_layers}. Got {len(val)}"
+        #             hidden_activation = np.take(self.ACTIVATION_FUNC_ORDER, val)
+        #             i += 1
+        #         elif enc_type == "output_activation":
+        #             val = genes[i].value
+        #             assert len(val) == 1, f"Values of {enc_type} must be of length {1}. Got {len(val)}"
+        #             output_activation = np.take(self.ACTIVATION_FUNC_ORDER, val).item() # Enforce scalar value
+        #             i += 1
+        #         else:
+        #             raise NotImplementedError(f"Encoding for {enc_type} not supported yet.")
         
-        # CASE 3: If `genes_to_encode` instruction is given for how to generate values for encoded genes
-        # Create random genes from passed-in instructions
-        elif genes_to_encode is not None:
-            genes = []
-            for enc_flag, enc_type in zip(self.encodings, self.GENE_ORDER):
-                if not enc_flag:
-                    continue
-                if enc_type == "weights":
-                    gene_params = self._genes_params.get(enc_type).copy()
-                    kind = gene_params.pop("kind")
-                    gene = param.create_param(kind=kind, length=weight_size, **gene_params)
-                    weight_dist = getattr(gene, "dist", None)
-                    weights = gene.value
-                    genes.append(gene)
-                elif enc_type == "learning_rate":
-                    gene_params = self._genes_params.get(enc_type).copy()
-                    kind = gene_params.pop("kind")
-                    gene = param.create_param(kind=kind, length=1, **gene_params)
-                    learning_rate = gene.value
-                    genes.append(gene)
-                elif enc_type == "hidden_activation":
-                    gene_params = self._genes_params.get(enc_type).copy()
-                    kind = gene_params.pop("kind")
-                    gene = param.create_param(kind=kind, length=num_hidden_layers, **gene_params)
-                    hidden_activation = np.take(self.ACTIVATION_FUNC_ORDER, gene.value)
-                    genes.append(gene)
-                elif enc_type == "output_activation":
-                    gene_params = self._genes_params.get(enc_type).copy()
-                    kind = gene_params.pop("kind")
-                    gene = param.create_param(kind=kind, length=1, **gene_params)
-                    output_activation = np.take(self.ACTIVATION_FUNC_ORDER, gene.value).item() # Enforce scalar value
-                    genes.append(gene)
-                else:
-                    raise NotImplementedError(f"Encoding for {enc_type} not supported yet.")
+        # # CASE 3: If `genes_to_encode` instruction is given for how to generate values for encoded genes
+        # # Create random genes from passed-in instructions
+        # elif genes_to_encode is not None:
+        #     genes = []
+        #     for enc_flag, enc_type in zip(self.encodings, self.GENE_ORDER):
+        #         if not enc_flag:
+        #             continue
+        #         if enc_type == "weights":
+        #             gene_params = self._genes_params.get(enc_type).copy()
+        #             kind = gene_params.pop("kind")
+        #             gene = param.create_param(kind=kind, length=weight_size, **gene_params)
+        #             weight_dist = getattr(gene, "dist", None)
+        #             weights = gene.value
+        #             genes.append(gene)
+        #         elif enc_type == "learning_rate":
+        #             gene_params = self._genes_params.get(enc_type).copy()
+        #             kind = gene_params.pop("kind")
+        #             gene = param.create_param(kind=kind, length=1, **gene_params)
+        #             learning_rate = gene.value
+        #             genes.append(gene)
+        #         elif enc_type == "hidden_activation":
+        #             gene_params = self._genes_params.get(enc_type).copy()
+        #             kind = gene_params.pop("kind")
+        #             gene = param.create_param(kind=kind, length=num_hidden_layers, **gene_params)
+        #             hidden_activation = np.take(self.ACTIVATION_FUNC_ORDER, gene.value)
+        #             genes.append(gene)
+        #         elif enc_type == "output_activation":
+        #             gene_params = self._genes_params.get(enc_type).copy()
+        #             kind = gene_params.pop("kind")
+        #             gene = param.create_param(kind=kind, length=1, **gene_params)
+        #             output_activation = np.take(self.ACTIVATION_FUNC_ORDER, gene.value).item() # Enforce scalar value
+        #             genes.append(gene)
+        #         else:
+        #             raise NotImplementedError(f"Encoding for {enc_type} not supported yet.")
 
-        # CASE 0: Nothing is passed through (but genes must be created accordingly)
-        # Create random genes based on default Parameter classes for each encoding
-        else:
-            genes = []
-            # weights = None
-            for enc_flag, enc_type in zip(self.encodings, self.GENE_ORDER):
-                if not enc_flag:
-                    continue
-                if enc_type == "weights":
-                    gene = param.RealParam(length=weight_size, dist=weight_dist, low=0, high=1)
-                    weights = gene.value
-                    genes.append(gene)
-                elif enc_type == "learning_rate":
-                    gene = param.RealParam(length=1, dist="uniform", low=0, high=1)
-                    learning_rate = gene.value
-                    genes.append(gene)
-                elif enc_type == "hidden_activation":
-                    gene = param.DiscreteParam(length=num_hidden_layers, n=len(self.ACTIVATION_FUNC_ORDER))
-                    hidden_activation = np.take(self.ACTIVATION_FUNC_ORDER, gene.value)
-                    genes.append(gene)
-                elif enc_type == "output_activation":
-                    gene = param.DiscreteParam(length=1, n=len(self.ACTIVATION_FUNC_ORDER))
-                    output_activation = np.take(self.ACTIVATION_FUNC_ORDER, gene.value).item() # Enforce scalar value
-                    genes.append(gene)     
-                else:
-                    raise NotImplementedError(f"Encoding for {enc_type} not supported yet.")
+        # # CASE 0: Nothing is passed through (but genes must be created accordingly)
+        # # Create random genes based on default Parameter classes for each encoding
+        # else:
+        #     genes = []
+        #     # weights = None
+        #     for enc_flag, enc_type in zip(self.encodings, self.GENE_ORDER):
+        #         if not enc_flag:
+        #             continue
+        #         if enc_type == "weights":
+        #             gene = param.RealParam(length=weight_size, dist=weight_dist, low=0, high=1)
+        #             weights = gene.value
+        #             genes.append(gene)
+        #         elif enc_type == "learning_rate":
+        #             gene = param.RealParam(length=1, dist="uniform", low=0, high=1)
+        #             learning_rate = gene.value
+        #             genes.append(gene)
+        #         elif enc_type == "hidden_activation":
+        #             gene = param.DiscreteParam(length=num_hidden_layers, n=len(self.ACTIVATION_FUNC_ORDER))
+        #             hidden_activation = np.take(self.ACTIVATION_FUNC_ORDER, gene.value)
+        #             genes.append(gene)
+        #         elif enc_type == "output_activation":
+        #             gene = param.DiscreteParam(length=1, n=len(self.ACTIVATION_FUNC_ORDER))
+        #             output_activation = np.take(self.ACTIVATION_FUNC_ORDER, gene.value).item() # Enforce scalar value
+        #             genes.append(gene)     
+        #         else:
+        #             raise NotImplementedError(f"Encoding for {enc_type} not supported yet.")
 
-        # Update learning rate (in case value is pulled from genome)
-        self.learning_rate = learning_rate
+        # # Update learning rate (in case value is pulled from genome)
+        # self.learning_rate = learning_rate
 
-        # Construct genome from stored genes
-        if genes is None:
-            raise NameError("Variable genes must be defined")
-        self.genome = CompositeGenome(genes=genes)
+        # # Construct genome from stored genes
+        # if genes is None:
+        #     raise NameError("Variable genes must be defined")
+        # self.genome = CompositeGenome(genes=genes)
 
         # Construct an ANN
-        self.ann = ANN(input_size=self.input_size, output_size=self.output_size, parameters=weights, 
-                       hidden_size=hidden_size, hidden_activation=hidden_activation, output_activation=output_activation,
-                       bias=bias, weight_dist=weight_dist,
-                       **kwargs)
+        # self.ann = ANN(input_size=self.input_size, output_size=self.output_size, parameters=weights, 
+        #                hidden_size=hidden_size, hidden_activation=hidden_activation, output_activation=output_activation,
+        #                bias=bias, weight_dist=weight_dist,
+        #                **kwargs)
         
+    def _build_gene_specs(self) -> Dict[str, Dict[str, Any]]:
+        specs = super()._build_gene_specs()
+        specs.update({
+            "weights": dict(kind="real", length=self._weight_size, dist="uniform", dist_params=dict(low=0, high=1)),
+            "hidden_activation": dict(kind="discrete", length=self._num_hidden_layers, n=len(self.ACTIVATION_FUNC_ORDER)),
+            "output_activation": dict(kind="discrete", length=1, n=len(self.ACTIVATION_FUNC_ORDER))
+        })
+        return specs
+
     def forward(self, inp):
         return self.ann.forward(inp)
 
@@ -545,9 +582,7 @@ class ANN_Rule(BaseLearningRule, Genome):
         d = super().to_dict()
         d.update(dict(
             # Encoding params
-            encode_learning_rate = self.encode_learning_rate,
-            encode_hidden_activation = self.encode_hidden_activation,
-            encode_output_activation = self.encode_output_activation,
+            gene_order = self.gene_order,
             # ANN params
             hidden_activation = self.ann.hidden_activation,
             output_activation = self.ann.output_activation,
@@ -620,6 +655,14 @@ class ANN_Rule(BaseLearningRule, Genome):
         # TODO: Edit for multiple gene types
         self.ann.parameters = value
         self.genome.parameters = value
+
+    @property
+    def encode_hidden_activation(self) -> bool:
+        return "hidden_activation" in self._gene_order
+
+    @property
+    def encode_output_activation(self) -> bool:
+        return "output_activation" in self._gene_order
 
     def __repr__(self):
         # return f"ANN_Rule(parameters_size={self.size}, use_trace_pre={self.use_trace_pre}, use_trace_post={self.use_trace_post}, use_weights={self.use_weights}, use_reward={self.use_reward}, " + \

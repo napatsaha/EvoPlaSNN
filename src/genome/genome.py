@@ -194,7 +194,7 @@ class EvolvableLearningRule(Genome):
         # Apply genes
         self._apply_gene_values()
 
-    def _build_gene_specs(self) -> Dict[str, GeneSpec]:
+    def _build_gene_specs(self) -> Dict[str, Dict[str, Any]]:
         specs = {}
         specs.update(self.default_gene_specs.items())
         # specs.extend(self.rule_specific_gene_specs())
@@ -238,14 +238,14 @@ class EvolvableLearningRule(Genome):
             params[name] = dict(item)
         return params
     
-    def _build_gene_params(self, genes_to_encode: Optional[Dict[str, Dict[str, Any]]]) -> Dict[str, Dict[str, Any]]:
+    def _build_gene_params(self, genes_to_encode: Optional[Dict[str, Dict[str, Any]]] = None) -> Dict[str, Dict[str, Any]]:
         params = {}
         for gene_name in self._gene_order:
             default_params = self._specs.get(gene_name).copy()
             if "name" in default_params:
                 default_params.pop("name") # Redundant information
             # Override existing params with user-input params
-            if genes_to_encode is not None:
+            if (genes_to_encode is not None) and (gene_name in genes_to_encode):
                 new_params = genes_to_encode.get(gene_name)
                 default_params.update(new_params)
             params[gene_name] = default_params
@@ -336,3 +336,23 @@ class EvolvableLearningRule(Genome):
     @property
     def parameters(self) -> np.ndarray:
         return self.genome.parameters
+
+    @property
+    def gene_order(self) -> List[str]:
+        return self._gene_order
+
+    @property
+    def specs(self) -> Dict[str, Dict[str, Any]]:
+        return self._specs
+
+    @property
+    def genes_to_encode(self) -> Dict[str, Dict[str, Any]]:
+        return self._gene_params
+
+    @property
+    def genes(self) -> List[Parameter]:
+        return self._genes
+
+    @property
+    def encode_learning_rate(self) -> bool:
+        return "learning_rate" in self._gene_order

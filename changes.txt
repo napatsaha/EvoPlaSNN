@@ -2,6 +2,19 @@
 v1.3
 ----
 
+v1.3.10.0 (2026-08-17)
+- Refactor `ANN_Rule` to derive from (BaseLearningRule, EvolvableLearningRule)
+    - Private attributes `_weight_size` and `_num_hidden_layer` is calculated after initialising `BaseLearningRule`
+    - Create logic for what to do with 'encode_**' args (only used when both "genes_to_encode" and "gene_order" are None)
+    - Pull data on weights, output_activation, hidden_activation and weight_dist from `_values` after initialising EvolvableLearningRule
+    - Edited custom `_build_gene_specs()`
+    - Changed `to_dict()` to return `gene_order` instead of `encode_**`
+    - New boolean properties `encode_hidden_activation` and `encode_output_activation` which is read from what is present in `gene_order`
+- `EvolvableLearningRule`
+    - New property `encode_learning_rate`
+    - New properties `genes`, `genes_to_encode`, `specs`, `gene_order`
+    - Name field check in `_build_gene_params()` when querying overriding params
+
 v.1.3.9.2 (2026-08-17)
 - Changed the structure gene_order is assumed from inputs:
     - If 'gene_order' is passed in, then that ordering is used
