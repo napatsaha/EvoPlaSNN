@@ -69,7 +69,7 @@ class BaseParameter(Parameter):
 
     def _validate(self, value: np.ndarray) -> np.ndarray:
         """
-        Check for validity, return processed value and raise TypeError or ValueError
+        Check for validity, return processed value and raise TypeError / ValueError / Assertion Error
 
         Args:
             value (_type_): _description_
@@ -80,7 +80,9 @@ class BaseParameter(Parameter):
         Returns:
             Any: _description_
         """
-        raise NotImplementedError(f"Each subclass must implement their own method of verifying value fits within distribution")
+        # NOTE: Cannot check for length, because during __init__, _validate is called before 'length' is set
+        # assert self.length == value.size, f"Invalid length. New value has length {value.size}. This Parameter must have length {self.length}"
+        return value
 
     def mutate(self, flags: bool | ArrayLike, method: Literal["resample", "perturb"] = "resample", scale: float = None) -> 'BaseParameter':
         # if not isinstance(bool):
@@ -136,6 +138,15 @@ class BaseParameter(Parameter):
     @property
     def value(self):
         return self._value
+    @value.setter
+    def value(self, new_value):
+        if not isinstance(new_value, np.ndarray):
+            new_value = np.asarray(new_value)
+            # Force value to be at least 1D array (not 0D array) for consistent behaviour, e.g. len()
+            if new_value.ndim == 0:
+                new_value = np.array([new_value])
+        assert new_value.size == self.length, f"Invalid length. New value has length {new_value.size}. This Parameter must have length {self.length}"
+        self._value = self._validate(new_value)
     
     @property
     def length(self):
@@ -204,6 +215,7 @@ class RealParam(BaseParameter):
         return value
 
     def _validate(self, value):
+        value = super()._validate(value)
         if self._bounded:
             check_upper = (value <= self.high) if self.high is not None else True
             check_lower = (value >= self.low) if self.low is not None else True
@@ -290,6 +302,7 @@ class DiscreteParam(BaseParameter):
         return value
 
     def _validate(self, value: np.ndarray) -> np.ndarray:
+        value = super()._validate(value)
         check = (value >= self.low) & (value < self.high)
         if not np.all(check):
             idx = np.where(~check)

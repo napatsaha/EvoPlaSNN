@@ -1,5 +1,6 @@
 from typing import Any, Dict, List, Literal, Sequence, Tuple, Optional
 import warnings
+import copy
 
 from genome import parameter as param
 from genome.parameter import GeneSpec
@@ -88,7 +89,7 @@ class CompositeGenome(Genome):
 
     def __init__(self, genes: List[Parameter], **kwargs):
         super().__init__(**kwargs)
-        self.genes = genes
+        self._genes = genes
         param = [g.value for g in self.genes]
         self._parameters = np.r_[*param]
 
@@ -135,8 +136,24 @@ class CompositeGenome(Genome):
         return self._parameters
     
     @parameters.setter
-    def parameters(self, value):
-        raise NotImplementedError(f"Parameter setter for {self.__class__.__name__} not yet implemented")
+    def parameters(self, values: np.ndarray):
+        assert len(values) == self.size
+        i = 0
+        for gene in self._genes:
+            l = gene.length
+            val = values[i:(i+l)]
+            gene.value = val
+            i += l
+        self._parameters = np.r_[*[g.value for g in self._genes]]
+
+    @property
+    def genes(self) -> List[Parameter]:
+        return self._genes
+
+    @genes.setter
+    def genes(self, value: List[Parameter]):
+        self._genes = value
+        self._parameters = np.r_[*[g.value for g in self._genes]]
 
     @property
     def size(self) -> int:
@@ -147,7 +164,7 @@ class CompositeGenome(Genome):
 
 
 class EvolvableLearningRule(Genome):
-    genome: Genome
+    genome: CompositeGenome
     _specs: Dict[str, Dict[str, Any]]
     default_gene_specs = {
         "learning_rate": dict(kind="real", length=1, low=0),
@@ -327,15 +344,27 @@ class EvolvableLearningRule(Genome):
     # def _apply_specific_gene_values(self):
     #     pass
 
-    def mutate(self, rate, scale, method, **kwargs):
-        raise NotImplementedError()
+    def mutate(self, rate: float = 1.0, scale: float = 0.1, method: Literal["resample", "perturb"] = "resample", **kwargs) -> 'EvolvableLearningRule':
+        dup = self.copy()
+        genes = dup.genome.mutate(rate, scale, method, return_genes_only=True, **kwargs)
+        dup.genes = genes
+        return dup
 
-    def crossover(self, other, rate):
-        raise NotImplementedError()
+    def crossover(self, other: 'EvolvableLearningRule', rate: float = 0.5) -> 'EvolvableLearningRule':
+        child = self.copy()
+        genes = child.genome.crossover(other.genome, rate, return_genes_only=True)
+        child.genes = genes
+        return child
+
+    def copy(self) -> 'EvolvableLearningRule':
+        return copy.deepcopy(self)
     
     @property
     def parameters(self) -> np.ndarray:
         return self.genome.parameters
+    @parameters.setter
+    def parameters(self, values):
+        self.genome.parameters = values
 
     @property
     def gene_order(self) -> List[str]:
@@ -352,6 +381,11 @@ class EvolvableLearningRule(Genome):
     @property
     def genes(self) -> List[Parameter]:
         return self._genes
+    @genes.setter
+    def genes(self, new_genes: List[Parameter]):
+        self._genes = new_genes
+        if hasattr(self.genome, "genes"):
+            self.genome.genes = new_genes
 
     @property
     def encode_learning_rate(self) -> bool:

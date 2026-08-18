@@ -2,6 +2,20 @@
 v1.3
 ----
 
+v1.3.10.3 (2026-08-18)
+- Make universal `mutate` and `crossover` methods and make certain Genome and Parameter properties settable
+- `EvolvableLearningRule`:
+    - `genes` and `parameters` now settable
+    - A new `copy()` method using `deepcopy`
+    - A copy-based `mutate` and `crossover` methods that any of its subclasses can use
+- `CompositeGenome`:
+    - `genes` is now a property and is settable
+    - `parameters` is settable with a same-length array (same method as extracting gene index in mutate and crossover)
+- `BaseParameter`:
+    - `value` is settable, and calls `_validate()`
+    - Base `_validate()` now simply returns original value, instead of throwing `NotImplementedError`
+        - It is also called by its child classes
+
 v1.3.10.2 (2026-08-18)
 - Small but important fix on `SmallPolynomialRule.__init__()`
     - Previously there was an error in checking for inputs of `delta_**` arguments to ensure only one output size
