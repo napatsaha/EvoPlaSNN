@@ -32,7 +32,7 @@ class SmallPolynomialRule(BaseLearningRule, EvolvableLearningRule):
                 # use_eligibility: bool = False, use_eligibility_pre: bool = False, use_eligibility_post: bool = False, use_eligibility_stdp: bool = False,
                 **kwargs
         ):
-        if sum(delta_weight, delta_threshold, delta_eligibility) != 1:
+        if sum([bool(delta_weight), bool(delta_threshold), bool(delta_eligibility)]) != 1:
             raise ValueError("Only one output must be specified")
 
         BaseLearningRule.__init__(self, learning_rate=learning_rate, learning_rate_thr=learning_rate_thr, threshold_agg_func=threshold_agg_func, 

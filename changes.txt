@@ -2,6 +2,11 @@
 v1.3
 ----
 
+v1.3.10.2 (2026-08-18)
+- Small but important fix on `SmallPolynomialRule.__init__()`
+    - Previously there was an error in checking for inputs of `delta_**` arguments to ensure only one output size
+    - The boolean check was erroneous
+
 v1.3.10.1 (2026-08-18)
 - Added a `SmallPolynomialRule` in `lrule/polynomial.py`
     - Hard-coded genes of length-4 "coefficients" on terms based on pre-post spikes and traces only (spike-driven)
