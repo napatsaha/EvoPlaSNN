@@ -2,6 +2,12 @@
 v1.3
 ----
 
+v1.3.10.1 (2026-08-18)
+- Added a `SmallPolynomialRule` in `lrule/polynomial.py`
+    - Hard-coded genes of length-4 "coefficients" on terms based on pre-post spikes and traces only (spike-driven)
+    - Arrangement of coefficients following Confavreux 2020 & 2025
+    - The `forward()` method following the local `STDP_Rule.forward()` of extracting pre-post trace and spike via indexing
+
 v1.3.10.0 (2026-08-17)
 - Refactor `ANN_Rule` to derive from (BaseLearningRule, EvolvableLearningRule)
     - Private attributes `_weight_size` and `_num_hidden_layer` is calculated after initialising `BaseLearningRule`
