@@ -2,6 +2,13 @@
 v1.3
 ----
 
+v1.3.11.0 (2026-08-19)
+- Customisable `tau_syn` in `SynapseLayer`
+    - Made `tau_syn` a public property, while `_tau_syn` and `_beta_syn` are private properties whic are changed when a new 
+        `tau_syn` is set
+- Added "tau_syn" to `default_gene_specs` and `default_gene_order` of `EvolvableLearningRule` (as a RealParam)
+- Added properties `values` and `encode_tau_syn` to `EvolvableLearningRule`
+
 v1.3.10.3 (2026-08-18)
 - Make universal `mutate` and `crossover` methods and make certain Genome and Parameter properties settable
 - `EvolvableLearningRule`:

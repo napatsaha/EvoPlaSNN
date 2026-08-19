@@ -168,6 +168,7 @@ class EvolvableLearningRule(Genome):
     _specs: Dict[str, Dict[str, Any]]
     default_gene_specs = {
         "learning_rate": dict(kind="real", length=1, low=0),
+        "tau_syn": dict(kind="real", length=1, low=0, high=0.5, dist="uniform")
     }
     default_gene_order = ("learning_rate", )
 
@@ -388,5 +389,12 @@ class EvolvableLearningRule(Genome):
             self.genome.genes = new_genes
 
     @property
+    def values(self) -> Dict[str, ArrayLike]:
+        return self._values
+
+    @property
     def encode_learning_rate(self) -> bool:
         return "learning_rate" in self._gene_order
+    @property
+    def encode_tau_syn(self) -> bool:
+        return "tau_syn" in self._gene_order
