@@ -309,6 +309,7 @@ class ANN_Rule(BaseLearningRule, EvolvableLearningRule):
     #             }
     GENE_ORDER = ("weights", "learning_rate", "hidden_activation", "output_activation")
     ACTIVATION_FUNC_ORDER = ("linear", "relu", "sigmoid", "tanh")
+    default_gene_order = ("weights", "learning_rate", "hidden_activation", "output_activation", "tau_syn", )
 
     genome: Genome
 
@@ -351,18 +352,12 @@ class ANN_Rule(BaseLearningRule, EvolvableLearningRule):
 
         EvolvableLearningRule.__init__(self, parameters=parameters, genes=genes, genes_to_encode=genes_to_encode, gene_order=gene_order)
 
-        weights = self._values.get("weights", None)
-        if "hidden_activation" in self._gene_order:
-            hidden_activation = np.take(self.ACTIVATION_FUNC_ORDER, self._values.get("hidden_activation"))
-        if "output_activation" in self._gene_order:
-            output_activation = np.take(self.ACTIVATION_FUNC_ORDER, self._values.get("output_activation")).item()
-
-        weight_dist = [getattr(gene, "dist") for gene, name in zip(self._genes, self._gene_order) if name == "weights"][0]
-
-        self.ann = ANN(input_size=self.input_size, output_size=self.output_size, parameters=weights, 
-                            hidden_size=hidden_size, hidden_activation=hidden_activation, output_activation=output_activation,
-                            bias=bias, weight_dist=weight_dist,
-                            **kwargs)
+        self.ann = ANN(input_size=self.input_size, output_size=self.output_size, parameters=self._weights, 
+                    hidden_size=hidden_size, 
+                    hidden_activation=self._hidden_activation if self._hidden_activation is not None else hidden_activation, 
+                    output_activation=self._output_activation if self._output_activation is not None else output_activation,
+                    bias=bias, weight_dist=self._weight_dist if self._weight_dist is not None else weight_dist,
+                    **kwargs)
 
         # self.encode_weights = True # Weights is always encoded
         # self.encode_learning_rate = encode_learning_rate
@@ -567,14 +562,33 @@ class ANN_Rule(BaseLearningRule, EvolvableLearningRule):
         })
         return specs
 
+    def _apply_gene_values(self):
+        super()._apply_gene_values()
+        # Extract weight information
+        if self.encode_weights:
+            self._weights = self.values.get("weights", None)
+            self._weight_dist = [getattr(gene, "dist") for gene, name in zip(self.genes, self.gene_order) if name == "weights"][0]
+        else:
+            self._weights = None
+            self._weight_dist = None
+        # Extract activation function information
+        if self.encode_hidden_activation:
+            self._hidden_activation = np.take(self.ACTIVATION_FUNC_ORDER, self.values.get("hidden_activation"))
+        else:
+            self._hidden_activation = None
+        if self.encode_output_activation:
+            self._output_activation = np.take(self.ACTIVATION_FUNC_ORDER, self.values.get("output_activation")).item()
+        else:
+            self._output_activation = None
+
     def forward(self, inp):
         return self.ann.forward(inp)
 
-    def mutate(self, rate: float, scale: float, method: str) -> np.ndarray:
+    def mutate(self, rate: float = 1.0, scale: float = 0.1, method: Literal["resample", "perturb"] = "resample") -> 'ANN_Rule':
         new_genes = self.genome.mutate(rate=rate, scale=scale, method=method, return_genes_only=True)
         return self.__class__(genes = new_genes, **self.to_dict())
 
-    def crossover(self, other: 'ANN_Rule', rate: float):
+    def crossover(self, other: 'ANN_Rule', rate: float = 0.5) -> 'ANN_Rule':
         new_genes = self.genome.crossover(other.genome, rate, return_genes_only=True)
         return self.__class__(genes = new_genes, **self.to_dict())
 
@@ -655,6 +669,10 @@ class ANN_Rule(BaseLearningRule, EvolvableLearningRule):
         # TODO: Edit for multiple gene types
         self.ann.parameters = value
         self.genome.parameters = value
+
+    @property
+    def encode_weights(self) -> bool:
+        return "weights" in self._gene_order
 
     @property
     def encode_hidden_activation(self) -> bool:

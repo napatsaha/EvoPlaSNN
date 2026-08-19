@@ -2,6 +2,20 @@
 v1.3
 ----
 
+v1.3.11.1 (2026-08-19)
+- Fixed issue with `values` not updating after mutation or crossover
+- `EvolvableLearningRule`:
+    - `_genes_from_**()` gene-building methods only return genes
+    - Added `_extract_values_from_genes` to recreate `_values` when needed
+    - Added short description to many public properties
+- Children of `EvolvableLearningRule` must apply their own genes in `_apply_gene_values()` and specify `encode_<gene>` properties
+- `ANN_Rule`:
+    - Extract ANN information in `_apply_gene_values()`
+    - Default arg values in mutate and crossover
+    - Added default_gene_order
+    - Since its mutation and crossover is based on re-initialising the object, and not making a deepcopy and modifying,
+        we don't have to worry about former attributes carrying over
+
 v1.3.11.0 (2026-08-19)
 - Customisable `tau_syn` in `SynapseLayer`
     - Made `tau_syn` a public property, while `_tau_syn` and `_beta_syn` are private properties whic are changed when a new 

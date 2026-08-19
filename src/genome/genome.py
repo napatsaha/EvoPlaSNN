@@ -170,7 +170,7 @@ class EvolvableLearningRule(Genome):
         "learning_rate": dict(kind="real", length=1, low=0),
         "tau_syn": dict(kind="real", length=1, low=0, high=0.5, dist="uniform")
     }
-    default_gene_order = ("learning_rate", )
+    default_gene_order = ("learning_rate", "tau_syn")
 
     def __init__(self, *, parameters: ArrayLike = None, genes: List[Parameter] = None, 
                  genes_to_encode: List[Dict] = None, gene_order: Sequence[str] = None,
@@ -190,26 +190,27 @@ class EvolvableLearningRule(Genome):
 
         # Build genes and encoded values from input data depending on what is passed in
         self._genes: List[Parameter] = []
-        self._values: Dict[str, Any] = {}
+        # self._values: Dict[str, Any] = {}
         # CASE 1 -> Reconstruct from flat genome
         if parameters is not None:
-            self._genes, self._values = self._genes_from_parameters(parameters)
+            self._genes = self._genes_from_parameters(parameters)
         # CASE 2 -> Build from existing genes
         elif genes is not None:
-            self._genes, self._values = self._genes_from_objects(genes)
+            self._genes = self._genes_from_objects(genes)
         # CASE 3 -> Sample from gene spec
         # elif genes_to_encode is not None:
         #     self._genes, self._values = self._genes_from_templates(genes_to_encode)
         # CASE 4 -> Fallback, randomising from default specs
         else:
-            self._genes, self._values = self._random_genes()
+            self._genes = self._random_genes()
 
         # self._gene_lookup = {spec.name: gene for spec, gene in zip(self._specs, self._genes)}
 
         # Build genome
         self.genome = CompositeGenome(genes=self._genes)
 
-        # Apply genes
+        # Extract values from genes and apply values to self attributes
+        self._values = self._extract_values_from_genes()
         self._apply_gene_values()
 
     def _build_gene_specs(self) -> Dict[str, Dict[str, Any]]:
@@ -272,9 +273,9 @@ class EvolvableLearningRule(Genome):
     def rule_specific_gene_specs(self):
         return []
 
-    def _genes_from_parameters(self, parameters: ArrayLike) -> Tuple[List[Parameter], Dict[str, Any]]:
+    def _genes_from_parameters(self, parameters: ArrayLike) -> List[Parameter]:
         genes = []
-        values = {}
+        # values = {}
         i = 0
 
         for gene_name in self._gene_order:
@@ -286,37 +287,37 @@ class EvolvableLearningRule(Genome):
             # gene_params.pop("name")
             # TODO: Validate value with gene_params
             gene = param.create_param(kind=kind, value=value, **gene_params)
-
-            values[gene_name] = value
+            gene.name = gene_name
+            # values[gene_name] = value
             i += l
             genes.append(gene)
 
-        return genes, values
+        return genes#, values
 
-    def _genes_from_objects(self, new_genes: List[Parameter]) -> Tuple[List[Parameter], Dict[str, Any]]:
+    def _genes_from_objects(self, new_genes: List[Parameter]) -> List[Parameter]:
         genes = []
-        values = {}
+        # values = {}
         i = 0
         for gene_name in self._gene_order:
             gene_params = self._gene_params[gene_name]
             new_gene = new_genes[i]
             # value = self._simplify_value(new_gene.value, gene_spec.length)
-            value = new_gene.value
-            values[gene_name] = value
+            # value = new_gene.value
+            # values[gene_name] = value
             # TODO: Validate gene with gene_params
             # Do something with gene_spec and new_gene
             new_gene.name = gene_name
             genes.append(new_gene)
             i += 1
 
-        return genes, values
+        return genes#, values
 
     # def _genes_from_templates(self, genes_to_encode: List[Dict]) -> Tuple[List[Parameter], Dict[str, Any]]:
     #     return [], {}
 
-    def _random_genes(self, ) -> Tuple[List[Parameter], Dict[str, Any]]:
+    def _random_genes(self, ) -> List[Parameter]:
         genes = []
-        values = {}
+        # values = {}
         i = 0
         for gene_name in self._gene_order:
             gene_params = self._gene_params[gene_name].copy()
@@ -325,22 +326,33 @@ class EvolvableLearningRule(Genome):
             # value = gene_params.pop("default")
             # gene_params.pop("name")
             gene = param.create_param(kind=kind, **gene_params)
-            value = gene.value
-            values[gene_name] = value
+            # value = gene.value
+            # values[gene_name] = value
+            gene.name = gene_name
             i += 1
             genes.append(gene)
-        return genes, values
+        return genes#, values
 
     def _simplify_value(self, value, length):
         return value[0] if length == 1 and isinstance(value, np.ndarray | Sequence) and len(value) == 1 else value
 
-    def _apply_gene_values(self):
-        # TODO: Extract universal gene values
-        if "learning_rate" in self._gene_order:
-            self.learning_rate = self._values.get("learning_rate")
+    def _extract_values_from_genes(self) -> Dict[str, ArrayLike]:
+        """
+        Extract and update values from genome according to gene order.
 
-        # Apply gene values to rule-specific scenarios
-        # self._apply_specific_gene_values()
+        Returns Dictionary[gene_name: gene_value]
+        """
+        values = {}
+        for gene_name, gene in zip(self.gene_order, self.genes):
+            values[gene_name] = gene.value
+        return values
+
+    def _apply_gene_values(self):
+        """
+        Perform class-specific operations based on gene values
+        """
+        if self.encode_learning_rate:
+            self.learning_rate = self.values.get("learning_rate")
 
     # def _apply_specific_gene_values(self):
     #     pass
@@ -349,12 +361,18 @@ class EvolvableLearningRule(Genome):
         dup = self.copy()
         genes = dup.genome.mutate(rate, scale, method, return_genes_only=True, **kwargs)
         dup.genes = genes
+        # Update internal values from new gene to ensure they are not retained from previous copy
+        dup._values = dup._extract_values_from_genes()
+        dup._apply_gene_values()
         return dup
 
     def crossover(self, other: 'EvolvableLearningRule', rate: float = 0.5) -> 'EvolvableLearningRule':
         child = self.copy()
         genes = child.genome.crossover(other.genome, rate, return_genes_only=True)
         child.genes = genes
+        # Update internal values from new gene to ensure they are not retained from previous copy
+        child._values = child._extract_values_from_genes()
+        child._apply_gene_values()
         return child
 
     def copy(self) -> 'EvolvableLearningRule':
@@ -362,6 +380,9 @@ class EvolvableLearningRule(Genome):
     
     @property
     def parameters(self) -> np.ndarray:
+        """
+        Flattened array of concatenated genome values
+        """
         return self.genome.parameters
     @parameters.setter
     def parameters(self, values):
@@ -369,27 +390,44 @@ class EvolvableLearningRule(Genome):
 
     @property
     def gene_order(self) -> List[str]:
+        """
+        Gene order controls how values in genome or list of genes should be read or written
+        """
         return self._gene_order
 
     @property
     def specs(self) -> Dict[str, Dict[str, Any]]:
+        """
+        Specs control what encodings are possible by default in this subclass.  
+        (see `genes_to_encode` for actual specs after user update)
+        """
         return self._specs
 
     @property
     def genes_to_encode(self) -> Dict[str, Dict[str, Any]]:
+        """
+        `genes_to_encode` contain kwargs for each gene Parameter
+        """
         return self._gene_params
 
     @property
     def genes(self) -> List[Parameter]:
+        """
+        This is a list of Parameters of encoded values for evolution, in the order specified by `gene_order`.
+        """
         return self._genes
     @genes.setter
     def genes(self, new_genes: List[Parameter]):
+        assert len(new_genes) == len(self.gene_order), f"New genes must have length {len(self.gene_order)}, but got length {len(new_genes)} instead"
         self._genes = new_genes
         if hasattr(self.genome, "genes"):
             self.genome.genes = new_genes
 
     @property
     def values(self) -> Dict[str, ArrayLike]:
+        """
+        Dictionary of gene value by name of each encoded gene, for easy access.
+        """
         return self._values
 
     @property

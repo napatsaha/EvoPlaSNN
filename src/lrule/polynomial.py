@@ -20,7 +20,7 @@ class SmallPolynomialRule(BaseLearningRule, EvolvableLearningRule):
     _new_specs = {
         "coefficients": dict(kind="real", length=4, dist="normal", dist_params=dict(loc=0, scale=1)),
     }
-    default_gene_order = ("learning_rate", "coefficients")
+    default_gene_order = ("learning_rate", "tau_syn", "coefficients")
 
     def __init__(self, *, 
                 parameters: ArrayLike = None, genes: List[Parameter] = None, 
@@ -45,12 +45,16 @@ class SmallPolynomialRule(BaseLearningRule, EvolvableLearningRule):
 
         EvolvableLearningRule.__init__(self, parameters=parameters, genes=genes, genes_to_encode=genes_to_encode, gene_order=gene_order)
 
-        self.coefficients = self._values.get("coefficients")
+        
 
     def _build_gene_specs(self):
         specs = super()._build_gene_specs()
         specs.update(self._new_specs)
         return specs
+
+    def _apply_gene_values(self):
+        super()._apply_gene_values()
+        self.coefficients = self.values.get("coefficients")
 
     def forward(self, inp: np.ndarray) -> np.ndarray:
         spk_pre = inp[:, 2]
@@ -61,3 +65,6 @@ class SmallPolynomialRule(BaseLearningRule, EvolvableLearningRule):
         dw = coefs[0] * spk_pre + coefs[1] * spk_post + coefs[2] * spk_post * trace_pre + coefs[3] * spk_pre * trace_post
         return dw
 
+    @property
+    def encode_coefficients(self) -> bool:
+        return "coefficients" in self._gene_order
