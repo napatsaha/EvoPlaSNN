@@ -323,7 +323,7 @@ class SynapseLayer(SynapseLayerProtocol):
     #             # Update tssp
     #         etssp[:, idx_spike] = 0
 
-    def update(self, reward=None) -> None:
+    def apply_learning_rule(self, reward: float = None) -> None:
         """
         Update the synaptic information by applying the stored learning rule.  
 
@@ -334,18 +334,32 @@ class SynapseLayer(SynapseLayerProtocol):
         """
         dw, dth, delig = self._learning_rule.update(self, reward=reward, always_return_tuple=True)
         if self._out_weights:
-            self.weights += dw
+            self._update_weights(dw)
         if self._out_thresholds: 
             self.post_layer.update_thresholds(dth)
         if self._out_eligibility:
             self._etrace_custom = self._etrace_custom + delig
-            self._etrace_custom = np.clip(self._etrace_custom, self.e_min, self.e_max) # Not sure if using np.clip or max(min()) is faster
-        
+            self._etrace_custom = np.clip(self._etrace_custom, self.e_min, self.e_max) 
+
+    def update_weights_from_etrace(self, reward: float, etrace: Literal["pre", "post", "stdp", "custom"], lrate: float = 1.0) -> None:
+        """
+        Perform a fixed weight update, given reward and type of eligibility trace (must be enabled).
+
+        Args:
+            reward (float): Reward Signal
+            etrace (Literal[&quot;pre&quot;, &quot;post&quot;, &quot;stdp&quot;, &quot;custom&quot;]): Type of eligibility trace to use
+            lrate (float, optional): amplitude of weight change. Defaults to 1.0.
+        """
+        dw = getattr(self, f"eligibility_{etrace}")
+        dw = dw * reward
+        self._update_weights(dw, lrate)
+
+    def _update_weights(self, dw, lrate: float = 1.0):
+        self.weights += lrate * dw
         # Clip the weights
         self._clip_weights()
-        
         # Normalise the weights
-        self._normalise_weights()
+        self._normalise_weights()# Not sure if using np.clip or max(min()) is faster
 
     def _clip_weights(self):
         if self.clip_weights:

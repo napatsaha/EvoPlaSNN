@@ -2,6 +2,21 @@
 v1.3
 ----
 
+v1.3.12.0 (2026-08-20)
+- Apply weight update from eligibility trace and reward, without learning rule
+- `SynapseLayer`:
+    - Renamed `update()` to `apply_learning_rule()`
+    - Moved dw operations and clipping, normalising weights to a private method `_update_weights`
+    - Added a public method `update_weights_from_etrace` for weight update based on etrace and reward alone
+- `SNN`:
+    - Added init argument `update_weights_on_etrace` + private flag `_etrace_to_update` to determine whether or not to
+        perform weight update on synapses with only etrace, and which etrace to use
+    - Added public method `apply_weight_updates_from_etrace` which will call the above related SynapseLayer's method
+    - Renamed `update_synapses()` to `apply_learning_rule()`
+- `Simulator`:
+    - Depending on whether `network.update_weights_on_etrace` is enabled, after an environment step, the simulator
+        will call the network's `apply_weight_updates_from_etrace()` using current modulation signal
+
 v1.3.11.1 (2026-08-19)
 - Fixed issue with `values` not updating after mutation or crossover
 - `EvolvableLearningRule`:

@@ -124,7 +124,7 @@ class SynapseLayerProtocol(Protocol):
         """
         pass
 
-    def update(self, reward: float | None) -> None:
+    def apply_learning_rule(self, reward: float | None) -> None:
         """
         Update the synaptic weights based on the learning rule.
         """

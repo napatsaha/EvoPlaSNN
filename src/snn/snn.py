@@ -22,6 +22,7 @@ class SNN:
                  synapse_params: dict = None, 
                  winner_take_all: bool = False, soft_reset: bool = False,
                  sim_method: Literal["event-driven", "step-wise"] = "step-wise",
+                 update_weights_on_etrace: bool | Literal["pre", "post", "stdp", "custom"] = False,
                 #  tau_mem: float | List[float] = 5e-3, tau_trace: float | List[float] = 1e-1, threshold: float | List[float] = 1.0, 
                 #  membrane_start: float = 0.0, reset_mechanism = "subtract"
                  ):
@@ -54,6 +55,9 @@ class SNN:
         self.use_etrace_post = self.synapse_params.get("eligibility_post", False)
         self.use_etrace_stdp = self.synapse_params.get("eligibility_stdp", False)
         self.use_etrace = self.use_etrace_pre or self.use_etrace_post or self.use_etrace_stdp
+
+        self.update_weights_on_etrace = bool(update_weights_on_etrace)
+        self._etrace_to_update = str(update_weights_on_etrace) if self.update_weights_on_etrace else None
 
         # Create each neuron layers
         self.neuron_layers = []
@@ -93,9 +97,13 @@ class SNN:
                 synapse.update_eligibility_trace()
         return spike_out
 
-    def update_synapses(self, reward=None):
+    def apply_learning_rule(self, reward=None):
         for synapse in self.synapse_layers:
-            synapse.update(reward)
+            synapse.apply_learning_rule(reward)
+
+    def apply_weight_updates_from_etrace(self, signal: float = None, lrate: float = 1.0):
+        for synapse in self.synapse_layers:
+            synapse.update_weights_from_etrace(signal, self._etrace_to_update, lrate)
 
     def reset(self):
         """

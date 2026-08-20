@@ -276,17 +276,21 @@ class SNNSimulator:
                     # Updates at every environment step
                     if self.update_condition == "on-step":
                         signal = self.modulator.signal(locals=locals()) if self._modulation else reward
-                        self.network.update_synapses(reward=signal)
+                        self.network.apply_learning_rule(reward=signal)
                     # Update upon receiving reward (require reward=None when no update is desired)
                     elif self.update_condition == "on-reward":
                         if reward is not None:
                             signal = self.modulator.signal(locals=locals()) if self._modulation else reward
-                            self.network.update_synapses(reward=signal)
+                            self.network.apply_learning_rule(reward=signal)
                     # Update network at the end of each episode
                     elif self.update_condition == "on-end":
                         if episode_done:
                             signal = self.modulator.signal(locals=locals()) if self._modulation else reward
-                            self.network.update_synapses(reward=signal)
+                            self.network.apply_learning_rule(reward=signal)
+                    # Perform fixed update without rule
+                    if self.network.update_weights_on_etrace:
+                        signal = self.modulator.signal(locals=locals()) if self._modulation else reward
+                        self.network.apply_weight_updates_from_etrace(signal)
 
                 # Perform episode reset or proceed to next env step
                 if episode_done:
@@ -313,7 +317,7 @@ class SNNSimulator:
             # Apply learning rule at every timestep
             if update and self.update_condition == "on-timestep":
                 signal = self.modulator.signal(locals=locals()) if self._modulation else reward
-                self.network.update_synapses(reward=signal)
+                self.network.apply_learning_rule(reward=signal)
 
             # Update softmax temperature / exploration rate
             if episode_done and self._explore:
