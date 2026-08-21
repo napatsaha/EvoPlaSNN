@@ -12,10 +12,11 @@ from common.utils import create_learning_rule, make_bc_func
 from snn import SNN, SNNSimulator
 # from snn.spikegen import BinaryClassGenerator
 import snn.spikegen as spkgen
+from snn.spike_coding import SpikeCoderEnvWrapper
 # from snn.spikegen import create_spikegen, create_poisson_class_timing, create_binary_class_timing
 # import snn.spikegen
 from lrule import LearningRule
-from rl import ENV_DICT, StateCoder, RewardCollector, BaseMaze
+from rl import ENV_DICT, RewardCollector, BaseMaze
 from common.base import SpikeCoder
 
 class RL_Evaluator(Evaluator):
@@ -71,7 +72,8 @@ class RL_Evaluator(Evaluator):
         self.env: BaseMaze = ENV_DICT.get(env_name)(**env_params)
         # num_states = self.env.observation_space.n
         # num_actions = self.env.action_space.n
-        self.spike_coder: SpikeCoder = StateCoder(self.env.observation_space, self.env.action_space, **params["spike_coder_params"])
+        self.spike_coder: SpikeCoder = SpikeCoderEnvWrapper(self.env.observation_space, self.env.action_space, 
+                                                            **params["spike_coder_params"])
         self.snn = SNN(input_size=self.spike_coder.input_size, output_size=self.spike_coder.output_size, 
                        **params["snn_params"])
         self.reward_collector = RewardCollector(**params["collector_params"])
@@ -88,6 +90,7 @@ class RL_Evaluator(Evaluator):
                                       record_eligibility_pre=record_info,
                                       record_eligibility_post=record_info,
                                       record_eligibility_stdp=record_info,
+                                      record_eligibility_custom=record_info,
                                       **params.get("simulator_params", {})
                                       )
         self.logger = None

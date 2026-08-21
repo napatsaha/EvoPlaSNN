@@ -377,6 +377,10 @@ class EvolvableLearningRule(Genome):
 
     def copy(self) -> 'EvolvableLearningRule':
         return copy.deepcopy(self)
+
+    @property
+    def size(self):
+        return self.genome.size
     
     @property
     def parameters(self) -> np.ndarray:

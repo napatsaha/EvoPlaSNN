@@ -125,6 +125,7 @@ class BaseLearningRule(LearningRule):
             idx += 1
         if self.delta_eligibility:
             delig = out[..., idx]
+            delig += self.learning_rate
             idx += 1
 
         # Return values -- always return tuples for consistency

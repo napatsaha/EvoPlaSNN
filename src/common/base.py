@@ -302,6 +302,7 @@ class Genome(ABC):
         """
 
     @property
+    @abstractmethod
     def parameters(self) -> np.ndarray:
         """
         Returns a 1D genetic blueprint of the genome
@@ -309,6 +310,7 @@ class Genome(ABC):
         # return self._parameters 
 
     @property
+    @abstractmethod
     def size(self) -> int:
         """
         Returns the number of parameters that exists in the genome

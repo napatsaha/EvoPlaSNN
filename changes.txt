@@ -2,6 +2,13 @@
 v1.3
 ----
 
+v1.3.12.2 (2026-08-21)
+- Various fixes to support running experiment
+- Fixed issue with `CompositeSpikeCoder._validate_input` when input is a scalar
+- Applied learning_rate to BaseLearningRule delta_eligibility output
+- Added `size` property to `EvolvableLearningRule`
+- Init spike_coder with `SpikeCoderEnvWrapper` in `RL_Evaluator`
+
 v1.3.12.1 (2026-08-21)
 - Added support for custom eligibility trace to various parts of the code
 - SynapseLayer: Added `eligibility_custom` as init arg. Allow custom etrace to be created when new learning rule is set

@@ -171,7 +171,10 @@ class CompositeSpikeCoder(SpikeCoder, ABC):
         self._output_buffer.fill(0)
 
     def _validate_input(self, inp):
-        assert len(inp) == self.encoder.n_channels
+        if hasattr(inp, "__len__"):
+            assert len(inp) == self.encoder.n_channels, f"Input length mismatch. Got {len(inp)}. Expected {self.encoder.n_channels}"
+        else:
+            assert self.encoder.n_channels == 1, f"Input size must be 1. Got input value={inp}"
 
     @property
     def ready(self):
