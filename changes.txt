@@ -2,6 +2,15 @@
 v1.3
 ----
 
+v1.3.12.1 (2026-08-21)
+- Added support for custom eligibility trace to various parts of the code
+- SynapseLayer: Added `eligibility_custom` as init arg. Allow custom etrace to be created when new learning rule is set
+- SNN: Added `eligibility_traces_custom` property, `use_etrace_custom` flag and `update_lrate` value
+- SNNSimulator: Support recording eligibility trace custom
+- snn/plot: Support plotting custom etrace in `plot_eligibility_traces`
+- common/utils: Added default values for spike-pre, spike-post and eligiblilty-custom to LRULE_INPUT_BOUNDS
+- run/evaluate.evaluate_and_plot: Added support for `plot_eligibility_custom`
+
 v1.3.12.0 (2026-08-20)
 - Apply weight update from eligibility trace and reward, without learning rule
 - `SynapseLayer`:

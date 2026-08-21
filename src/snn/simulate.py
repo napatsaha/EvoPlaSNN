@@ -38,7 +38,8 @@ class SNNSimulator:
                  decay_method: Literal["time", "constant"] = "time",
                  decay_rate: float = None, decay_cutoff: Optional[int] = None, 
                  record_membrane: bool = True, record_spikes: bool = True, record_traces: bool = True, record_thresholds: bool = False,
-                 record_weights: bool = False, record_eligibility_pre: bool = False, record_eligibility_post: bool = False, record_eligibility_stdp: bool = False,
+                 record_weights: bool = False, record_eligibility_pre: bool = False, record_eligibility_post: bool = False, 
+                 record_eligibility_stdp: bool = False, record_eligibility_custom: bool = False,
                  **kwargs):
         # Duration params
         self.num_steps = 0
@@ -62,6 +63,7 @@ class SNNSimulator:
         self.record_eligibility_pre = record_eligibility_pre if self.network.use_etrace_pre else False
         self.record_eligibility_post = record_eligibility_post if self.network.use_etrace_post else False
         self.record_eligibility_stdp = record_eligibility_stdp if self.network.use_etrace_stdp else False
+        self.record_eligibility_custom = record_eligibility_custom
 
         # Initialize recorders
         self.mem_recorder = LayerRecorder(network.layer_sizes_active) if self.record_membrane else None
@@ -72,6 +74,7 @@ class SNNSimulator:
         self.eligibility_pre_recorder = MatrixRecorder([synapse.weights.shape for synapse in network.synapse_layers]) if self.record_eligibility_pre else None
         self.eligibility_post_recorder = MatrixRecorder([synapse.weights.shape for synapse in network.synapse_layers]) if self.record_eligibility_post else None
         self.eligibility_stdp_recorder = MatrixRecorder([synapse.weights.shape for synapse in network.synapse_layers]) if self.record_eligibility_stdp else None
+        self.eligibility_custom_recorder = MatrixRecorder([synapse.weights.shape for synapse in network.synapse_layers]) if self.record_eligibility_custom else None
 
         # # Learning related attributes
         # self._supervised = supervised
@@ -168,6 +171,8 @@ class SNNSimulator:
             self.eligibility_post_recorder.reset()
         if self.record_eligibility_stdp:
             self.eligibility_stdp_recorder.reset()
+        if self.record_eligibility_custom:
+            self.eligibility_custom_recorder.reset()
         # self.reward_manager.reset()
         # if hasattr(self, 'decoder') and self.decoder is not None:
         #     self.decoder.reset()
@@ -222,6 +227,8 @@ class SNNSimulator:
                 self.eligibility_post_recorder.reset()
             if self.record_eligibility_stdp:
                 self.eligibility_stdp_recorder.reset()
+            if self.record_eligibility_custom:
+                self.eligibility_custom_recorder.reset()
 
         if deterministic:
             self.network.set_deterministic()
@@ -289,6 +296,7 @@ class SNNSimulator:
                             self.network.apply_learning_rule(reward=signal)
                     # Perform fixed update without rule
                     if self.network.update_weights_on_etrace:
+                        # Note to self: Need a way to control trigger (e.g. "on-reward", "on-end")
                         signal = self.modulator.signal(locals=locals()) if self._modulation else reward
                         self.network.apply_weight_updates_from_etrace(signal)
 
@@ -316,6 +324,7 @@ class SNNSimulator:
 
             # Apply learning rule at every timestep
             if update and self.update_condition == "on-timestep":
+                # Warning: reward can be None
                 signal = self.modulator.signal(locals=locals()) if self._modulation else reward
                 self.network.apply_learning_rule(reward=signal)
 
@@ -370,6 +379,9 @@ class SNNSimulator:
             if record and self.record_eligibility_stdp:
                 for i, etraces in enumerate(self.network.eligibility_traces_stdp):
                     self.eligibility_stdp_recorder.record(i, t, etraces)
+            if record and self.record_eligibility_custom:
+                for i, etraces in enumerate(self.network.eligibility_traces_custom):
+                    self.eligibility_custom_recorder.record(i, t, etraces)
             
             # # Check for start of new sample
             # _new_sample = self.spike_generator.is_final()
@@ -485,6 +497,8 @@ class SNNSimulator:
             self.eligibility_post_recorder.setup(num_steps)
         if self.record_eligibility_stdp:
             self.eligibility_stdp_recorder.setup(num_steps)
+        if self.record_eligibility_custom:
+            self.eligibility_custom_recorder.setup(num_steps)
 
     def _should_explore(self, t: int) -> bool:
         """

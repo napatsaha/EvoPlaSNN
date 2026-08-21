@@ -23,6 +23,7 @@ class SNN:
                  winner_take_all: bool = False, soft_reset: bool = False,
                  sim_method: Literal["event-driven", "step-wise"] = "step-wise",
                  update_weights_on_etrace: bool | Literal["pre", "post", "stdp", "custom"] = False,
+                 update_lrate: float = 1.0,
                 #  tau_mem: float | List[float] = 5e-3, tau_trace: float | List[float] = 1e-1, threshold: float | List[float] = 1.0, 
                 #  membrane_start: float = 0.0, reset_mechanism = "subtract"
                  ):
@@ -54,10 +55,12 @@ class SNN:
         self.use_etrace_pre = self.synapse_params.get("eligibility_trace", False) or self.synapse_params.get("eligibility_pre", False)
         self.use_etrace_post = self.synapse_params.get("eligibility_post", False)
         self.use_etrace_stdp = self.synapse_params.get("eligibility_stdp", False)
+        self.use_etrace_custom = self.synapse_params.get("eligibility_custom", False)
         self.use_etrace = self.use_etrace_pre or self.use_etrace_post or self.use_etrace_stdp
 
         self.update_weights_on_etrace = bool(update_weights_on_etrace)
         self._etrace_to_update = str(update_weights_on_etrace) if self.update_weights_on_etrace else None
+        self._update_lrate = float(update_lrate)
 
         # Create each neuron layers
         self.neuron_layers = []
@@ -103,7 +106,7 @@ class SNN:
 
     def apply_weight_updates_from_etrace(self, signal: float = None, lrate: float = 1.0):
         for synapse in self.synapse_layers:
-            synapse.update_weights_from_etrace(signal, self._etrace_to_update, lrate)
+            synapse.update_weights_from_etrace(signal, self._etrace_to_update, lrate=self._update_lrate)
 
     def reset(self):
         """
@@ -183,6 +186,10 @@ class SNN:
     @property
     def eligibility_traces_stdp(self):
         return [synapse.eligibility_stdp for synapse in self.synapse_layers]
+
+    @property
+    def eligibility_traces_custom(self):
+        return [synapse.eligibility_custom for synapse in self.synapse_layers]
     
     @property
     def learning_rule(self):

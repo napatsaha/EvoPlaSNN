@@ -620,7 +620,7 @@ def plot_env_weight_greedy(simulator: 'SNNSimulator', *, arrowcolors = ("white",
 
 
 def plot_eligibility_traces(simulator: 'SNNSimulator' = None, values: np.ndarray = None, *, 
-                            synapse_layer: int = 0, etype: Literal["pre", "post", "stdp"] = "pre",
+                            synapse_layer: int = 0, etype: Literal["pre", "post", "stdp", "custom"] = "pre",
                             x_scale: float = 0.2, y_scale: float = 0.8,
                             t_min: int = None, t_max: int = None, t_range: int = 100,
                             cmap: str = "viridis", figsize=None, dpi: int = 100,
@@ -635,6 +635,9 @@ def plot_eligibility_traces(simulator: 'SNNSimulator' = None, values: np.ndarray
         elif etype == "stdp":
             assert simulator.record_eligibility_stdp, "STDP eligibility trace recording is not enabled."
             etrace = simulator.eligibility_stdp_recorder.values[synapse_layer]
+        elif etype == "custom":
+            assert simulator.record_eligibility_custom, "Custom eligibility trace recording is not enabled."
+            etrace = simulator.eligibility_custom_recorder.values[synapse_layer]
         else:
             raise ValueError(f"Eligiblity trace type: {etype} not supported.")
         

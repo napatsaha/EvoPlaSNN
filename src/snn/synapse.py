@@ -29,6 +29,7 @@ class SynapseLayer(SynapseLayerProtocol):
                  learning_rule: LearningRule = None,
                  eligibility_trace: bool = False, eligibility_pre: bool = False, eligibility_post: bool = False,
                  eligibility_stdp: bool = False, ltd_coef: float = 1.0,
+                 eligibility_custom: bool = False,
                  e_max: float = None, e_min: float = None,
                  tau_syn: float = None, dt: float = 1e-3,
                  synaptic_delay: int = 0,
@@ -49,6 +50,11 @@ class SynapseLayer(SynapseLayerProtocol):
         self.post_layer = post_layer
         self.learning_rule = learning_rule if learning_rule is not None else Empty_Rule()
         # self._learning_rule_type = self._get_lrule_type()
+
+        # Interactions with learning rule
+        self._out_weights = False
+        self._out_thresholds = False
+        self._out_eligibility = False
 
         # Synaptic Delay
         self.synaptic_delay = synaptic_delay
@@ -83,7 +89,7 @@ class SynapseLayer(SynapseLayerProtocol):
                 self._elast_stdp = np.zeros((self.pre_layer.size, self.post_layer.size), dtype=np.float32)
                 self._etssp_stdp = np.full((self.pre_layer.size, self.post_layer.size), np.inf, dtype=np.float32)
         # Custom Eligibility trace (for rule-controlled e-trace)
-        self._use_elig_custom = self._out_eligibility
+        self._use_elig_custom = eligibility_custom
         if self._use_elig_custom:
             # For the sake of simplicity, only step-wise method of updating custom eligibility will be used
             self._etrace_custom = np.zeros((self.pre_layer.size, self.post_layer.size), dtype=np.float32)
@@ -440,6 +446,10 @@ class SynapseLayer(SynapseLayerProtocol):
         self._out_weights = getattr(rule, "delta_weight", False)
         self._out_thresholds = getattr(rule, "delta_threshold", False)
         self._out_eligibility = getattr(rule, "delta_eligibility", False)
+        # Recreate custom eligibility trace if necessary
+        if self._out_eligibility and not self._use_elig_custom:
+            self._use_elig_custom = True
+            self._etrace_custom = np.zeros((self.pre_layer.size, self.post_layer.size), dtype=np.float32)
         # Perform necessary changes based on rule encodings
         if getattr(rule, "encode_tau_syn", False):
             value = getattr(rule, "values", {}).get("tau_syn")

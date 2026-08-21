@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import List, Tuple
 
 
-def _plot_simulation_results(simulator, results_path, prefix, save_plots, show_plots, plot_params, default_plot_flag):
+def _plot_simulation_results(simulator: 'SNNSimulator', results_path, prefix, save_plots, show_plots, plot_params, default_plot_flag):
     # Plot spike raster
     if plot_params.get("plot_spikes", default_plot_flag):
         try:
@@ -80,6 +80,13 @@ def _plot_simulation_results(simulator, results_path, prefix, save_plots, show_p
                                             savepath=Path(results_path, f"{prefix}_eligibility_stdp_traces.png") if save_plots else None, show=show_plots)
         except Exception as e:
             print(f"Error plotting eligibility STDP traces: {e}")
+    # Plot Custom (rule-derived) eligibility traces
+    if plot_params.get("plot_eligibility_custom", default_plot_flag) and simulator.record_eligibility_custom:
+        try:
+            snn_plot.plot_eligibility_traces(simulator, etype="custom", synapse_layer=0,
+                                            savepath=Path(results_path, f"{prefix}_eligibility_custom_traces.png") if save_plots else None, show=show_plots)
+        except Exception as e:
+            print(f"Error plotting eligibility Custom traces: {e}")
     # Plot intermediate fitness within simulation
     if plot_params.get("plot_intermediate_fitness", default_plot_flag):
         try:
@@ -126,6 +133,7 @@ def evaluate_and_plot(results_path: Path | str = None, *, config_path: str | Pat
             plot_params.get("plot_eligibility_pre", default_plot_flag) or \
             plot_params.get("plot_eligibility_post", default_plot_flag) or \
             plot_params.get("plot_eligibility_stdp", default_plot_flag) or \
+            plot_params.get("plot_eligibility_custom", default_plot_flag) or \
             plot_params.get("plot_intermediate_fitness", default_plot_flag)
 
     # T = config["num_sim_steps"] if num_steps is None else num_steps
@@ -135,7 +143,7 @@ def evaluate_and_plot(results_path: Path | str = None, *, config_path: str | Pat
             raise FileNotFoundError(f"Rule file {rule_id_name} not found in {results_path}. Please run the evolution first.")
 
         # Load the best ANN learning rule
-        rule = read_learning_rule(results_path / rule_id_name, config_path=results_path / "config.yaml")
+        rule = read_learning_rule(results_path / rule_id_name, config_path=config_path)
         prefix = f"eval_rule-{rule_id:02d}"
     else:
         assert isinstance(learning_rule, LearningRule), f"{type(learning_rule)} is not a LearningRule object."
@@ -259,7 +267,7 @@ def evaluate_and_plot(results_path: Path | str = None, *, config_path: str | Pat
                     if not (results_path / rule_id_name).exists():
                         raise FileNotFoundError(f"Rule file {rule_id_name} not found in {results_path}. Please run the evolution first.")
                     # Load the best ANN learning rule
-                    rule_i = read_learning_rule(results_path / rule_id_name, config_path=results_path / "config.yaml")
+                    rule_i = read_learning_rule(results_path / rule_id_name, config_path=config_path)
                     prefix_i = f"eval_rule_{rule_id:02d}"
                     snn_plot.plot_learning_rule(rule_i,
                                                 savepath=Path(results_path, f"{prefix_i}_learning_rule.png") if save_plots else None, show=show_plots)

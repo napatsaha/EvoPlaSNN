@@ -128,11 +128,14 @@ def compare_deep_dict(d1: dict, d2: dict, warn_missing_keys: bool = True):
 LRULE_INPUT_BOUNDS = {
     "trace_pre": (0, 1),
     "trace_post": (0, 1),
+    "spike_pre": (0, 1),
+    "spike_post": (0, 1),
     "weights": (-5, 5), 
     "reward": (-1, 1), 
     "eligibility_pre": (0, 1),
     "eligibility_post": (0, 1), 
-    "eligibility_stdp": (-1, 1)
+    "eligibility_stdp": (-1, 1),
+    "eligibility_custom": (-1, 1)
 }
 
 def compute_lrule_bc(rule: LearningRule, inp: np.ndarray = None, normalise: bool = False, *,
@@ -163,7 +166,8 @@ def make_bc_func(input_order, num_grid, normalise):
 
 
 def get_boundaries_for_lrule_inputs(simulator: 'SNNSimulator', input_var: str) -> Tuple[float, float]:
-    _supported_inputs = ("trace_pre", "trace_post", "weights", "reward", "eligibility_pre", "eligibility_post", "eligibility_stdp")
+    # _supported_inputs = ("trace_pre", "trace_post", "weights", "reward", "eligibility_pre", "eligibility_post", "eligibility_stdp")
+    _supported_inputs = LRULE_INPUT_BOUNDS.keys()
     assert input_var in _supported_inputs, f"Input variable needs to be one of {_supported_inputs}. Got {input_var}"
     min_, max_ = None, None
     try:
@@ -270,7 +274,8 @@ TYPE_DICT = {
     "cgp" : ("lrule.cgp", "CGP_Rule"),
     "graph" : ("lrule.cgp", "CGP_Graph"),
     # "stdp" : ("lrule.stdp", "STDP_Rule"),
-    "rstdp" : ("lrule.stdp", "R_STDP_Rule")
+    "rstdp" : ("lrule.stdp", "R_STDP_Rule"),
+    "small-poly" : ("lrule.polynomial", "SmallPolynomialRule")
 }
 
 
