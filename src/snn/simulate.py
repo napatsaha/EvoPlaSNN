@@ -12,7 +12,7 @@ from .snn import SNN
 from .modulation import Modulator, Reward_Modulator, TD_Error_Modulator
 # from lrule import LearningRule
 from .spikegen import BinaryClassGenerator
-from .decoding_old import get_decoder_class, get_fitnessor_class, BaseDecoder, BaseFitnessor
+# from .decoding_old import get_decoder_class, get_fitnessor_class, BaseDecoder, BaseFitnessor
 from .rewarder import create_rewarder, create_collector, RewarderProtocol, CollectorProtocol
 from common.base import SpikeCoder
 from rl.collector import RewardCollector, TrajectoryCollector
@@ -20,8 +20,8 @@ import gymnasium as gym
 
 
 class SNNSimulator:
-    decoder: BaseDecoder | None
-    fitnessor: BaseFitnessor | None
+    # decoder: BaseDecoder | None
+    # fitnessor: BaseFitnessor | None
     rewarder: RewarderProtocol | None
     collector: CollectorProtocol | None
     def __init__(self, network: SNN, #spike_generator: SpikeGenerator = None, 
