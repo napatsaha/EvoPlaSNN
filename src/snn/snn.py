@@ -57,6 +57,13 @@ class SNN:
                     layer_params["spike_method"] = "deterministic"
                     layer_params["threshold"] = 1.0
                     layer_params["reset_condition"] = "all-above"
+                    tau_trace = neuron_params.get("tau_trace", None)
+                    if tau_trace is None:
+                        pass
+                    elif isinstance(tau_trace, Sequence):
+                        layer_params["tau_trace"] = tau_trace[0]
+                    else:
+                        layer_params["tau_trace"] = tau_trace
                     self.neuron_params.append(layer_params)
                     continue
                 for k, v in neuron_params.items():

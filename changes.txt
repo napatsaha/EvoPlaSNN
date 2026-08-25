@@ -2,6 +2,9 @@
 v1.3
 ----
 
+v1.3.14.1 (2026-08-25)
+- Hotfix: get tau_trace for input layer from neuron_params if use_default_input_params is enabled
+
 v1.3.14.0 (2026-08-25)
 - Introduce 'use_default_input_params' to SNN params
     - When enabled, `neuron_params` only applies to non-inputs layers
