@@ -2,6 +2,11 @@
 v1.3
 ----
 
+v1.3.14.0 (2026-08-25)
+- Introduce 'use_default_input_params' to SNN params
+    - When enabled, `neuron_params` only applies to non-inputs layers
+    - Expand out the for loop SNN.init for normalising neuron_params as list
+
 v1.3.13.0 (2026-08-25)
 - `LogRealParam` as an extension of `RealParam`
     - uses `base` to control exponent

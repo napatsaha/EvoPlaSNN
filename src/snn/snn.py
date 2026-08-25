@@ -23,7 +23,7 @@ class SNN:
                  winner_take_all: bool = False, soft_reset: bool = False,
                  sim_method: Literal["event-driven", "step-wise"] = "step-wise",
                  update_weights_on_etrace: bool | Literal["pre", "post", "stdp", "custom"] = False,
-                 update_lrate: float = 1.0,
+                 update_lrate: float = 1.0, use_default_input_params: bool = False,
                 #  tau_mem: float | List[float] = 5e-3, tau_trace: float | List[float] = 1e-1, threshold: float | List[float] = 1.0, 
                 #  membrane_start: float = 0.0, reset_mechanism = "subtract"
                  ):
@@ -46,10 +46,33 @@ class SNN:
 
         # Store neuron and synapse parameters
         self.winner_take_all = winner_take_all
-        self.neuron_params = [
-            {k: v if not isinstance(v, list | tuple) else v[(self.num_layers + i) % len(v)] for k, v in neuron_params.items()} \
-            for i in range(self.num_layers)
-        ] if neuron_params is not None else [{}] * self.num_layers
+        # num_layers = self.num_layers if not use_default_input_params else self.num_layers - 1 # Exclude input layers from neuron_params
+        if neuron_params is not None:
+            self.neuron_params = []
+            for i in range(self.num_layers):
+                layer_params = {}
+                if use_default_input_params and i == 0:
+                    # Use Default param for input layer
+                    layer_params["wta"] = False
+                    layer_params["spike_method"] = "deterministic"
+                    layer_params["threshold"] = 1.0
+                    layer_params["reset_condition"] = "all-above"
+                    self.neuron_params.append(layer_params)
+                    continue
+                for k, v in neuron_params.items():
+                    if isinstance(v, list | tuple):
+                        layer_params[k] = v[i-1] if use_default_input_params else v[i]
+                    else:
+                        layer_params[k] = v
+                if "wta" not in layer_params:
+                    layer_params["wta"] = self.winner_take_all
+                self.neuron_params.append(layer_params)
+        else:
+            self.neuron_params = [{}] * self.num_layers
+        # self.neuron_params = [
+        #     {k: v if not isinstance(v, list | tuple) else v[(self.num_layers + i) % len(v)] for k, v in neuron_params.items()} \
+        #     for i in range(self.num_layers)
+        # ] if neuron_params is not None else [{}] * self.num_layers
 
         self.synapse_params = synapse_params if synapse_params is not None else {}
         self.use_etrace_pre = self.synapse_params.get("eligibility_trace", False) or self.synapse_params.get("eligibility_pre", False)
@@ -65,10 +88,6 @@ class SNN:
         # Create each neuron layers
         self.neuron_layers = []
         for i, layer_size in enumerate(self.layer_sizes_active):
-            if self.winner_take_all and i > 0:
-                self.neuron_params[i]["wta"] = True
-            else:
-                self.neuron_params[i]["wta"] = False
             layer = NeuronLayer(layer_size, dt=self.dt,
                                 sim_method=self.sim_method, 
                                 **self.neuron_params[i]
