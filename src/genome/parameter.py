@@ -11,6 +11,7 @@ from common.base import Parameter
 
 PARAM_DICT = {
     "real": "RealParam",
+    "log": "LogRealParam",
     "discrete": "DiscreteParam"
 }
 
@@ -36,14 +37,14 @@ class BaseParameter(Parameter):
     value: np.typing.ArrayLike
     name: str
 
-    def __init__(self, value, length: int = 1, name: str = None):
+    def __init__(self, value, length: int = 1, name: str = None, dtype: np.typing.DTypeLike = np.float32):
         super().__init__()
         if value is None:
             length = max(1, length)
             value = self._generate(length)
         else:
             if not isinstance(value, np.ndarray):
-                value = np.asarray(value)
+                value = np.asarray(value, dtype=dtype)
                 # Force value to be at least 1D array (not 0D array) for consistent behaviour, e.g. len()
                 if value.ndim == 0:
                     value = np.array([value])
@@ -87,11 +88,11 @@ class BaseParameter(Parameter):
     def mutate(self, flags: bool | ArrayLike, method: Literal["resample", "perturb"] = "resample", scale: float = None) -> 'BaseParameter':
         # if not isinstance(bool):
         #     assert len(flags) == self.length
-        if isinstance(flags, (np.ndarray, Sequence)):
+        if isinstance(flags, bool):
+            flags = np.full(self.length, bool(flags), dtype=bool)
+        elif isinstance(flags, (np.ndarray, Sequence)):
             assert flags.size == self.length, "Length of flags must be equal to length of param"
             flags = np.asarray(flags, dtype=bool)
-        elif isinstance(flags, (bool, int, float)):
-            flags = np.full(self.length, bool(flags), dtype=bool)
         else:
             raise ValueError(f"Invalid flags argument: type={type(flags)}, value={flags}")
         # Make n number of changes according to how True there is in flags
@@ -126,6 +127,9 @@ class BaseParameter(Parameter):
 
     def to_dict(self) -> dict:
         return {k: self.__dict__.get(k) for k in self.__dict__ if not k.startswith("_")}
+
+    def get_value(self):
+        return self.value
     
     def copy(self) -> 'BaseParameter':
         value = copy(self._value)
@@ -133,7 +137,7 @@ class BaseParameter(Parameter):
         return new_param
 
     def __repr__(self):
-        return f"Param({self._value})"
+        return f"Param({self.value})"
     
     @property
     def value(self):
@@ -196,7 +200,7 @@ class RealParam(BaseParameter):
             # self.loc = loc if loc is not None else 0
             # self.scale = scale if scale is not None else 1
 
-        super().__init__(value, length, name)
+        super().__init__(value, length, name, dtype=np.float32)
 
     def _generate(self, size):
         if self._uniform:
@@ -243,6 +247,50 @@ class RealParam(BaseParameter):
 #         return np.random.uniform(low, high)
 
 
+class LogRealParam(RealParam):
+    # TBA
+    def __init__(self, value=None, length=1, name = None, *, 
+                 base: float | str = None,
+                 low=None, high=None, dist_params = None, dist = "normal", **kwargs):
+        if dist_params is None:
+            dist_params = {"loc":0, "scale":1}
+        super().__init__(value, length, name, low=low, high=high, dist_params=dist_params, dist=dist, **kwargs)
+        if base is None or (base == 'e'):
+            self._base_e = True
+            self._base_10 = False
+            self.base = np.e
+        else:
+            assert isinstance(base, int | float | np.ndarray), f"Base must be a scalar number. Got type={type(base)}"
+            self._base_e = np.isclose(base, np.e)
+            self._base_10 = np.isclose(base, 10)
+            self.base = np.e if self._base_e else 10 if self._base_10 else float(base)
+
+    def _convert_value_out(self, value):
+        """Return base^(value)"""
+        if self._base_e:
+            return np.exp(value)
+        elif self._base_10:
+            return 10**value
+        else:
+            return np.float_power(self.base, value)
+
+    def _convert_value_in(self, value):
+        """Return logarithm<base> of value"""
+        if self._base_e:
+            return np.log(value)
+        elif self._base_10:
+            return np.log10(value)
+        else:
+            return np.emath.logn(self.base, value)
+
+    def get_value(self):
+        return self._convert_value_out(self.value)
+
+    def __repr__(self):
+        kwargs = ', '.join(f"{k}={v}" for k, v in self.to_dict().items() if v is not None)
+        return f"LogRealParam({self.value}, {kwargs})"
+
+
 class DiscreteParam(BaseParameter):
     # DONE: Add n for number of possible values
     def __init__(self, value=None, length=1, name: str = None, *, 
@@ -283,7 +331,7 @@ class DiscreteParam(BaseParameter):
             else:
                 raise AssertionError("Insufficient information. Either one of 'n' or 'high' or both of 'high' and 'low' must be passed through.")
 
-        super().__init__(value, length, name)
+        super().__init__(value, length, name, dtype=np.int_)
 
         # self._value = self._value.astype(np.int_)
 

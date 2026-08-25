@@ -2,6 +2,19 @@
 v1.3
 ----
 
+v1.3.13.0 (2026-08-25)
+- `LogRealParam` as an extension of `RealParam`
+    - uses `base` to control exponent
+    - currently only uses `_convert_value_out` for returning value to be used, but also has `_convert_value_in` 
+        for future uses
+- Added method `.get_value()` for base protocol `Parameter`
+    - Only used for extracting values in `EvolvableLearningRule._extract_values_from_genes()`
+- Added default Param kwargs for 'learning_rate' and 'tau_syn' in base `EvolvableLearningRule.default_gene_specs`
+- `BaseParameter.mutate()` can take a single bool input, which will be applied to all gene positions
+    - Removed (int, float) conditions of `flags=`
+- Added `dtype` argument to `BaseParameter` which will be set automatically by children's `__init__`, 
+    in order to prevent unintentional int dtype to be preserved during mutation (which would lose information in float resampling)
+
 v1.3.12.2 (2026-08-21)
 - Various fixes to support running experiment
 - Fixed issue with `CompositeSpikeCoder._validate_input` when input is a scalar

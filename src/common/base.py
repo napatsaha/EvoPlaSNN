@@ -356,17 +356,23 @@ class Parameter(ABC):
         Returns:
             Parameter: New recombined Parameter
         """
+
+    @abstractmethod
+    def get_value(self) -> Any:
+        """
+        Extract value represented by this gene (This may be different from value encoded in genome)
+        """
         
     @abstractmethod
     def copy(self) -> 'Parameter':
         """
-        _summary_
+        Make a copy of this gene
         """
     
     @abstractmethod
     def to_dict(self) -> 'Dict':
         """
-        _summary_
+        Return attributes required as kwargs to recreate this Parameter during init
         """
 
 

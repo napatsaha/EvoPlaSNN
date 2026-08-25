@@ -167,8 +167,8 @@ class EvolvableLearningRule(Genome):
     genome: CompositeGenome
     _specs: Dict[str, Dict[str, Any]]
     default_gene_specs = {
-        "learning_rate": dict(kind="real", length=1, low=0),
-        "tau_syn": dict(kind="real", length=1, low=0, high=0.5, dist="uniform")
+        "learning_rate": dict(kind="log", length=1, base=10, low=-3, high=1, dist="uniform"),
+        "tau_syn": dict(kind="log", length=1, base=2, low=-3, high=0, dist="uniform")
     }
     default_gene_order = ("learning_rate", "tau_syn")
 
@@ -344,7 +344,7 @@ class EvolvableLearningRule(Genome):
         """
         values = {}
         for gene_name, gene in zip(self.gene_order, self.genes):
-            values[gene_name] = gene.value
+            values[gene_name] = gene.get_value()
         return values
 
     def _apply_gene_values(self):
