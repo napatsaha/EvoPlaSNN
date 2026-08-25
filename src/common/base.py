@@ -136,11 +136,32 @@ class SynapseLayerProtocol(Protocol):
         """
         pass
 
+    def update_traces(self) -> None:
+        """
+        Update pre- and post-synaptic traces, if enabled
+        """
+
     def update_eligibility_trace(self) -> None:
         """
         Update the eligibility trace based on the pre and post neuron layer spikes.
         """
         pass
+
+    def get_pre_trace(self) -> np.ndarray | None:
+        """
+        Return pre-synaptic spike traces of shape (pre_size, post_size)
+
+        Returns:
+            np.ndarray | None: shape (pre_size, post_size)
+        """
+
+    def get_post_trace(self) -> np.ndarray | None:
+        """
+        Return post-synaptic spike traces of shape (pre_size, post_size)
+
+        Returns:
+            np.ndarray | None: shape (pre_size, post_size)
+        """
 
 
 class SNNProtocol(Protocol):

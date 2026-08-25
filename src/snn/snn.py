@@ -121,8 +121,9 @@ class SNN:
             curr = self.synapse_layers[i].forward(spk)
         spike_out = self.neuron_layers[-1].forward(curr)
         # Update eligibility traces if applicable
-        if self.use_etrace:
-            for synapse in self.synapse_layers:
+        for synapse in self.synapse_layers:
+            synapse.update_traces()
+            if self.use_etrace:
                 synapse.update_eligibility_trace()
         return spike_out
 

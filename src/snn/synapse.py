@@ -27,11 +27,13 @@ class SynapseLayer(SynapseLayerProtocol):
     
     def __init__(self, pre_layer: NeuronLayerProtocol, post_layer: NeuronLayerProtocol, *, 
                  learning_rule: LearningRule = None,
+                 pre_trace: bool = False, post_trace: bool = False,
                  eligibility_trace: bool = False, eligibility_pre: bool = False, eligibility_post: bool = False,
                  eligibility_stdp: bool = False, ltd_coef: float = 1.0,
                  eligibility_custom: bool = False,
                  e_max: float = None, e_min: float = None,
-                 tau_syn: float = None, dt: float = 1e-3,
+                 tau_syn: float = None, tau_pre: float = None, tau_post: float = None,
+                 dt: float = 1e-3,
                  synaptic_delay: int = 0,
                  sim_method: Literal["event-driven", "step-wise"] = "step-wise",
                  weight_init: Literal["uniform", "normal", "constant"] = "uniform",
@@ -61,6 +63,33 @@ class SynapseLayer(SynapseLayerProtocol):
         self._apply_delay = synaptic_delay > 0
         if self._apply_delay:
             self.current_buffer = Array_FIFO(shape=(self.post_layer.size, ), size=synaptic_delay + 1)
+
+        # Self-retained pre- and post-neuron traces
+        self._use_pre_trace = pre_trace
+        if self._use_pre_trace:
+            if self._step_wise:
+                self._pre_trace = np.zeros((self.pre_layer.size, self.post_layer.size), dtype=np.float32)
+            elif self._event_driven:
+                self._pretrace_tssp = np.full((self.pre_layer.size, self.post_layer.size), np.inf, dtype=np.float32)
+                self._pretrace_last = 1.0
+        self._use_post_trace = post_trace
+        if self._use_post_trace:
+            if self._step_wise:
+                self._post_trace = np.zeros((self.pre_layer.size, self.post_layer.size), dtype=np.float32)
+            elif self._event_driven:
+                self._posttrace_tssp = np.full((self.pre_layer.size, self.post_layer.size), np.inf, dtype=np.float32)
+                self._posttrace_last = 1.0
+
+        # Tau for pre-traces
+        if tau_pre is not None and tau_pre > 1:
+            tau_pre = tau_pre * dt
+        self._tau_pre = tau_pre if tau_pre is not None else dt
+        self._beta_pre = np.exp(-self.dt / self._tau_pre)
+        # Tau for post-traces
+        if tau_post is not None and tau_post > 1:
+            tau_post = tau_post * dt
+        self._tau_post = tau_post if tau_post is not None else dt
+        self._beta_post = np.exp(-self.dt / self._tau_post)
 
         # Eligibility trace
         # Pre-before-post trace (previously just "eligibility_trace")
@@ -155,6 +184,18 @@ class SynapseLayer(SynapseLayerProtocol):
         """
         Reset only eligibility traces, but keep the synaptic weights unchanged.
         """
+        if self._use_pre_trace:
+            if self._step_wise:
+                self._pre_trace.fill(0.0)
+            elif self._event_driven:
+                self._pretrace_tssp.fill(np.inf)
+                # self._pretrace_last.fill(0.0)
+        if self._use_post_trace:
+            if self._step_wise:
+                self._post_trace.fill(0.0)
+            elif self._event_driven:
+                self._posttrace_tssp.fill(np.inf)
+                # self._posttrace_last.fill(0.0)
         if self._use_elig_pre:
             if self._step_wise:
                 self._etrace_pre.fill(0.0)
@@ -191,6 +232,32 @@ class SynapseLayer(SynapseLayerProtocol):
         if self._apply_delay:
             output_current = self.current_buffer.push(output_current)
         return output_current
+
+    def update_traces(self) -> None:
+        """Update pre- and post-synaptic traces, if enabled"""
+        if self._use_pre_trace:
+            if self._step_wise:
+                self._pre_trace = self._pre_trace * self._beta_pre
+                idx_spike = self.pre_layer.spike.nonzero()[0]
+                self._pre_trace[idx_spike, :] = 1.0
+            elif self._event_driven:
+                self._pretrace_tssp += 1
+                pre_spike = self.pre_layer.spike
+                if any(pre_spike):
+                    idx_spike = pre_spike.nonzero()[0]
+                    self._pretrace_tssp[idx_spike, :] = 0
+        if self._use_post_trace:
+            if self._step_wise:
+                self._post_trace *= self._beta_post
+                idx_spike = self.post_layer.spike.nonzero()[0]
+                self._post_trace[:, idx_spike] = 1.0
+                # self._post_trace[:, :] = self.post_layer.spike[np.newaxis, :]
+            elif self._event_driven:
+                self._posttrace_tssp += 1
+                post_spike = self.post_layer.spike
+                if any(post_spike):
+                    idx_spike = post_spike.nonzero()[0]
+                    self._posttrace_tssp[:, idx_spike] = 0
     
     def update_eligibility_trace(self) -> None:
         # Gets called every timestep
@@ -329,6 +396,27 @@ class SynapseLayer(SynapseLayerProtocol):
     #             # Update tssp
     #         etssp[:, idx_spike] = 0
 
+    def get_pre_trace(self) -> np.ndarray | None:
+        if self._use_pre_trace:
+            if self._step_wise:
+                return self._pre_trace
+            else:
+                return self._pretrace_last * np.exp(-self._pretrace_tssp * self.dt / self._tau_pre)
+        else:
+            pre_trace = self.pre_layer.get_trace()
+            return np.broadcast_to(pre_trace[:, np.newaxis], (self.pre_layer.size, self.post_layer.size))
+
+    def get_post_trace(self) -> np.ndarray | None:
+        if self._use_post_trace:
+            if self._step_wise:
+                return self._post_trace
+            else:
+                return self._posttrace_last * np.exp(-self._posttrace_tssp * self.dt / self._tau_post)
+        else:
+            post_trace = self.post_layer.get_trace()
+            return np.broadcast_to(post_trace[:, np.newaxis], (self.pre_layer.size, self.post_layer.size))
+
+
     def apply_learning_rule(self, reward: float = None) -> None:
         """
         Update the synaptic information by applying the stored learning rule.  
@@ -389,6 +477,30 @@ class SynapseLayer(SynapseLayerProtocol):
         assert value > 0, f"Time constant value must be strictly posive. Got tau_syn={value}"
         self._tau_syn = value
         self._beta_syn = np.exp(-self.dt / self._tau_syn)
+
+    @property
+    def tau_pre(self) -> float:
+        """
+        Time constant used for pre-synaptic trace
+        """
+        return self._tau_pre
+    @tau_pre.setter
+    def tau_pre(self, value):
+        assert value > 0, f"Time constant value must be strictly posive. Got tau_pre={value}"
+        self._tau_pre = value
+        self._beta_pre = np.exp(-self.dt / self._tau_pre)
+
+    @property
+    def tau_post(self) -> float:
+        """
+        Time constant used for post-synaptic trace
+        """
+        return self._tau_post
+    @tau_post.setter
+    def tau_post(self, value):
+        assert value > 0, f"Time constant value must be strictly posive. Got tau_post={value}"
+        self._tau_post = value
+        self._beta_post = np.exp(-self.dt / self._tau_post)
     
     @property
     def eligibility_pre(self):

@@ -76,14 +76,18 @@ class BaseLearningRule(LearningRule):
         inp = []
         # 1, 2 = trace pre, post
         if self.use_trace_pre or self.use_trace_post:
-            trace_pre, trace_post = tile_array(w_shape, synapse.pre_layer.get_trace(), synapse.post_layer.get_trace())
+            # trace_pre, trace_post = tile_array(w_shape, synapse.pre_layer.get_trace(), synapse.post_layer.get_trace())
+            trace_pre = synapse.get_pre_trace()
+            trace_post = synapse.get_post_trace()
             if self.use_trace_pre:
                 inp.append(trace_pre.reshape(-1, 1))
             if self.use_trace_post:
                 inp.append(trace_post.reshape(-1, 1))
         # 3, 4 = Pre- and post- spikes
         if self.use_spike_pre or self.use_spike_post:
-            spike_pre, spike_post = tile_array(w_shape, synapse.pre_layer.spike, synapse.post_layer.spike)
+            # spike_pre, spike_post = tile_array(w_shape, synapse.pre_layer.spike, synapse.post_layer.spike)
+            spike_pre = np.broadcast_to(synapse.pre_layer.spike[:, np.newaxis], w_shape)
+            spike_post = np.broadcast_to(synapse.post_layer.spike[np.newaxis, :], w_shape)
             if self.use_spike_pre:
                 inp.append(spike_pre.reshape(-1, 1))
             if self.use_spike_post:

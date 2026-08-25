@@ -2,6 +2,22 @@
 v1.3
 ----
 
+v1.3.15.0 (2026-08-25)
+- SynapseLayer pre- and post-traces
+    - Added init args: tau_pre, tau_post, pre_trace, post_trace
+    - New settable properties: tau_pre, tau_post
+    - New methods: update_traces, get_pre_trace, get_post_trace
+    - Added internal trace variables for both pre and post traces:
+        _use_pre_trace, _use_post_trace, _pre_trace, _post_trace, _pretrace_tssp, _posttrace_tssp
+        _pretrace_last, _posttrace_last
+    - Only a 'recent' or last spike only trace is implemented for the sake of simplicity
+    - Implemented trace update for both step-wise and event-driven simulation method
+- New SynapseLayer method `.update_traces()` which is called during `SNN.forward()`
+- Ability for NeuronLayer to turn off traces by specifying `trace_type='none'`
+- Inside `BaseLearningRule.prepare_inputs()`
+    - SynapseLayer's new `get_pre_trace()` and `get_post_trace()` is now called instead of tiling traces
+    - Pre and Post spike use `np.broadcast_to` instead of `tile_array()` to prepare to synapse shape 
+
 v1.3.14.1 (2026-08-25)
 - Hotfix: get tau_trace for input layer from neuron_params if use_default_input_params is enabled
 

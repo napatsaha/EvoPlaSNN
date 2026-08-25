@@ -62,13 +62,14 @@ class NeuronLayer(NeuronLayerProtocol):
                  reset_mechanism: Literal["rest", "zero", "subtract"] = "rest", mem_rest: float = 0.0, 
                  reset_condition: Literal["only-winner", "all-above", "all", "none"] = "all-above", delayed_wta: bool = False, 
                  trace_amp: float = 1.0, #trace_type: Literal["dx1", "dx2", "dx3", "dx4"] = None,
-                 trace_type: Literal["cumulative", "recent", "dx1", "dx2", "dx3", "dx4"] = "recent"):
+                 trace_type: Literal["cumulative", "recent", "dx1", "dx2", "dx3", "dx4", "none"] = "recent"):
         # Simulation parameters
         self.size = size
         self.dt = dt
         self.sim_method = sim_method
         self._event_driven = sim_method == "event-driven"
         self._step_wise = sim_method == "step-wise"
+        self._enable_trace = trace_type != "none"
         self._last_only = trace_type == "recent" 
         if trace_type.startswith("dx"): # Backwards compatibility
             self._last_only = True if trace_type in ["dx3", "dx4"] else False # dx2 and dx1 are cumulative traces
@@ -124,13 +125,15 @@ class NeuronLayer(NeuronLayerProtocol):
         self.membrane = np.full((size,), mem_rest)
         # Spike status
         self.spike = np.zeros(size, dtype=np.int8)
-        if self._event_driven:
-            # Time since last spike
-            self.tssp = np.full(size, dtype=np.float32, fill_value=np.inf)
-            self.last_peak = np.zeros(size, dtype=np.float32)
-        elif self._step_wise:
-            # Trace
-            self._trace = np.zeros(size, dtype=np.float32)
+        # Traces
+        if self._enable_trace:
+            if self._event_driven:
+                # Time since last spike
+                self.tssp = np.full(size, dtype=np.float32, fill_value=np.inf)
+                self.last_peak = np.zeros(size, dtype=np.float32)
+            elif self._step_wise:
+                # Trace
+                self._trace = np.zeros(size, dtype=np.float32)
 
     def reset(self):
         """
@@ -142,11 +145,12 @@ class NeuronLayer(NeuronLayerProtocol):
     def soft_reset(self):
         self.membrane.fill(self.mem_rest)
         self.spike.fill(0)
-        if self._event_driven:
-            self.tssp.fill(np.inf)
-            self.last_peak.fill(0.0)
-        elif self._step_wise:
-            self._trace.fill(0.0)
+        if self._enable_trace:
+            if self._event_driven:
+                self.tssp.fill(np.inf)
+                self.last_peak.fill(0.0)
+            elif self._step_wise:
+                self._trace.fill(0.0)
 
     def forward(self, input_current: np.ndarray):
         """
@@ -243,6 +247,8 @@ class NeuronLayer(NeuronLayerProtocol):
         """
         Update the trace based on the time since last spike and the trace type.
         """
+        if not self._enable_trace:
+            return
         if self._event_driven:
             self._update_tssp()
         elif self._step_wise:
@@ -269,7 +275,9 @@ class NeuronLayer(NeuronLayerProtocol):
     #     t = self.dt * self.tssp
     #     return self.trace_amp * np.exp(-t / self.tau_trace)
 
-    def get_trace(self, idx: List[int] | np.ndarray[int] = None) -> np.ndarray:
+    def get_trace(self, idx: List[int] | np.ndarray[int] = None) -> np.ndarray | None:
+        if not self._enable_trace:
+            return None
         if self._step_wise:
             return self._trace
         elif self._event_driven:
