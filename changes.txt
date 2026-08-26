@@ -2,6 +2,13 @@
 v1.3
 ----
 
+v1.3.17.0 (2026-08-26)
+- SNN synapse_params can specify separate param for each synapse layer (similar to neuron_params)
+- Refactored the params are expanded into list of params with a helper function `_expand_params_per_layer` (assisted by CoPilot),
+    both for neuron_params and synapse_params
+- Force wta to always be False in input neuron layer
+- Removed attribute `use_etrace` since it is useless anyway
+
 v1.3.16.1 (2026-08-26)
 - Change plot_learning_rule to use default var from rule.input_order, and customisable var_x, var_y
 - Also standardised input args, and function a bit between 2D, 3D, 4D plot_learning_rule

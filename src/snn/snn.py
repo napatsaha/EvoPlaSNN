@@ -2,14 +2,46 @@
 Simple Network of LIF neurons
 """
 
-from typing import List, Literal, Sequence
-from common.base import LearningRule
+from typing import List, Literal, Sequence, Mapping, Any
+from copy import deepcopy
+
 import numpy as np
-from typing import Union
+
 from .synapse import SynapseLayer
-from lrule import Empty_Rule
 from .neurons import NeuronLayer
+from lrule import Empty_Rule
 from common.utils import solve_hidden
+from common.base import LearningRule
+
+
+def _expand_params_per_layer(
+    params: Mapping[str, Any] | None,
+    num_layers: int,
+    *,
+    name: str,
+) -> list[dict[str, Any]]:
+    """
+    Converts a dictionary of params into layer-by-layer list of params, using the specified number of layers.  
+    For each value that is a scalar, apply equally to all layers.  
+    For each value that is a list or tuple, apply each element to each layer.  
+    If the length of the list or tuple does not equal number of layers, throw a ValueError.
+    """
+    if params is None:
+        return [{} for _ in range(num_layers)]
+
+    params_per_layer = [dict() for _ in range(num_layers)]
+    for key, value in params.items():
+        if isinstance(value, (list, tuple)):
+            if len(value) != num_layers:
+                raise ValueError(
+                    f"{name}.{key} expects length {num_layers}, got {len(value)}"
+                )
+            for i in range(num_layers):
+                params_per_layer[i][key] = deepcopy(value[i])
+        else:
+            for i in range(num_layers):
+                params_per_layer[i][key] = deepcopy(value)
+    return params_per_layer
 
 
 class SNN:
@@ -34,6 +66,7 @@ class SNN:
         self.layer_sizes = [input_size] + self.hidden_size + [output_size]
         self.layer_sizes_active = self.layer_sizes
         self.num_layers = len(self.layer_sizes_active)
+        self.num_syn_layers = self.num_layers - 1
 
         # Learning rule
         self._learning_rule = learning_rule if learning_rule is not None else Empty_Rule()
@@ -45,48 +78,65 @@ class SNN:
             raise ValueError(f"Invalid simulation method: {self.sim_method}. Choose 'event-driven' or 'step-wise'.")
 
         # Store neuron and synapse parameters
-        self.winner_take_all = winner_take_all
-        # num_layers = self.num_layers if not use_default_input_params else self.num_layers - 1 # Exclude input layers from neuron_params
+        self.winner_take_all = bool(winner_take_all)
+        # Extract neuron_params
         if neuron_params is not None:
-            self.neuron_params = []
-            for i in range(self.num_layers):
-                layer_params = {}
-                if use_default_input_params and i == 0:
-                    # Use Default param for input layer
-                    layer_params["wta"] = False
-                    layer_params["spike_method"] = "deterministic"
-                    layer_params["threshold"] = 1.0
-                    layer_params["reset_condition"] = "all-above"
-                    tau_trace = neuron_params.get("tau_trace", None)
-                    if tau_trace is None:
-                        pass
-                    elif isinstance(tau_trace, Sequence):
-                        layer_params["tau_trace"] = tau_trace[0]
-                    else:
-                        layer_params["tau_trace"] = tau_trace
-                    self.neuron_params.append(layer_params)
-                    continue
-                for k, v in neuron_params.items():
-                    if isinstance(v, list | tuple):
-                        layer_params[k] = v[i-1] if use_default_input_params else v[i]
-                    else:
-                        layer_params[k] = v
-                if "wta" not in layer_params:
-                    layer_params["wta"] = self.winner_take_all
-                self.neuron_params.append(layer_params)
+            if use_default_input_params:
+                # When 'use_default_input_params=True', lists in neuron_params are interpreted as non-input layers only.
+                non_input_params = _expand_params_per_layer(
+                    neuron_params,
+                    self.num_layers - 1,
+                    name="neuron_params",
+                )
+                # Then, create input_params separately from default and append in front to the rest
+                input_params = {
+                    "wta": False,
+                    "spike_method": "deterministic",
+                    "threshold": 1.0,
+                    "reset_condition": "all-above",
+                }
+                # To ensure consistent backward compatibility, tau_trace is the only argument that always applies to input layer
+                tau_trace = neuron_params.get("tau_trace", None)
+                if isinstance(tau_trace, (list, tuple, np.ndarray)): # If more than one, use first layer by default
+                    input_params["tau_trace"] = tau_trace[0]
+                elif tau_trace is not None: # Otherwise If scalar, use if available
+                    input_params["tau_trace"] = tau_trace
+                self.neuron_params = [input_params] + non_input_params
+            else:
+                # Otherwise, lists in neuron_params apply to input layer as well
+                self.neuron_params = _expand_params_per_layer(
+                    neuron_params,
+                    self.num_layers,
+                    name="neuron_params",
+                )
         else:
-            self.neuron_params = [{}] * self.num_layers
+            self.neuron_params = [{} for _ in range(self.num_layers)]
+
+        # Winner Take All param adjustment, if necessary
+        for i, layer_params in enumerate(self.neuron_params):
+            # Ensure there is no wta in input_layer either way
+            if i==0:
+                layer_params["wta"] = False
+                continue
+            # If 'wta' not explicitly specified in neuron_params, use snn-level param winner_take_all
+            if "wta" not in layer_params:
+                layer_params["wta"] = self.winner_take_all
+
         # self.neuron_params = [
         #     {k: v if not isinstance(v, list | tuple) else v[(self.num_layers + i) % len(v)] for k, v in neuron_params.items()} \
         #     for i in range(self.num_layers)
         # ] if neuron_params is not None else [{}] * self.num_layers
 
-        self.synapse_params = synapse_params if synapse_params is not None else {}
-        self.use_etrace_pre = self.synapse_params.get("eligibility_trace", False) or self.synapse_params.get("eligibility_pre", False)
-        self.use_etrace_post = self.synapse_params.get("eligibility_post", False)
-        self.use_etrace_stdp = self.synapse_params.get("eligibility_stdp", False)
-        self.use_etrace_custom = self.synapse_params.get("eligibility_custom", False)
-        self.use_etrace = self.use_etrace_pre or self.use_etrace_post or self.use_etrace_stdp
+        self.synapse_params = _expand_params_per_layer(synapse_params, self.num_syn_layers, name="synapse_params")
+        self.use_etrace_pre = any(
+            p.get("eligibility_trace", False) or p.get("eligibility_pre", False)
+            for p in self.synapse_params
+        )
+        self.use_etrace_post = any(p.get("eligibility_post", False) for p in self.synapse_params)
+        self.use_etrace_stdp = any(p.get("eligibility_stdp", False) for p in self.synapse_params)
+        self.use_etrace_custom = any(p.get("eligibility_custom", False) for p in self.synapse_params)
+
+        # self.use_etrace = self.use_etrace_pre or self.use_etrace_post or self.use_etrace_stdp
 
         self.update_weights_on_etrace = bool(update_weights_on_etrace)
         self._etrace_to_update = str(update_weights_on_etrace) if self.update_weights_on_etrace else None
@@ -103,12 +153,12 @@ class SNN:
 
         # Create synapse layers
         self.synapse_layers = []
-        for i in range(self.num_layers - 1):
+        for i in range(self.num_syn_layers):
             pre_layer = self.neuron_layers[i]
             post_layer = self.neuron_layers[i + 1]
             synapse = SynapseLayer(pre_layer, post_layer, learning_rule=self._learning_rule, 
                                    dt=self.dt, sim_method=self.sim_method,
-                                   **self.synapse_params)
+                                   **self.synapse_params[i])
             self.synapse_layers.append(synapse)
 
         # Other parameters
@@ -123,8 +173,8 @@ class SNN:
         # Update eligibility traces if applicable
         for synapse in self.synapse_layers:
             synapse.update_traces()
-            if self.use_etrace:
-                synapse.update_eligibility_trace()
+            # if self.use_etrace:
+            synapse.update_eligibility_trace()
         return spike_out
 
     def apply_learning_rule(self, reward=None):
