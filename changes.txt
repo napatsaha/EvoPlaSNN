@@ -2,6 +2,9 @@
 v1.3
 ----
 
+v1.3.15.1 (2026-08-25)
+- Hotfix: fix new SynapseLayer.get_post_trace
+
 v1.3.15.0 (2026-08-25)
 - SynapseLayer pre- and post-traces
     - Added init args: tau_pre, tau_post, pre_trace, post_trace

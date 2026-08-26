@@ -414,7 +414,7 @@ class SynapseLayer(SynapseLayerProtocol):
                 return self._posttrace_last * np.exp(-self._posttrace_tssp * self.dt / self._tau_post)
         else:
             post_trace = self.post_layer.get_trace()
-            return np.broadcast_to(post_trace[:, np.newaxis], (self.pre_layer.size, self.post_layer.size))
+            return np.broadcast_to(post_trace[np.newaxis, :], (self.pre_layer.size, self.post_layer.size))
 
 
     def apply_learning_rule(self, reward: float = None) -> None:
