@@ -26,7 +26,7 @@ class SynapseLayer(SynapseLayerProtocol):
     _learning_rule: LearningRule
     
     def __init__(self, pre_layer: NeuronLayerProtocol, post_layer: NeuronLayerProtocol, *, 
-                 learning_rule: LearningRule = None,
+                 learning_rule: LearningRule = None, plastic: bool = True,
                  pre_trace: bool = False, post_trace: bool = False,
                  eligibility_trace: bool = False, eligibility_pre: bool = False, eligibility_post: bool = False,
                  eligibility_stdp: bool = False, ltd_coef: float = 1.0,
@@ -48,10 +48,13 @@ class SynapseLayer(SynapseLayerProtocol):
         self._event_driven = sim_method == "event-driven"
         self._step_wise = sim_method == "step-wise"
 
+        # Connecting neuron layers
         self.pre_layer = pre_layer
         self.post_layer = post_layer
+
+        # Learning-related params
+        self.plastic = plastic
         self.learning_rule = learning_rule if learning_rule is not None else Empty_Rule()
-        # self._learning_rule_type = self._get_lrule_type()
 
         # Interactions with learning rule
         self._out_weights = False
@@ -371,31 +374,6 @@ class SynapseLayer(SynapseLayerProtocol):
             # only the decay part is updated here, the 'rise' part will be added when learning_rule is called
             self._etrace_custom = self._etrace_custom * self._beta_syn
 
-    # def _update_etrace_step(self, spike_layer: NeuronLayerProtocol, trace_layer: NeuronLayerProtocol, etrace):
-    #     spike = spike_layer.spike
-    #     if sum(spike) == 0:
-    #         rise = 0.0
-    #     else:        
-    #         trace = trace_layer.get_trace()
-    #         trace, spike = self._tile(trace, spike)
-    #         rise = trace * spike
-    #     etrace = etrace * self.beta_syn + rise
-
-    # def _update_etrace_event(self, spike_layer: NeuronLayerProtocol, trace_layer: NeuronLayerProtocol, elast, etssp):
-    #     etssp += 1
-    #     spike = spike_layer.spike
-    #     idx_spike = spike.nonzero()[0]
-    #     if len(idx_spike) == 0:
-    #         return
-    #     else:
-    #         trace = trace_layer.get_trace() # Shape: [pre_size,]
-    #             # Value before rise
-    #         decay = elast[:, idx_spike] * np.exp(-etssp[:, idx_spike] * self.dt / self.tau_syn) # Shape: [pre_size, num_post_spikes]
-    #             # Update last peak
-    #         elast[:, idx_spike] = trace[:, np.newaxis] + decay
-    #             # Update tssp
-    #         etssp[:, idx_spike] = 0
-
     def get_pre_trace(self) -> np.ndarray | None:
         if self._use_pre_trace:
             if self._step_wise:
@@ -426,14 +404,15 @@ class SynapseLayer(SynapseLayerProtocol):
         - threshold (of post-synaptic layer) 
         - eligibility trace (to 'eligibility_custom')
         """
-        dw, dth, delig = self._learning_rule.update(self, reward=reward, always_return_tuple=True)
-        if self._out_weights:
-            self._update_weights(dw)
-        if self._out_thresholds: 
-            self.post_layer.update_thresholds(dth)
-        if self._out_eligibility:
-            self._etrace_custom = self._etrace_custom + delig
-            self._etrace_custom = np.clip(self._etrace_custom, self.e_min, self.e_max) 
+        if self.plastic:
+            dw, dth, delig = self._learning_rule.update(self, reward=reward, always_return_tuple=True)
+            if self._out_weights:
+                self._update_weights(dw)
+            if self._out_thresholds: 
+                self.post_layer.update_thresholds(dth)
+            if self._out_eligibility:
+                self._etrace_custom = self._etrace_custom + delig
+                self._etrace_custom = np.clip(self._etrace_custom, self.e_min, self.e_max) 
 
     def update_weights_from_etrace(self, reward: float, etrace: Literal["pre", "post", "stdp", "custom"], lrate: float = 1.0) -> None:
         """
@@ -444,9 +423,10 @@ class SynapseLayer(SynapseLayerProtocol):
             etrace (Literal[&quot;pre&quot;, &quot;post&quot;, &quot;stdp&quot;, &quot;custom&quot;]): Type of eligibility trace to use
             lrate (float, optional): amplitude of weight change. Defaults to 1.0.
         """
-        dw = getattr(self, f"eligibility_{etrace}")
-        dw = dw * reward
-        self._update_weights(dw, lrate)
+        if self.plastic:
+            dw = getattr(self, f"eligibility_{etrace}")
+            dw = dw * reward
+            self._update_weights(dw, lrate)
 
     def _update_weights(self, dw, lrate: float = 1.0):
         self.weights += lrate * dw

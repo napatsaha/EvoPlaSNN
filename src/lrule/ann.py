@@ -327,13 +327,15 @@ class ANN_Rule(BaseLearningRule, EvolvableLearningRule):
                  # LearningRule params
                  learning_rate: float = 1.0, learning_rate_thr: float = 0.1, threshold_agg_func: Literal["max", "min", "mean", "sum"] = "mean",
                  delta_weight: bool = True, delta_threshold: bool = False,
-                 use_trace_pre: bool = False, use_trace_post: bool = False, use_weights: bool = True, use_reward: bool = False, 
+                 use_trace_pre: bool = False, use_trace_post: bool = False, use_spike_pre: bool = False, use_spike_post: bool = False,
+                 use_weights: bool = True, use_reward: bool = False, 
                  use_eligibility: bool = False, use_eligibility_pre: bool = False, use_eligibility_post: bool = False, use_eligibility_stdp: bool = False,
                  **kwargs):
         
         BaseLearningRule.__init__(self, learning_rate=learning_rate, learning_rate_thr=learning_rate_thr, threshold_agg_func=threshold_agg_func, 
                         delta_weight=delta_weight, delta_threshold=delta_threshold, 
-                        use_trace_pre=use_trace_pre, use_trace_post=use_trace_post, use_weights=use_weights, use_reward=use_reward, 
+                        use_trace_pre=use_trace_pre, use_trace_post=use_trace_post, use_spike_pre=use_spike_pre, use_spike_post=use_spike_post,
+                        use_weights=use_weights, use_reward=use_reward, 
                         use_eligibility=use_eligibility, use_eligibility_pre=use_eligibility_pre, 
                         use_eligibility_post=use_eligibility_post, use_eligibility_stdp=use_eligibility_stdp, 
                         **kwargs)
