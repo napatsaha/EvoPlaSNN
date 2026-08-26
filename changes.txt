@@ -2,7 +2,15 @@
 v1.3
 ----
 
-v1.3.15.1 (2026-08-25)
+v1.3.16.0 (2026-08-26)
+- Plotting improvements
+- `run/evaluate.py` (Changes assisted by CoPilot):
+    - Added `_get_plot_config` for checking whether plotting for each plot is enabled, and to get kwargs to pass to the corresponding plot function
+    - Define default kwargs as a dictionary which is then overriden by user-given kwargs
+    - Combine plotting novelty_dist, local_fitness, rank into a loop in plot_solution_gen
+
+
+v1.3.15.1 (2026-08-26)
 - Hotfix: fix new SynapseLayer.get_post_trace
 
 v1.3.15.0 (2026-08-25)
