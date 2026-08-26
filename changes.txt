@@ -2,6 +2,14 @@
 v1.3
 ----
 
+v1.3.16.1 (2026-08-26)
+- Change plot_learning_rule to use default var from rule.input_order, and customisable var_x, var_y
+- Also standardised input args, and function a bit between 2D, 3D, 4D plot_learning_rule
+- `snn/plot`:
+    - Allow specifying var_x, var_y in `plot_learning_rule_4D`, `plot_learning_rule_3D`, `plot_learning_rule_2D`
+    - Use default from rule_order to (var_x, var_y, var_col, var_row) for each var not specified
+    - Renamed `xii` to `bins` for easier understanding
+
 v1.3.16.0 (2026-08-26)
 - Plotting improvements
 - `run/evaluate.py` (Changes assisted by CoPilot):

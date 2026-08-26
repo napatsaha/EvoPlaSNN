@@ -786,7 +786,8 @@ def plot_learning_rule(rule: 'base.LearningRule', simulator: 'SNNSimulator' = No
 def plot_learning_rule_4D(rule: 'base.LearningRule', simulator: 'SNNSimulator' = None, *, 
                           custom_bounds: dict[str, tuple] = None,
                           n_bins: int = 100, n_cols: int = 5, n_rows: int = 5,
-                          var_col: str = "reward", var_row: str = "weights",
+                          var_col: str = None, var_row: str = None,
+                          var_x: str = None, var_y: str = None,
                           cmap: str = "RdBu", aspect="auto",
                           rule_name: str = None, title: str = None,
                           figsize: tuple = (20, 20), dpi: int = 100,
@@ -800,21 +801,49 @@ def plot_learning_rule_4D(rule: 'base.LearningRule', simulator: 'SNNSimulator' =
         bounds = [LRULE_INPUT_BOUNDS.get(inp) for inp in rule.input_order]
     # TODO: Update bounds with recorded values if a Simulator is passed in
 
+    # Input Validation
+    var_names: List = rule.input_order.copy()
+    # First, if any variable is specified, remove them from variable list
+    if var_x is not None:
+        assert var_x in rule.input_order, f"X-Axis Variable {var_x} must exists within rule." + \
+            f" Rule only uses following inputs: {rule.input_order}"
+        var_x = var_names.pop(var_names.index(var_x))
+    if var_y is not None:
+        assert var_y in rule.input_order, f"Y-Axis Variable {var_y} must exists within rule." + \
+            f" Rule only uses following inputs: {rule.input_order}"
+        var_y = var_names.pop(var_names.index(var_y))
+    if var_col is not None:
+        assert var_col in rule.input_order, f"Column Variable {var_col} must exists within rule." + \
+            f" Rule only uses following inputs: {rule.input_order}"
+        var_col = var_names.pop(var_names.index(var_col))
+    if var_row is not None:
+        assert var_row in rule.input_order, f"Row Variable {var_row} must exists within rule." + \
+            f" Rule only uses following inputs: {rule.input_order}"
+        var_row = var_names.pop(var_names.index(var_row))
+    # Then for any variable not specified, use them by order of (x, y, col, row)
+    if var_x is None:
+        var_x = var_names.pop(0)
+    if var_y is None:
+        var_y = var_names.pop(0)
+    if var_col is None:
+        var_col = var_names.pop(0)
+    if var_row is None:
+        var_row = var_names.pop(0)
+
+    # Get index position for each variable name
+    i_x = rule.input_order.index(var_x)
+    i_y = rule.input_order.index(var_y)
+    i_col = rule.input_order.index(var_col)
+    i_row = rule.input_order.index(var_row)
+
     # Set axis names for column and remaining x-y variables
-    assert var_col in rule.input_order, f"Variable {var_col} to set by Column must exists within rule." + \
-        f" Rule only uses following inputs: {rule.input_order}"
-    assert var_row in rule.input_order, f"Variable {var_row} to set by Row must exists within rule." + \
-        f" Rule only uses following inputs: {rule.input_order}"
-    var_names = rule.input_order.copy()
-    i_col = var_names.index(var_col)
-    var_col = var_names.pop(i_col)
-    i_row = var_names.index(var_row)
-    var_row = var_names.pop(i_row)
+    # var_col = var_names.get(i_col)
+    # var_row = var_names.get(i_row)
 
 
     # Index for x-y variables
-    xy_index = [i for i in range(rule.input_size) if i not in (i_col, i_row)]
-    i_x, i_y = xy_index
+    # xy_index = [i for i in range(rule.input_size) if i not in (i_col, i_row)]
+    # i_x, i_y = xy_index
 
     # Set extent to be used with imshow for remaining x-y variables
     xy_bounds = [bounds[i_x], bounds[i_y]]
@@ -830,7 +859,7 @@ def plot_learning_rule_4D(rule: 'base.LearningRule', simulator: 'SNNSimulator' =
         else:
             num_meshes.append(n_bins)
 
-    xii = [np.linspace(low, upp, n) for (low, upp), n in zip(bounds, num_meshes)]
+    bins = [np.linspace(low, upp, n) for (low, upp), n in zip(bounds, num_meshes)]
 
     # Query the rule for each value of column variable
     # The reason this has to be done in a for loop is because array.reshape
@@ -841,10 +870,10 @@ def plot_learning_rule_4D(rule: 'base.LearningRule', simulator: 'SNNSimulator' =
     for xj in range(n_rows):
         for xi in range(n_cols): 
             # Make meshgrid based on remaining x-y variables
-            xx, yy = np.meshgrid(xii[i_x], xii[i_y], indexing='xy')
+            xx, yy = np.meshgrid(bins[i_x], bins[i_y], indexing='xy')
             # Make a constant array broadcasted to 2D grid
-            cc = np.full([n_bins, n_bins], xii[i_col][xi])
-            rr = np.full((n_bins, n_bins), xii[i_row][xj])
+            cc = np.full([n_bins, n_bins], bins[i_col][xi])
+            rr = np.full((n_bins, n_bins), bins[i_row][xj])
             # Insert this z-array into the position governed by i_col
             inp_list = [None, None, None, None]
             inp_list[i_row] = rr
@@ -868,8 +897,8 @@ def plot_learning_rule_4D(rule: 'base.LearningRule', simulator: 'SNNSimulator' =
     for xj in range(n_rows):
         for xi in range(n_cols):
             ax: Axes = axs[xj, xi]
-            val_xi = xii[i_col][xi]
-            val_xj = xii[i_row][xj]
+            val_xi = bins[i_col][xi]
+            val_xj = bins[i_row][xj]
             img = ax.imshow(vv[:, :, xi, xj], extent=xy_bounds, aspect=aspect, origin="lower", colorizer=colorizer)
             ax.set_box_aspect(1)
             if xj == 0:
@@ -877,8 +906,8 @@ def plot_learning_rule_4D(rule: 'base.LearningRule', simulator: 'SNNSimulator' =
             if xi == n_cols - 1:
                 ax.text(1.05, 0.5, f"{var_row} = {val_xj:.2f}", rotation=90, fontsize=15, va="center") # row label
 
-    fig.text(0.51, 0.22, var_names[0], fontsize=20, ha="center", transform=fig.transFigure) # xlabel
-    fig.text(0.1, 0.55, var_names[1], fontsize=20, rotation=90, va="center", transform=fig.transFigure) # ylabel
+    fig.text(0.51, 0.22, var_x, fontsize=20, ha="center", transform=fig.transFigure) # xlabel
+    fig.text(0.1, 0.55, var_y, fontsize=20, rotation=90, va="center", transform=fig.transFigure) # ylabel
 
     # Optionally display rule_path or name
     if rule_name is not None:
@@ -901,7 +930,8 @@ def plot_learning_rule_4D(rule: 'base.LearningRule', simulator: 'SNNSimulator' =
 
 def plot_learning_rule_3D(rule: 'base.LearningRule', simulator: 'SNNSimulator' = None, *, 
                           custom_bounds: dict[str, tuple] = None,
-                          n_bins: int = 100, n_cols: int = 5, var_col: str = "reward",
+                          n_bins: int = 100, n_cols: int = 5, 
+                          var_x: str = None, var_y: str = None, var_col: str = None,
                           cmap: str = "RdBu", figsize: tuple = (20, 5), aspect="auto", dpi: int = 100,
                           rule_name: str = None, title: str = None,
                           savepath: str | Path = None, show: bool = True,
@@ -914,27 +944,64 @@ def plot_learning_rule_3D(rule: 'base.LearningRule', simulator: 'SNNSimulator' =
         bounds = [LRULE_INPUT_BOUNDS.get(inp) for inp in rule.input_order]
     # TODO: Update bounds with recorded values if a Simulator is passed in
 
-    # Set axis names for column and remaining x-y variables
-    assert var_col in rule.input_order, f"Variable {var_col} to set by column must exists within rule." + \
-        f" Rule only uses following inputs: {rule.input_order}"
-    var_names = rule.input_order.copy()
-    i_col = var_names.index(var_col)
-    var_col = var_names.pop(i_col)
+    # # Set axis names for column and remaining x-y variables
+    # assert var_col in rule.input_order, f"Variable {var_col} to set by column must exists within rule." + \
+    #     f" Rule only uses following inputs: {rule.input_order}"
+    # var_names = rule.input_order.copy()
+    # i_col = var_names.index(var_col)
+    # var_col = var_names.pop(i_col)
+
+    # Input Validation
+    var_names: List = rule.input_order.copy()
+    # First, if any variable is specified, remove them from variable list
+    if var_x is not None:
+        assert var_x in rule.input_order, f"X-Axis Variable {var_x} must exists within rule." + \
+            f" Rule only uses following inputs: {rule.input_order}"
+        var_x = var_names.pop(var_names.index(var_x))
+    if var_y is not None:
+        assert var_y in rule.input_order, f"Y-Axis Variable {var_y} must exists within rule." + \
+            f" Rule only uses following inputs: {rule.input_order}"
+        var_y = var_names.pop(var_names.index(var_y))
+    if var_col is not None:
+        assert var_col in rule.input_order, f"Column Variable {var_col} must exists within rule." + \
+            f" Rule only uses following inputs: {rule.input_order}"
+        var_col = var_names.pop(var_names.index(var_col))
+
+    # Then for any variable not specified, use them by order of (x, y, col)
+    if var_x is None:
+        var_x = var_names.pop(0)
+    if var_y is None:
+        var_y = var_names.pop(0)
+    if var_col is None:
+        var_col = var_names.pop(0)
+
+    # Get index position for each variable name
+    i_x = rule.input_order.index(var_x)
+    i_y = rule.input_order.index(var_y)
+    i_col = rule.input_order.index(var_col)
 
     # Set extent to be used with imshow for remaining x-y variables
-    xy_bounds = bounds.copy()
-    xy_bounds.pop(i_col)
+    # xy_bounds = bounds.copy()
+    # xy_bounds.pop(i_col)
+    # xy_bounds = [x for xy in xy_bounds for x in xy]
+    xy_bounds = [bounds[i_x], bounds[i_y]]
     xy_bounds = [x for xy in xy_bounds for x in xy]
 
     # Index for x-y variables
-    xy_index = [*range(rule.input_size)]
-    xy_index.pop(i_col)
+    # xy_index = [*range(rule.input_size)]
+    # xy_index.pop(i_col)
 
     # Preparing spaces for each variables
-    num_meshes = [n_bins, n_bins]
-    num_meshes.insert(i_col, n_cols)
+    # num_meshes = [n_bins, n_bins]
+    # num_meshes.insert(i_col, n_cols)
+    num_meshes = []
+    for i in range(rule.input_size):
+        if i == i_col:
+            num_meshes.append(n_cols)
+        else:
+            num_meshes.append(n_bins)
 
-    xii = [np.linspace(low, upp, n) for (low, upp), n in zip(bounds, num_meshes)]
+    bins = [np.linspace(low, upp, n) for (low, upp), n in zip(bounds, num_meshes)]
 
     # Query the rule for each value of column variable
     # The reason this has to be done in a for loop is because array.reshape
@@ -943,9 +1010,9 @@ def plot_learning_rule_3D(rule: 'base.LearningRule', simulator: 'SNNSimulator' =
 
     for xi in range(n_cols):
         # Make meshgrid based on remaining x-y variables
-        xx, yy = np.meshgrid(xii[xy_index[0]], xii[xy_index[1]], indexing='xy')
+        xx, yy = np.meshgrid(bins[i_x], bins[i_y], indexing='xy')
         # Make a constant array broadcasted to 2D grid
-        z = xii[i_col][xi]
+        z = bins[i_col][xi]
         zz = np.full([n_bins, n_bins], z)
         # Insert this z-array into the position governed by i_col
         inp_list = [xx, yy]
@@ -966,13 +1033,13 @@ def plot_learning_rule_3D(rule: 'base.LearningRule', simulator: 'SNNSimulator' =
     fig, axs = plt.subplots(1, n_cols, figsize=figsize, dpi=dpi)
     for xi in range(n_cols):
         ax: Axes = axs[xi]
-        val_xi = xii[i_col][xi]
+        val_xi = bins[i_col][xi]
         img = ax.imshow(vv[:, :, xi], extent=xy_bounds, aspect=aspect, origin="lower", colorizer=colorizer, **kwargs)
         ax.set_box_aspect(1)
         ax.set_title(f"{var_col} = {val_xi}")
         if xi == 0:
-            ax.set_xlabel(var_names[0])
-            ax.set_ylabel(var_names[1])
+            ax.set_xlabel(var_x)
+            ax.set_ylabel(var_y)
 
     # Optionally display rule_path or name
     if rule_name is not None:
@@ -994,9 +1061,9 @@ def plot_learning_rule_3D(rule: 'base.LearningRule', simulator: 'SNNSimulator' =
 
 
 def plot_learning_rule_2D(rule: base.LearningRule, simulator: 'SNNSimulator' = None, *, 
-                          transpose: bool = False, custom_bounds: dict[str, tuple] = None,
-                          xmin: float = 0.0, xmax: float = 1.0, ymin: float = 0.0, ymax: float = 1.0,
-                          num_mesh: int = 100, cmap: str = "RdBu", figsize: tuple = (10, 10), dpi: int = 100,
+                          custom_bounds: dict[str, tuple] = None,
+                          n_bins: int = 100, var_x: str = None, var_y: str = None, 
+                          cmap: str = "RdBu", figsize: tuple = (10, 10), dpi: int = 100,
                           rule_name: str = None, title: str = None,
                           savepath: str | Path = None, show: bool = True,
                           **kwargs):
@@ -1007,61 +1074,77 @@ def plot_learning_rule_2D(rule: base.LearningRule, simulator: 'SNNSimulator' = N
     Args:
         rule (base.LearningRule): Learning Rule to be plotted
         simulator (SNNSimulator, optional): If a Simulator is passed in, boundaries for each input variable will be extracted. Defaults to None.
-        transpose (bool, optional): Whether to swap x-axis and y-axis. Does not effect order of inputs queried in learning rule. Defaults to False.
-        xmin (float, optional): Minimum value for first variable. Defaults to 0.0.
-        xmax (float, optional): Maximum value for first variable. Defaults to 1.0.
-        ymin (float, optional): Minimum value for second variable. Defaults to 0.0.
-        ymax (float, optional): Maximum value for second variable. Defaults to 1.0.
-        num_mesh (int, optional): Level of granularity in plot. Defaults to 100.
+        n_bins (int, optional): Level of granularity in plot. Defaults to 100.
         cmap (str, optional): Name of matplotlib color map. Defaults to "RdBu".
         figsize (tuple, optional): Figure size. Defaults to (10, 10).
         savepath (str | Path, optional): Path to save the figure. If None, will not save the plot. Defaults to None.
         show (bool, optional): Whether to call `plt.show()` at the end. Defaults to True.
     """
-    # Extract info from learning rule
-    n_inputs = rule.input_size
-    rule_inputs = rule.input_order
-
     if custom_bounds is not None:
         bounds = [LRULE_INPUT_BOUNDS.get(inp) if inp not in custom_bounds else custom_bounds.get(inp) for inp in rule.input_order]
     else:
         bounds = [LRULE_INPUT_BOUNDS.get(inp) for inp in rule.input_order]
-    xmin, xmax = bounds[0]
-    ymin, ymax = bounds[1]
     # TODO: Update boundaries if simulator is passed in
-    # if simulator is not None:
-    #     xmin_, xmax_ = get_boundaries_for_lrule_inputs(simulator, rule_inputs[0])
-    #     xmin = xmin_ if xmin_ is not None else xmin
-    #     xmax = xmax_ if xmax_ is not None else xmax
-
-    #     ymin_, ymax_ = get_boundaries_for_lrule_inputs(simulator, rule_inputs[1])
-    #     ymin = ymin_ if ymin_ is not None else ymin
-    #     ymax = ymax_ if ymax_ is not None else ymax
         
-    # Prepare inputs
-    x_vals = np.linspace(xmin, xmax, num_mesh)
-    y_vals = np.linspace(ymin, ymax, num_mesh)
+    # Input Validation
+    var_names: List = rule.input_order.copy()
+    # First, if any variable is specified, remove them from variable list
+    if var_x is not None:
+        assert var_x in rule.input_order, f"X-Axis Variable {var_x} must exists within rule." + \
+            f" Rule only uses following inputs: {rule.input_order}"
+        var_x = var_names.pop(var_names.index(var_x))
+    if var_y is not None:
+        assert var_y in rule.input_order, f"Y-Axis Variable {var_y} must exists within rule." + \
+            f" Rule only uses following inputs: {rule.input_order}"
+        var_y = var_names.pop(var_names.index(var_y))
+    # Then for any variable not specified, use them by order of (x, y)
+    if var_x is None:
+        var_x = var_names.pop(0)
+    if var_y is None:
+        var_y = var_names.pop(0)
 
-    xx, yy = np.meshgrid(x_vals, y_vals)
+    # Get index position for each variable name
+    i_x = rule.input_order.index(var_x)
+    i_y = rule.input_order.index(var_y)
 
-    inp = np.concatenate([xx[..., np.newaxis], yy[..., np.newaxis]], axis=2)
-    inp = inp.reshape(-1, n_inputs)
+    # Set xy extents
+    xy_bounds = [bounds[i_x], bounds[i_y]]
+    xy_bounds = [x for xy in xy_bounds for x in xy]
 
-    # Query rule for outputs
-    vv = rule.forward(inp)
-    vv = vv.reshape(num_mesh, num_mesh)
-    if transpose:
-        vv = vv.T
+    # Create bins
+    num_meshes = [n_bins, n_bins]
+    bins = [np.linspace(low, upp, n) for (low, upp), n in zip(bounds, num_meshes)]
+
+    # Query the rule for each value of column variable
+    vv = np.empty(shape=(n_bins, n_bins)) 
+
+    # Make meshgrid based on remaining x-y variables
+    xx, yy = np.meshgrid(bins[i_x], bins[i_y], indexing='xy')
+    # Insert this z-array into the position governed by i_col
+    inp_list = [None, None]
+    inp_list[i_x] = xx
+    inp_list[i_y] = yy
+    # Flatten inputs and query learning rule
+    inp = np.concatenate([ip.reshape(-1, 1) for ip in inp_list], axis=-1)
+    outp = rule.forward(inp)
+    vv[:, :] = outp.reshape((n_bins, n_bins))
+
+    # After all values are queried, build a divergent colormap based centered at 0 
+    #   and global min-max of outputs
+    vmin = vv.min()
+    vmax = vv.max()
+    colorizer = mpl.colorizer.Colorizer(cmap=cmap, norm=mpl.colors.CenteredNorm(vcenter=0))
+    colorizer.set_clim(vmin, vmax)
 
     fig, axs = plt.subplots(1, 1, figsize=figsize, squeeze=False, dpi=dpi)
 
     ax: Axes = axs[0, 0]
-    extents = [xmin, xmax, ymin, ymax] if not transpose else [ymin, ymax, xmin, xmax]
-    img = ax.imshow(vv, extent=extents, origin='lower', aspect='auto', cmap=cmap, norm=mpl.colors.CenteredNorm(), **kwargs)
+    # extents = [xmin, xmax, ymin, ymax] if not transpose else [ymin, ymax, xmin, xmax]
+    img = ax.imshow(vv, extent=xy_bounds, origin='lower', aspect='auto', cmap=cmap, norm=mpl.colors.CenteredNorm(), **kwargs)
     ax.set_box_aspect(1)
 
-    ax.set_xlabel(rule_inputs[0 if not transpose else 1])
-    ax.set_ylabel(rule_inputs[1 if not transpose else 0])
+    ax.set_xlabel(var_x)
+    ax.set_ylabel(var_y)
 
     # Optionally display rule_path or name
     if rule_name is not None:
