@@ -84,6 +84,8 @@ class RL_Evaluator(Evaluator):
         self.simulator = SNNSimulator(self.snn, self.env, self.spike_coder, self.reward_collector,
                                       record_weights=record_info, 
                                       record_traces=record_info,
+                                      record_pre_traces=record_info,
+                                      record_post_traces=record_info,
                                       record_membrane=record_info,
                                       record_spikes=record_info,
                                       record_thresholds=record_info,

@@ -37,7 +37,8 @@ class SNNSimulator:
                  supervised: bool = True, decay: bool = False,
                  decay_method: Literal["time", "constant"] = "time",
                  decay_rate: float = None, decay_cutoff: Optional[int] = None, 
-                 record_membrane: bool = True, record_spikes: bool = True, record_traces: bool = True, record_thresholds: bool = False,
+                 record_membrane: bool = True, record_spikes: bool = True, record_traces: bool = True, record_pre_traces: bool = False, record_post_traces: bool = False,
+                 record_thresholds: bool = False,
                  record_weights: bool = False, record_eligibility_pre: bool = False, record_eligibility_post: bool = False, 
                  record_eligibility_stdp: bool = False, record_eligibility_custom: bool = False,
                  **kwargs):
@@ -57,7 +58,9 @@ class SNNSimulator:
         # Flags to indicate what to record
         self.record_membrane = record_membrane
         self.record_spikes = record_spikes
-        self.record_traces = record_traces
+        self.record_traces = record_traces if self.network.use_neuronal_trace else False
+        self.record_pre_traces = record_traces if self.network.use_presynaptic_trace else False
+        self.record_post_traces = record_traces if self.network.use_postsynaptic_trace else False
         self.record_thresholds = record_thresholds
         self.record_weights = record_weights
         self.record_eligibility_pre = record_eligibility_pre if self.network.use_etrace_pre else False
@@ -69,6 +72,8 @@ class SNNSimulator:
         self.mem_recorder = LayerRecorder(network.layer_sizes_active) if self.record_membrane else None
         self.spike_recorder = LayerRecorder(network.layer_sizes, dtype=np.int8) if self.record_spikes else None
         self.trace_recorder = LayerRecorder(network.layer_sizes, dtype=np.float32) if self.record_traces else None
+        self.trace_pre_recorder = LayerRecorder(network.layer_sizes[:-1], dtype=np.float32) if self.record_pre_traces else None
+        self.trace_post_recorder = LayerRecorder(network.layer_sizes[1:], dtype=np.float32) if self.record_post_traces else None
         self.threshold_recorder = LayerRecorder(network.layer_sizes, dtype=np.float32) if self.record_thresholds else None
         self.weight_recorder = MatrixRecorder([synapse.weights.shape for synapse in network.synapse_layers]) if self.record_weights else None
         self.eligibility_pre_recorder = MatrixRecorder([synapse.weights.shape for synapse in network.synapse_layers]) if self.record_eligibility_pre else None
@@ -155,24 +160,7 @@ class SNNSimulator:
             self.network.set_exploration_rate(self.decay_init_value)
 
         # Reset recorders
-        if self.record_membrane:
-            self.mem_recorder.reset()
-        if self.record_spikes:
-            self.spike_recorder.reset()
-        if self.record_traces:
-            self.trace_recorder.reset()
-        if self.record_thresholds:
-            self.threshold_recorder.reset()
-        if self.record_weights:
-            self.weight_recorder.reset()
-        if self.record_eligibility_pre:
-            self.eligibility_pre_recorder.reset()
-        if self.record_eligibility_post:
-            self.eligibility_post_recorder.reset()
-        if self.record_eligibility_stdp:
-            self.eligibility_stdp_recorder.reset()
-        if self.record_eligibility_custom:
-            self.eligibility_custom_recorder.reset()
+        self._reset_recorders()
         # self.reward_manager.reset()
         # if hasattr(self, 'decoder') and self.decoder is not None:
         #     self.decoder.reset()
@@ -211,24 +199,7 @@ class SNNSimulator:
             self.trajectory_collector.reset()
         # Reset other recorders
         if erase_recorders:
-            if self.record_membrane:
-                self.mem_recorder.reset()
-            if self.record_spikes:
-                self.spike_recorder.reset()
-            if self.record_traces:
-                self.trace_recorder.reset()
-            if self.record_thresholds:
-                self.threshold_recorder.reset()
-            if self.record_weights:
-                self.weight_recorder.reset()
-            if self.record_eligibility_pre:
-                self.eligibility_pre_recorder.reset()
-            if self.record_eligibility_post:
-                self.eligibility_post_recorder.reset()
-            if self.record_eligibility_stdp:
-                self.eligibility_stdp_recorder.reset()
-            if self.record_eligibility_custom:
-                self.eligibility_custom_recorder.reset()
+            self._reset_recorders()
 
         if deterministic:
             self.network.set_deterministic()
@@ -358,6 +329,14 @@ class SNNSimulator:
             if record and self.record_traces:
                 for i, traces in enumerate(self.network.traces):
                     self.trace_recorder.record(i, t, traces)
+            # Pre-synaptic Traces
+            if record and self.record_pre_traces:
+                for i, traces in enumerate(self.network.pre_trace):
+                    self.trace_pre_recorder.record(i, t, traces)
+            # Post-synaptic Traces
+            if record and self.record_post_traces:
+                for i, traces in enumerate(self.network.post_trace):
+                    self.trace_post_recorder.record(i, t, traces)
 
             # Record thresholds
             if record and self.record_thresholds:
@@ -487,6 +466,10 @@ class SNNSimulator:
             self.spike_recorder.setup(num_steps)
         if self.record_traces:
             self.trace_recorder.setup(num_steps)
+        if self.record_pre_traces:
+            self.trace_pre_recorder.setup(num_steps)
+        if self.record_post_traces:
+            self.trace_post_recorder.setup(num_steps)
         if self.record_thresholds:
             self.threshold_recorder.setup(num_steps)
         if self.record_weights:
@@ -499,6 +482,30 @@ class SNNSimulator:
             self.eligibility_stdp_recorder.setup(num_steps)
         if self.record_eligibility_custom:
             self.eligibility_custom_recorder.setup(num_steps)
+
+    def _reset_recorders(self):
+        if self.record_membrane:
+            self.mem_recorder.reset()
+        if self.record_spikes:
+            self.spike_recorder.reset()
+        if self.record_traces:
+            self.trace_recorder.reset()
+        if self.record_pre_traces:
+            self.trace_pre_recorder.reset()
+        if self.record_post_traces:
+            self.trace_post_recorder.reset()
+        if self.record_thresholds:
+            self.threshold_recorder.reset()
+        if self.record_weights:
+            self.weight_recorder.reset()
+        if self.record_eligibility_pre:
+            self.eligibility_pre_recorder.reset()
+        if self.record_eligibility_post:
+            self.eligibility_post_recorder.reset()
+        if self.record_eligibility_stdp:
+            self.eligibility_stdp_recorder.reset()
+        if self.record_eligibility_custom:
+            self.eligibility_custom_recorder.reset()
 
     def _should_explore(self, t: int) -> bool:
         """

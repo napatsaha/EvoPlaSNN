@@ -114,6 +114,8 @@ class SNN_Evaluator(Evaluator):
         self.simulator = SNNSimulator(self.snn, self.spikegen, 
                                       record_weights=False if not record_info else True, 
                                       record_traces=False if not record_info else True,
+                                      record_pre_traces=False if not record_info else True,
+                                      record_post_traces=False if not record_info else True,
                                       record_membrane=False if not record_info else True,
                                       record_spikes=False if not record_info else True,
                                       record_eligibility_pre=False if not record_info else True,

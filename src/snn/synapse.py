@@ -394,6 +394,11 @@ class SynapseLayer(SynapseLayerProtocol):
             post_trace = self.post_layer.get_trace()
             return np.broadcast_to(post_trace[np.newaxis, :], (self.pre_layer.size, self.post_layer.size))
 
+    def has_pre_trace(self) -> bool:
+        return self._use_pre_trace
+
+    def has_post_trace(self) -> bool:
+        return self._use_post_trace
 
     def apply_learning_rule(self, reward: float = None) -> None:
         """
@@ -543,9 +548,15 @@ class SynapseLayer(SynapseLayerProtocol):
             self._use_elig_custom = True
             self._etrace_custom = np.zeros((self.pre_layer.size, self.post_layer.size), dtype=np.float32)
         # Perform necessary changes based on rule encodings
-        if getattr(rule, "encode_tau_syn", False):
-            value = getattr(rule, "values", {}).get("tau_syn")
+        if hasattr(rule, "contains_gene") and rule.contains_gene("tau_syn"):
+            value = rule.values["tau_syn"]
             self.tau_syn = value
+        if hasattr(rule, "contains_gene") and rule.contains_gene("tau_pre"):
+            value = rule.values["tau_pre"]
+            self.tau_pre = value
+        if hasattr(rule, "contains_gene") and rule.contains_gene("tau_post"):
+            value = rule.values["tau_post"]
+            self.tau_post = value
 
     def has_elig_pre(self):
         return self._use_elig_pre

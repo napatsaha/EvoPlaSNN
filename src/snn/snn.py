@@ -161,6 +161,11 @@ class SNN:
                                    **self.synapse_params[i])
             self.synapse_layers.append(synapse)
 
+        # Which trace we're collecting
+        self.use_neuronal_trace = all(n.has_spike_trace() for n in self.neuron_layers)
+        self.use_presynaptic_trace = all(s.has_pre_trace() for s in self.synapse_layers)
+        self.use_postsynaptic_trace = all(s.has_post_trace() for s in self.synapse_layers)
+
         # Other parameters
         self._soft_reset = soft_reset
     
@@ -243,6 +248,13 @@ class SNN:
     @property
     def traces(self):
         return [layer.get_trace() for layer in self.neuron_layers]
+
+    @property
+    def pre_trace(self):
+        return [synapse.get_pre_trace()[:, 0] for synapse in self.synapse_layers]
+    @property
+    def post_trace(self):
+        return [synapse.get_post_trace()[0, :] for synapse in self.synapse_layers]
     
     @property
     def weights(self):

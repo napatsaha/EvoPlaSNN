@@ -2,6 +2,19 @@
 v1.3
 ----
 
+v1.3.18.0 (2026-08-27)
+- Added 'tau_pre', 'tau_post' to `default_gene_order` and `default_gene_specs` in `EvolvableLearningRule`
+- Added `contains_gene` function to more easily check if a gene is being encoded in `EvolvableLearningRule`
+- `SynapseLayer` change its tau_pre and tau_post when setting learning rule if necessary
+- Added boolean check function `has_spike_trace` in `NeuronLayer`
+- Added boolean check functions `has_pre_trace` and `has_pre_trace` in `SynapseLayer`
+- Added boolean flags `use_neuronal_trace`, `use_presynaptic_trace`, `use_postsynaptic_trace` in `SNN` 
+    which is True only if ALL of neuron or synapses (respectively) enable the corresponding traces
+- Set pre- and post-synaptic trace recorders in `SNNSimulator` depending on related SNN flags
+- `SNN_Evaluator` and `RL_Evaluator` set the record pre/post traces according during init
+- SNN Plot `plot_traces` can take values instead of simulator object
+- Added necessary plot_traces, plot_pre_traces, plot_post_traces mechanics to `evaluate_and_plot()`
+
 v1.3.17.1 (2026-08-26)
 - Added ability for SynapseLayer to have plasticity turned on or off (by setting `plastic=True`)
     - Remove old commented code fluff

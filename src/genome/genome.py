@@ -168,9 +168,11 @@ class EvolvableLearningRule(Genome):
     _specs: Dict[str, Dict[str, Any]]
     default_gene_specs = {
         "learning_rate": dict(kind="log", length=1, base=10, low=-3, high=1, dist="uniform"),
-        "tau_syn": dict(kind="log", length=1, base=2, low=-3, high=0, dist="uniform")
+        "tau_syn": dict(kind="log", length=1, base=2, low=-3, high=0, dist="uniform"),
+        "tau_pre": dict(kind="log", length=1, base=2, low=-5, high=0, dist="uniform"),
+        "tau_post": dict(kind="log", length=1, base=2, low=-5, high=0, dist="uniform"),
     }
-    default_gene_order = ("learning_rate", "tau_syn")
+    default_gene_order = ("learning_rate", "tau_syn", "tau_pre", "tau_post")
 
     def __init__(self, *, parameters: ArrayLike = None, genes: List[Parameter] = None, 
                  genes_to_encode: List[Dict] = None, gene_order: Sequence[str] = None,
@@ -440,3 +442,9 @@ class EvolvableLearningRule(Genome):
     @property
     def encode_tau_syn(self) -> bool:
         return "tau_syn" in self._gene_order
+
+    def contains_gene(self, gene_name: str) -> bool:
+        """
+        Check whether this rule is encoding a certain gene in its genome
+        """
+        return gene_name in self._gene_order

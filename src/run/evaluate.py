@@ -42,6 +42,43 @@ def _plot_simulation_results(simulator: 'SNNSimulator', results_path, prefix, sa
             snn_plot.plot_membranes(simulator, **kwargs)
         except Exception as e:
             print(f"Error plotting membranes: {e}")
+    # Plot neuronal traces
+    plot_enabled, plot_kwargs = _get_plot_config(plot_params, "plot_traces", default_plot_flag)
+    if plot_enabled:
+        try:
+            kwargs = {"x_range": 200,
+                      "savepath": Path(results_path, f"{prefix}_traces.png") if save_plots else None,
+                      "show": show_plots}
+            kwargs.update(plot_kwargs)
+            snn_plot.plot_traces(simulator, **kwargs)
+        except Exception as e:
+            print(f"Error plotting neuronal traces: {e}")
+    # Plot pre-synaptic traces
+    plot_enabled, plot_kwargs = _get_plot_config(plot_params, "plot_pre_traces", default_plot_flag)
+    if plot_enabled:
+        try:
+            if not simulator.record_pre_traces:
+                raise RuntimeError("Pre-synaptic trace recording not enabled for this Simulator")
+            kwargs = {"x_range": 200, "title": "Pre-Synaptic Traces",
+                      "savepath": Path(results_path, f"{prefix}_pre_traces.png") if save_plots else None,
+                      "show": show_plots}
+            kwargs.update(plot_kwargs)
+            snn_plot.plot_traces(values=simulator.trace_pre_recorder.values, **kwargs)
+        except Exception as e:
+            print(f"Error plotting pre-synaptic traces: {e}")
+    # Plot post-synaptic traces
+    plot_enabled, plot_kwargs = _get_plot_config(plot_params, "plot_post_traces", default_plot_flag)
+    if plot_enabled:
+        try:
+            if not simulator.record_post_traces:
+                raise RuntimeError("Post-synaptic trace recording not enabled for this Simulator")
+            kwargs = {"x_range": 200, "title": "Post-Synaptic Traces",
+                      "savepath": Path(results_path, f"{prefix}_post_traces.png") if save_plots else None,
+                      "show": show_plots}
+            kwargs.update(plot_kwargs)
+            snn_plot.plot_traces(values=simulator.trace_post_recorder.values, **kwargs)
+        except Exception as e:
+            print(f"Error plotting post-synaptic traces: {e}")
     # Plot static weight at end of simulation
     plot_enabled, plot_kwargs = _get_plot_config(plot_params, "plot_weights", default_plot_flag)
     if plot_enabled:
@@ -175,7 +212,8 @@ def evaluate_and_plot(results_path: Path | str = None, *, config_path: str | Pat
     if plot_params is None:
         plot_params = config.get("plot_params", {})
     if "plot_simulation" not in plot_params:
-        simulation_plots = ("plot_spikes", "plot_membranes", "plot_weights", "plot_weight_over_time",
+        simulation_plots = ("plot_spikes", "plot_membranes", "plot_traces", "plot_pre_traces", "plot_post_traces",
+                            "plot_weights", "plot_weight_over_time",
                             "plot_env_weight_actions", "plot_env_weight_greedy", "plot_eligibility_pre",
                             "plot_eligibility_post", "plot_eligibility_stdp", "plot_eligibility_custom",
                             "plot_intermediate_fitness")

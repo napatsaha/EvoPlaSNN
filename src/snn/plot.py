@@ -93,8 +93,10 @@ def plot_spikes(simulator: 'SNNSimulator' = None, values: List[np.ndarray] = Non
     # plt.close(fig)
 
 
-def plot_traces(simulator: 'SNNSimulator', x_scale: float = 0.2, y_scale: float = 0.8,
-                y_eps: float = 0.1, x_eps: int | float = 1, trace_scale: float = 0.8, x_min = None, x_max = None, x_range: int = 100,
+def plot_traces(simulator: 'SNNSimulator' = None, values: List[np.ndarray] = None, *, 
+                x_scale: float = 0.2, y_scale: float = 0.8,
+                y_eps: float = 0.1, x_eps: int | float = 1, trace_scale: float = 0.8, 
+                x_min = None, x_max = None, x_range: int = 100,
                 drawstyle: str = 'steps-post',
                 title: str = None, cmap = None, color: str = "black", cmap_range: tuple = (0, 1),
                 figsize: tuple = None, dpi: int = 100,
@@ -102,12 +104,22 @@ def plot_traces(simulator: 'SNNSimulator', x_scale: float = 0.2, y_scale: float 
     """
     Plot traces
     """
-    assert simulator.record_traces, "Trace recording is not enabled."
+    if simulator is not None:
+        assert simulator.record_traces, "Trace recording is not enabled."
+    if values is None and simulator is None:
+        raise RuntimeError("Either a simulator (with trace recording enabled) or a list of recorded traces [layer_size, num_steps] * num_layers, must be provided.")
+
+    # Extract necessary info
+    num_steps = simulator.num_steps if simulator is not None else min([val.shape[1] for val in values])
+    values = simulator.spike_recorder.values if simulator is not None else values
+    num_layers = simulator.network.num_layers if simulator is not None else len(values)
+    layer_sizes = simulator.network.layer_sizes if simulator is not None else [val.shape[0] for val in values]
+    dt = f"{simulator.dt} s" if simulator is not None else "1 unit"
 
     if x_eps < 1 and x_eps > 0:
-        x_eps = x_eps * simulator.num_steps
+        x_eps = x_eps * num_steps
     if x_max is None:
-        x_max = simulator.num_steps
+        x_max = num_steps
     if x_min is None:
         x_min = max(0, x_max - x_range)
     if cmap is None:
@@ -115,13 +127,12 @@ def plot_traces(simulator: 'SNNSimulator', x_scale: float = 0.2, y_scale: float 
     else:
         cm = mpl.colormaps[cmap]
 
-    num_layers = simulator.network.num_layers
-    layer_sizes = simulator.network.layer_sizes
+
     if figsize is None:
         figsize = ((x_max - x_min) * x_scale, sum(layer_sizes) * y_scale)
     fig, axs = plt.subplots(num_layers, 1, gridspec_kw={"hspace": 0.0}, sharex=True, height_ratios=layer_sizes[::-1], 
                             figsize=figsize, dpi=dpi, layout="constrained")
-    for i, layer_traces in enumerate(reversed(simulator.trace_recorder.values)):
+    for i, layer_traces in enumerate(reversed(values)):
         ax = axs[i]
         n_neurons = layer_traces.shape[0]
 
@@ -145,7 +156,7 @@ def plot_traces(simulator: 'SNNSimulator', x_scale: float = 0.2, y_scale: float 
         ax.xaxis.set_minor_locator(ticker.MultipleLocator(1))
         ax.xaxis.grid(visible=True, which="both", color="gray", linewidth=0.5, alpha=0.2)
 
-    ax.set_xlabel(f"Time ({simulator.dt} s)")
+    ax.set_xlabel(f"Time ({dt} s)")
     fig.suptitle(title if title is not None else "Neuron Traces", fontsize=20)
     fig.supylabel("Neuron Index")
     if savepath is not None:

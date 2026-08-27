@@ -286,6 +286,9 @@ class NeuronLayer(NeuronLayerProtocol):
             else:
                 return trace_x3(self.tssp[idx], self.dt, self.tau_trace, self.last_peak[idx])
 
+    def has_spike_trace(self) -> bool:
+        return self._enable_trace
+
     def update_thresholds(self, delta_thr: np.ndarray):
         """
         Update the thresholds of the neuron layer by adding delta_thr.
