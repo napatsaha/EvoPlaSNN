@@ -25,7 +25,7 @@ class EvoManager:
                  multiple_evaluators: bool = False,
                  max_generations: int = None, max_stagnation: int = None,
                  use_target_fitness: bool = None, target_fitness: float = None, tolerance: float = 1e-6, 
-                 record_classes: bool = False, save_best: int = 1,
+                 record_classes: bool = False, save_best: int = 1, save_precision: int = 6,
                  log_trial_fts: bool = True, log_trial_info: bool = True, 
                  log_genome: bool = True, log_indiv: bool = True,
                 #  update_inputs: bool = True,  # Whether to update input classes for each generation
@@ -99,6 +99,7 @@ class EvoManager:
 
         self.num_trials = num_trials
         self.save_best = save_best
+        self.save_precision = save_precision
         self.results_path = Path(results_path) if results_path is not None else None
         self._logfile_name = "log_generation.log"
         # self.update_inputs = update_inputs
@@ -163,6 +164,7 @@ class EvoManager:
             self.max_generations = 1000  # Default maximum generations
 
         global_best_fitness = np.inf if self.solver.minimise else -np.inf
+        global_best_solution = None
         stag_count = 0  # Counter for stagnation
         
         try:
@@ -209,34 +211,31 @@ class EvoManager:
                 if self.measure_behaviour:
                     self.solver.tell(fitness_list, behaviours, gen_no=gen_count)
                 else:
-                    self.solver.tell(fitness_list)
+                    self.solver.tell(fitness_list, gen_no=gen_count)
 
                 self.solver.write_to_file(gen_no=gen_count)
 
                 # Get best solutions and their fitnesses
-                best_solution, best_fitness = self.solver.result()
-                if self.solver.minimise:
-                    if best_fitness < global_best_fitness:
-                        global_best_fitness = best_fitness
+                best_solution, best_fitness, global_improved = self.solver.result()
+                if self._check_stagnation:
+                    if global_improved:
                         stag_count = 0
-                    else:
-                        stag_count += 1
-                else:
-                    if best_fitness > global_best_fitness:
-                        global_best_fitness = best_fitness
-                        stag_count = 0
+                        global_best_solution, global_best_fitness = self.solver.get_all_time_best()
                     else:
                         stag_count += 1
 
                 # Log result
                 if gen_count % logging_freq == 0:
-                    self.logger.info(f"Generation {gen_count}: Best fitness this generation = {best_fitness:.3f}, All-time best fitness = {global_best_fitness:.3f}, Stagnation count = {stag_count}")
+                    msg = f"Generation {gen_count}: Best fitness this generation = {best_fitness:.3f}, All-time best fitness = {global_best_fitness:.3f}"
+                    if self._check_stagnation:
+                        msg += f", Number of generations with no improvement = {stag_count}"
+                    self.logger.info(msg)
 
                 # Check stopping criteria
                 # Reached target fitness
                 if self._check_target_fitness and np.abs(best_fitness - self.target_fitness) < self.tolerance:
                     pbar.update(1)
-                    self.logger.info(f"TARGET FITNESS: Terminated due to reaching target fitness of {best_fitness:.3f}")
+                    self.logger.info(f"TARGET FITNESS: Terminated due to reaching target fitness of {self.target_fitness:.3f}")
                     break
 
                 # Reached maximum generations
@@ -255,9 +254,10 @@ class EvoManager:
                 pbar.update(1)
 
             # Save best solution
-            self.solver.wrapup(n_best=self.save_best)
+            self.solver.wrapup(n_best=self.save_best, precision=self.save_precision)
         finally:
             pbar.close()
+            self.logger.info("Terminating Evolutionary optimisation.")
             t1 = time.time()
             dt = t1 - t0
             self.solver.close()
@@ -267,14 +267,21 @@ class EvoManager:
                 for evaluator in self.evaluators:
                     evaluator.close()
 
-        if isinstance(best_solution, Genome):
-            best_solution = best_solution.parameters.round(4)
-        self.logger.info("Terminating Evolutionary optimisation.")
-        self.logger.info(f"Best solution: {best_solution}")
-        self.logger.info(f"Best fitness: {best_fitness:.3f}")
-        self.logger.info(f"Total time taken: {dt // 3600} hours, {(dt % 3600) // 60} minutes, {dt % 60:.2f} seconds")
-        self.logger.info(f"Total generations: {gen_count}")
-        self.logger.info(f"Results saved to directory: {self.results_path}")
+        # Post-amble logs
+        msg = ""
+        msg += "Results:"
+        try:
+            if isinstance(global_best_solution, Genome):
+                global_best_solution = global_best_solution.parameters.round(4)
+            msg += f"\nAll-Time Best solution: \n\t{global_best_solution}"
+            msg += f"\n\tFitness: {global_best_fitness:.3f}"
+            best_gen_idx, best_indiv_idx = self.solver.all_time_best_idx
+            msg += f"\n\tAt Generation number: {best_gen_idx}\n\tIndividual number: {best_indiv_idx}"
+            msg += f"\nTotal time taken: {dt // 3600} hours, {(dt % 3600) // 60} minutes, {dt % 60:.2f} seconds"
+            msg += f"\nTotal generations: {gen_count}"
+            msg += f"\nResults saved to directory: {self.results_path}"
+        finally: 
+            self.logger.info(msg)
 
         # if self.results_path is not None:
         #     save_path = Path(self.results_path)

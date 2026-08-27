@@ -35,9 +35,17 @@ class BaseSolver(Solver):
                 self._genome_type = self._genome_params.pop("type")
         self._first_gen = True
         self.fitnesses = np.zeros(self.popsize)
+
+        # Solution and fitness management
+        # Best solution in each generation
         self.best_fitness = None
         self.best_solution = None
-        # self.reset()
+        # Best solution across all generations
+        self.all_time_best_fitness = None
+        self.all_time_best_solution = None
+        self.all_time_best_idx = (None, None)
+        self.all_time_improved = False
+
         self.log_path: Path = None
         self._record = False
         self._solution_file: TextIOWrapper = None
@@ -53,6 +61,14 @@ class BaseSolver(Solver):
                 indiv = SimpleGenome(size=self.ndim)
             self.solutions.append(indiv)
 
+    def _is_better(self, candidate_fts: float, best_fts: float) -> bool:
+        if best_fts is None:
+            return True
+        if self.minimise:
+            return candidate_fts < best_fts
+        else:
+            return candidate_fts > best_fts
+
     def ask(self) -> List['Genome']:
         if self._first_gen:
             self._first_gen = False
@@ -64,6 +80,10 @@ class BaseSolver(Solver):
         self._solutions.clear()
         self.best_fitness = None
         self.best_solution = None
+        self.all_time_best_fitness = None
+        self.all_time_best_solution = None
+        self.all_time_best_idx = (None, None)
+        self.all_time_improved = False
 
     def tell(self, fitnesses, *, gen_no: int = None):
         best_idx = np.argmin(fitnesses) if self.minimise else np.argmax(fitnesses)
@@ -72,10 +92,28 @@ class BaseSolver(Solver):
         self.best_fitness = fitnesses[best_idx]
         self.best_solution = self.solutions[best_idx]
 
+        # Compare current gen's best solution with all-time best
+        self.all_time_improved = self._is_better(self.best_fitness, self.all_time_best_fitness)
+        if self.all_time_improved:
+            self.all_time_best_fitness = self.best_fitness
+            self.all_time_best_solution = self.best_solution
+            self.all_time_best_idx = (gen_no, best_idx)
+
     @override
-    def result(self) -> Tuple['Genome', float]:
-        """Return the best solution and its fitness."""
-        return self.best_solution, self.best_fitness
+    def result(self) -> Tuple['Genome', float, bool]:
+        """
+        Returns (
+            best solution in current generation,
+            its fitness value,
+            whether or not all-time-best-fitness has improved
+        )"""
+        return (
+            self.best_solution, self.best_fitness,
+            self.all_time_improved
+        )
+
+    def get_all_time_best(self) -> Tuple['Genome', float]:
+        return self.all_time_best_solution, self.all_time_best_fitness,
     
     def write_to_file(self, gen_no: int):
         """
@@ -91,11 +129,14 @@ class BaseSolver(Solver):
             self.log_path = Path(log_path)
             self._record = True
     
-    def wrapup(self, n_best):
+    def wrapup(self, n_best, precision: int = None):
         if self._record:
+            # Write all-time best solution
+            self.write_solution(self.all_time_best_solution, self.log_path, "all-time-best_rule.txt", precision)
+            # Write n best solution from last generation
             self.save_best(self.log_path, n=n_best)
 
-    def save_best(self, save_dir: str | Path, n: int = 1, precision: int = 6):
+    def save_best(self, save_dir: str | Path, n: int = 1, precision: int = None):
         top_indices = np.argsort(self.fitnesses if self.minimise else -self.fitnesses) # Will arrange from lowest to highest fitness
         top_indices = top_indices[:n]
         # if self.minimise:
@@ -109,15 +150,22 @@ class BaseSolver(Solver):
         for i in range(n):
             sol = top_solutions[i]
             i = str(i + 1).zfill(2)  # Ensure two-digit index
-            if isinstance(sol, np.ndarray):
-                pass
-            elif isinstance(sol, Genome):
-                sol = sol.parameters
-            elif hasattr(sol, "genome"):
-                sol = getattr(getattr(sol, "genome"), "parameters")
-            else:
-                raise TypeError(f"Genome {sol} cannot be written via np.savetxt")
-            np.savetxt(Path(save_dir) / f"best_rule_{i}.txt", sol, fmt=f'%.{precision}f')
+            file_name = f"best_rule_{i}.txt"
+            self.write_solution(sol, save_dir, file_name, precision)
+
+    def write_solution(self, sol: np.ndarray | Genome, save_dir: str | Path, file_name: str, precision: int = None):
+        if isinstance(sol, np.ndarray):
+            pass
+        elif isinstance(sol, Genome):
+            sol = sol.parameters
+        elif hasattr(sol, "genome"):
+            sol = getattr(getattr(sol, "genome"), "parameters")
+        else:
+            raise TypeError(f"Genome {sol} cannot be written via 'np.savetxt'")
+        if precision is None:
+            precision = 6
+        # Save via numpy
+        np.savetxt(Path(save_dir) / file_name, sol, fmt=f'%.{precision}f')
 
     def close(self):
         if self._record and self._solution_file is not None:

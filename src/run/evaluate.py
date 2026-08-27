@@ -220,20 +220,29 @@ def evaluate_and_plot(results_path: Path | str = None, *, config_path: str | Pat
         plot_params["plot_simulation"] = any(
             _get_plot_config(plot_params, name, default_plot_flag)[0] for name in simulation_plots
         )
+    if "rule_id" in plot_params:
+        rule_id = plot_params.get("rule_id")
 
     # T = config["num_sim_steps"] if num_steps is None else num_steps
     if learning_rule is None:
-        rule_id_name = f"best_rule_{rule_id:02d}.txt"
+        if isinstance(rule_id, int):
+            # Load the best learning rule from last generation
+            rule_id_name = f"best_rule_{rule_id:02d}.txt"
+            prefix = f"eval_rule-{rule_id:02d}"
+        elif rule_id == "all-time":
+            # Load the all-time best learning rule
+            rule_id_name = f"all-time-best_rule.txt"
+            prefix = f"eval_rule-best"
+        else:
+            raise ValueError(f"Rule ID: {rule_id} not recognised")
         if not (results_path / rule_id_name).exists():
             raise FileNotFoundError(f"Rule file {rule_id_name} not found in {results_path}. Please run the evolution first.")
-
-        # Load the best ANN learning rule
         rule = read_learning_rule(results_path / rule_id_name, config_path=config_path)
-        prefix = f"eval_rule-{rule_id:02d}"
+    
     else:
         assert isinstance(learning_rule, LearningRule), f"{type(learning_rule)} is not a LearningRule object."
         rule = learning_rule
-        prefix = f"eval_custom_rule"
+        prefix = f"eval_rule-custom"
 
     # For compatibility with newer versions of config without "manager" or "evaluator" in "evo_params"
     evaluator_params = config.get("evaluator_params") if "evaluator_params" in config else \

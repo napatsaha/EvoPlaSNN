@@ -187,6 +187,7 @@ class Solver(Protocol):
     """
     popsize: int
     minimise: bool
+    all_time_best_idx: Tuple[int, int]
     def __init__(self, popsize: int):
         pass
 
@@ -202,11 +203,16 @@ class Solver(Protocol):
         """
         raise NotImplementedError("tell method must be implemented by subclasses.")
 
-    def result(self) -> Tuple[object, float]:
+    def result(self) -> Tuple['Genome', float, bool]:
         """
-        Returns the best solutions and their fitnesses.
+        Returns the best solution and its fitness in this generation, and whether all-time fitness has improved.
         """
         raise NotImplementedError("result method must be implemented by subclasses.")
+
+    def get_all_time_best(self) -> Tuple['Genome', float]:
+        """
+        Returns all-time best solution and its fitness
+        """
 
     def write_to_file(self, gen_no: int):
         """
@@ -218,7 +224,7 @@ class Solver(Protocol):
         Sets up a logger for the solver.
         """
 
-    def wrapup(self, **kwargs):
+    def wrapup(self, n_best: int, precision: int):
         """
         Doing any necessary task after evolution has finished running.
 

@@ -2,6 +2,23 @@
 v1.3
 ----
 
+v1.3.18.1 (2026-08-27)
+- Added ability to keep track of all-time best solution during evolutionary run
+- `BaseSolver`:
+    - New attributes: `all_time_best_solution`, `all_time_best_fitness`, `all_time_improved`, `all_time_best_idx`
+    - `result()` returns tuple of 3 (solution, fitness, has_improved)
+    - Helper private function `_is_better` for checking if new solution is better
+    - `wrapup()` records all-time best solution as well as best-n in last gen + take in 'precision' as args
+    - Refactor out genome writing to `write_solution()`
+- Public methods and properties in Solver Protocal changed accordingly
+- `EvoManager`:
+    - new param `save_precision` to be passed into `solver.wrapup()`
+    - Cleaner post-amble report in log_generation.log at the end of run
+    - Clearer delineation of when stagnation is being checked
+- `evaluate_and_plot`:
+    - Will perform simulation and plotting on all-time best solution if `rule_id="all-time"`,
+        which can also be set inside `plot_params` config
+
 v1.3.18.0 (2026-08-27)
 - Added 'tau_pre', 'tau_post' to `default_gene_order` and `default_gene_specs` in `EvolvableLearningRule`
 - Added `contains_gene` function to more easily check if a gene is being encoded in `EvolvableLearningRule`
