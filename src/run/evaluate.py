@@ -360,6 +360,13 @@ def evaluate_and_plot(results_path: Path | str = None, *, config_path: str | Pat
         plot_enabled, plot_kwargs = _get_plot_config(plot_params, "plot_learning_rule", default_plot_flag)
         if plot_enabled:
             try:
+                # First plot the evaluated rule
+                kwargs = {"savepath": Path(results_path, f"{prefix}_learning_rule.png") if save_plots else None,
+                            "show": show_plots}
+                kwargs.update(plot_kwargs)
+                snn_plot.plot_learning_rule(rule, **kwargs)
+
+                # Then plot n best rule in last generation
                 num_save_best = manager_params.get("save_best", 0)
                 for rule_id in range(1, num_save_best+1):
                     rule_id_name = f"best_rule_{rule_id:02d}.txt"

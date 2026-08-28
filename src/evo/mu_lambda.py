@@ -83,7 +83,7 @@ class MuPlusLambda(BaseSolver):
         # idx_best = np.argsort(fitnesses)[:self.mu]
         # self.best_fitness = fitnesses[idx_best[0]]
         # self.best_solution = self.take_solutions(idx_best[0])
-        super().tell(fitnesses)
+        super().tell(fitnesses, gen_no=gen_no)
 
         # TODO: Deal with fitness ties between parent and offspring (choose offspring)
         if not self.minimise:

@@ -71,7 +71,7 @@ class CMA_ES(BaseSolver):
     @override
     def tell(self, fitnesses, *, gen_no: int = None):
         # Save best solution and fitness
-        super().tell(fitnesses)
+        super().tell(fitnesses, gen_no=gen_no)
 
         # Select parents
         best_indices = np.argsort(fitnesses)[:self.n_best] if self.minimise else np.argsort(fitnesses)[:-self.n_best-1:-1]

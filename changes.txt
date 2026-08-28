@@ -2,6 +2,10 @@
 v1.3
 ----
 
+v1.3.18.2 (2026-08-28)
+- Hotfix for missing gen_no in all_time_best_idx in CMA_ES and MuPlusLambda
+- Added plot_learning_rule for all-time-best rule in addition to n-best rules in `evaluate_and_plot`
+
 v1.3.18.1 (2026-08-27)
 - Added ability to keep track of all-time best solution during evolutionary run
 - `BaseSolver`:
