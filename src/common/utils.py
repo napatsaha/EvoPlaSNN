@@ -249,6 +249,7 @@ def make_input_grid(bounds, N):
 
 ALGO_DICT = {
     "cma_es": ("evo.cma_es", "CMA_ES"),
+    "pycma": ("evo.pycma_wrapper", "PyCMAWrapper"),
     "es": ("evo.es", "EvolutionStrategy"),
     "simple": ("evo.es", "EvolutionStrategy"),
     "mu_plus_lambda": ("evo.mu_lambda", "MuPlusLambda"),

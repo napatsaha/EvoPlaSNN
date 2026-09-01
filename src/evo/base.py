@@ -3,8 +3,7 @@ from typing import List, Literal, Tuple, Union, override
 from pathlib import Path
 import numpy as np
 
-from common.base import Solver
-from common.base import Genome
+from common.base import LearningRule, Solver, Genome
 from common.utils import create_learning_rule
 from genome.genome import SimpleGenome
 
@@ -54,12 +53,16 @@ class BaseSolver(Solver):
     def _generate_new_population(self, ):
         self.solutions = []
         for p in range(self.popsize):
-            # Generalise solution creation to any type of genome
-            if self._genome_type is not None:
-                indiv = create_learning_rule(self._genome_type, **self._genome_params)
-            else:
-                indiv = SimpleGenome(size=self.ndim)
+            indiv = self._create_individual()
             self.solutions.append(indiv)
+
+    def _create_individual(self) -> Genome | LearningRule:
+        # Generalise solution creation to any type of genome
+        if self._genome_type is not None:
+            indiv = create_learning_rule(self._genome_type, **self._genome_params)
+        else:
+            indiv = SimpleGenome(size=self.ndim)
+        return indiv
 
     def _is_better(self, candidate_fts: float, best_fts: float) -> bool:
         if best_fts is None:
