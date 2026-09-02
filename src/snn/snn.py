@@ -216,7 +216,7 @@ class SNN:
 
     def get_exploration_rate(self, simplify: bool = False):
         values = []
-        for neuron_layer in self.neuron_layers[1:]:
+        for neuron_layer in self.neuron_layers[-1:]:
             values.append(neuron_layer.softmax_temp)
         if simplify:
             # Might not be the best way to do this
@@ -226,15 +226,15 @@ class SNN:
 
     def set_exploration_rate(self, value: float = None):
         if value is not None:
-            for neuron_layer in self.neuron_layers[1:]:
+            for neuron_layer in self.neuron_layers[-1:]:
                 neuron_layer.softmax_temp = value
 
     def set_deterministic(self):
-        for neuron_layer in self.neuron_layers[1:]:
+        for neuron_layer in self.neuron_layers[-1:]:
             neuron_layer.spike_method = "deterministic"
 
     def set_stochastic(self):
-        for neuron_layer in self.neuron_layers[1:]:
+        for neuron_layer in self.neuron_layers[-1:]:
             neuron_layer.spike_method = "stochastic"
 
     @property

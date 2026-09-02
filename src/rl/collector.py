@@ -147,7 +147,7 @@ class RewardCollector:
         return agg(fitnesses)
     
 
-Trajectory = namedtuple("Trajectory", ["state", "observation", "action", "reward", "done", "info"])
+Trajectory = namedtuple("Trajectory", ["t", "state", "observation", "action", "reward", "done", "info"])
 
 class TrajectoryCollector:
     records: List[Trajectory]
@@ -157,8 +157,9 @@ class TrajectoryCollector:
     def reset(self):
         self.records.clear()
 
-    def collect(self, observation, action, reward, done, info, state = None):
+    def collect(self, t, observation, action, reward, done, info, state = None):
         self.records.append(Trajectory(
+            t=t,
             state = state,
             observation = observation,
             action = action,

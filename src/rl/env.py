@@ -278,7 +278,7 @@ class BaseMaze(gym.Env):
         new_dist = self._prev_dist
 
         # Perform supposed movement
-        new_pos = self._agent_pos + self.action_map[action]
+        new_pos = self._agent_pos + self.action_map[int(action)]
         displaced_item = self.maze[*new_pos]
 
         # Check where the agent would end up

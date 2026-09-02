@@ -2,6 +2,15 @@
 v1.3
 ----
 
+v1.3.20.0 (2026-09-02)
+- Various fixes:
+    - Added `t` to TrajectoryCollector records
+    - Added `_log_traj` flag to Simulator, and added trajectory at the end of episode to RewardCollector if available
+    - Also Simulator now take a boolean arg `collect_trajectory` to determine whether to collect trajectory instead of passing in the object itself
+    - Fixed `plot_traces` having used `spike_recorder` instead of `trace_recorder`
+    - `env.BaseMaze` coerce action to int before indexing from action_map dict
+    - SNN exploration now explicitly only changes the final layer only, affecting `exploration_rate` getter-setter and `set_deterministic` and `set_stochastic`
+
 v1.3.19.0 (2026-09-01)
 - Added `pycma` wrapper: 'PyCMAWrapper' for using with `pycma` package `CMAEvolutionStrategy`
     (currently still very limited in its usage and capabilities)

@@ -26,7 +26,8 @@ class SNNSimulator:
     collector: CollectorProtocol | None
     def __init__(self, network: SNN, #spike_generator: SpikeGenerator = None, 
                  env: gym.Env = None, spike_coder: SpikeCoder = None, reward_collector: RewardCollector = None,
-                 trajectory_collector: TrajectoryCollector = None,
+                #  trajectory_collector: TrajectoryCollector = None,
+                 collect_trajectory: bool = False,
                  update_condition: Literal["on-step", "on-end"] = "on-end",
                  modulation: Literal["reward", "td-error"] = None, modulation_params: dict = {},
                  *, 
@@ -52,8 +53,10 @@ class SNNSimulator:
         self._learning_rule = network.learning_rule
         self.env = env
         self.spike_coder = spike_coder
+        # Episode and Trajectory collectors
         self.reward_collector = reward_collector
-        self.trajectory_collector = trajectory_collector
+        self._log_traj = bool(collect_trajectory)
+        self.trajectory_collector = TrajectoryCollector() if self._log_traj else None
 
         # Flags to indicate what to record
         self.record_membrane = record_membrane
@@ -177,7 +180,7 @@ class SNNSimulator:
         self.spike_coder.reset()
         if self.reward_collector is not None:
             self.reward_collector.reset()
-        if self.trajectory_collector is not None:
+        if self._log_traj:
             self.trajectory_collector.reset()
 
         # Reset network
@@ -195,7 +198,7 @@ class SNNSimulator:
         self.env.reset()
         if self.reward_collector is not None:
             self.reward_collector.soft_reset()
-        if self.trajectory_collector is not None:
+        if self._log_traj:
             self.trajectory_collector.reset()
         # Reset other recorders
         if erase_recorders:
@@ -241,8 +244,9 @@ class SNNSimulator:
                 episode_done = terminated or truncated
 
                 # Optional: Record step data
-                if self.trajectory_collector is not None:
+                if self._log_traj:
                     self.trajectory_collector.collect(
+                        t=t,
                         state=info.get("current_state", None) if hasattr(self.env, "get_agent_state") else None,
                         observation=state,
                         action=action,
@@ -282,7 +286,11 @@ class SNNSimulator:
                             starting_state=starting_state,
                             exploration=self.network.get_exploration_rate(simplify=True),
                             terminated=terminated,
-                            truncated=truncated)
+                            truncated=truncated,
+                            trajectory=copy.deepcopy(self.trajectory_collector.records) if self._log_traj else None,
+                            )
+                    if self._log_traj:
+                        self.trajectory_collector.reset()
                     # self.env.reset()
                     state, info = self.env.reset()
                     starting_state = info.get("current_state", None)

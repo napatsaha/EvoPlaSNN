@@ -111,7 +111,7 @@ def plot_traces(simulator: 'SNNSimulator' = None, values: List[np.ndarray] = Non
 
     # Extract necessary info
     num_steps = simulator.num_steps if simulator is not None else min([val.shape[1] for val in values])
-    values = simulator.spike_recorder.values if simulator is not None else values
+    values = simulator.trace_recorder.values if simulator is not None else values
     num_layers = simulator.network.num_layers if simulator is not None else len(values)
     layer_sizes = simulator.network.layer_sizes if simulator is not None else [val.shape[0] for val in values]
     dt = f"{simulator.dt} s" if simulator is not None else "1 unit"
