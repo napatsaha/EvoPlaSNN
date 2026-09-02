@@ -2,6 +2,12 @@
 v1.3
 ----
 
+v1.3.20.1 (2026-09-02)
+- Added `no_spike_action` argument to `SpikeCoderEnvWrapper`
+- `BaseDecoder` now internally checks whether each channel has no spike during `_calculate_output`
+- During decoding in `SpikeCoderEnvWrapper._perform_decoding`, it will calculate output from decoder, then
+    check if any output channel needs its value overriden when total spike count is zero
+
 v1.3.20.0 (2026-09-02)
 - Various fixes:
     - Added `t` to TrajectoryCollector records

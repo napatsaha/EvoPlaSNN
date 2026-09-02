@@ -107,6 +107,7 @@ class CompositeSpikeCoder(SpikeCoder, ABC):
         # If previous window just ended, clear buffer and reset counter
         if self._window_start:
             self._clear_buffer()
+            self.decoder.reset()
             self._counter = 0
             self._window_end = False
 
@@ -146,7 +147,7 @@ class CompositeSpikeCoder(SpikeCoder, ABC):
         # If window has ended, decode the output buffer into output values
         outp = None
         if self._window_end:
-            outp = self.decoder.decode_spikes(self._output_buffer)
+            outp = self._perform_decoding()
             ## Remove this after testing
             # print(f"Decoding output")
             # outp = self._output_buffer.sum(axis=1)
@@ -156,6 +157,10 @@ class CompositeSpikeCoder(SpikeCoder, ABC):
 
         self._decoder_called = True
 
+        return outp
+
+    def _perform_decoding(self):
+        outp = self.decoder.decode_spikes(self._output_buffer)
         return outp
 
     def reset(self):
@@ -198,7 +203,8 @@ class SpikeCoderEnvWrapper(CompositeSpikeCoder):
                  encoding_method: Literal["single", "multi", "rate", "temporal"] = 'single',
                 encoder_params: dict = {},
                 decoding_method: Literal["voting", "weighted-voting", "rate", "rate-div", "temporal", "ttfs"] = 'voting',
-                decoder_params: dict = {}
+                decoder_params: dict = {},
+                no_spike_action: int | None = None,
                 ):
         self._obs_space = observation_space
         self._action_space = action_space
@@ -215,6 +221,8 @@ class SpikeCoderEnvWrapper(CompositeSpikeCoder):
         super().__init__(input_channels, output_channels, window_size, 
                          encoding_method=encoding_method, encoder_params=encoder_params, 
                          decoding_method=decoding_method, decoder_params=decoder_params)
+
+        self.no_spike_action = no_spike_action
 
     def get_env_info(self, space: gym.Space) -> Tuple[int, int, ArrayLike, ArrayLike, str]:
         if isinstance(space, gym.spaces.Box):
@@ -238,6 +246,21 @@ class SpikeCoderEnvWrapper(CompositeSpikeCoder):
         else:
             raise ValueError(f"Space type {type(space)} not yet supported. Please use CompositeSpikeCoder class directly")
         return n_channels, n_neurons, lower_bounds, upper_bounds, dtype
+
+    def _perform_decoding(self):
+        # Perform decoding and flag any output channels with no flags
+        outp = super()._perform_decoding()
+
+        # If allowed to override output for channel with no spikes
+        if self.no_spike_action is not None:
+            # Check if there are no spikes in output buffer
+            no_spike_flags = self.decoder.had_no_spikes()
+            if any(no_spike_flags):
+                if len(no_spike_flags) == 1:
+                    outp = self.no_spike_action
+                else:
+                    return np.where(no_spike_flags, self.no_spike_action, outp)
+        return outp
 
 
 #### Encoder ####
@@ -393,6 +416,7 @@ class BaseSpikeDecoder(ABC):
         assert self._output_type in ("discrete", "continuous"), f"Invalid Output type. Got {self._output_type}"
         self._is_discrete = self._output_type == "discrete"
         self._is_continuous = self._output_type == "continuous"
+        self._no_spikes = np.zeros(self.out_channels, dtype=bool)
 
     @abstractmethod
     def decode_spikes(self, spikes: np.ndarray) -> np.ndarray:
@@ -423,6 +447,13 @@ class BaseSpikeDecoder(ABC):
         return self._is_discrete
     def is_continuous(self) -> bool:
         return self._is_continuous
+    def had_no_spikes(self) -> np.ndarray:
+        """
+        Returns an 1D boolean array of size `output_channels` showing whether each channel receive no spikes in the last buffer
+        """
+        return self._no_spikes
+    def reset(self):
+        self._no_spikes.fill(False)
 
 
 class OneToOneSpikeDecoder(BaseSpikeDecoder, ABC):
@@ -439,6 +470,7 @@ class OneToOneSpikeDecoder(BaseSpikeDecoder, ABC):
 
     def decode_spikes(self, spikes):
         assert spikes.shape == (self._total_neurons, self.window_size)
+        self._check_no_spikes(spikes)
         outp = self._calculate_output(spikes)
         if self.is_discrete():
             outp = np.astype(outp, dtype=int)
@@ -449,6 +481,12 @@ class OneToOneSpikeDecoder(BaseSpikeDecoder, ABC):
     @abstractmethod
     def _calculate_output(self, spikes):
         pass
+
+    def _check_no_spikes(self, spikes: np.ndarray):
+        spike_count = spikes.sum(axis=1)
+        for n in range(self.out_channels):
+            if spike_count[n] == 0:
+                self._no_spikes[n] = True
 
 
 class RateDivDecoder(OneToOneSpikeDecoder):
@@ -547,6 +585,7 @@ class ManyToOneSpikeDecoder(BaseSpikeDecoder, ABC):
 
     def decode_spikes(self, spikes: np.ndarray):
         assert spikes.shape == (self._total_neurons, self.window_size)
+        self._check_no_spikes(spikes)
         outp = self._calculate_output(spikes)
         if self.is_discrete():
             outp = np.astype(outp, int)
@@ -556,6 +595,16 @@ class ManyToOneSpikeDecoder(BaseSpikeDecoder, ABC):
 
     def _calculate_output(self):
         pass
+
+    def _check_no_spikes(self, spikes):
+        for n in range(self.out_channels):
+            if n < self.out_channels - 1:
+                section = spikes[self._start_index[n]: self._start_index[n+1], :]
+            else:
+                section = spikes[self._start_index[n]: , :]
+            spike_count = np.sum(section, axis=1)
+            if all(spike_count == 0):
+                self._no_spikes[n] = True
     
 
 class SingleVotingDecoder(ManyToOneSpikeDecoder):
