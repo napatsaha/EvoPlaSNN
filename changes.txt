@@ -2,6 +2,11 @@
 v1.4
 ----
 
+v1.4.0.2 (2026-09-03)
+- Hotfix for `PyCMAWrapper`: moved model plotting from `.close()` to `.wrapup()` to avoid throwing error outside try block
+    (Error was thrown because `module 'cma.s' has no attribute 'figclose'`)
+- `plot_membrane` now allows apecifying which `neuron_layer` to plot. Good for exploration, and keeping plot size manageable
+
 v1.4.0.1 (2026-09-03)
 - Various fixes for backward compatibility with previous experiments
 - `RL_Evaluator` throws warning when a learning_rule is passed in during init, but will use that rule during evaluation to update incoming parameters

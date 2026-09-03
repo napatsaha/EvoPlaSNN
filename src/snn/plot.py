@@ -168,7 +168,7 @@ def plot_traces(simulator: 'SNNSimulator' = None, values: List[np.ndarray] = Non
 
 
 def plot_membranes(simulator: 'SNNSimulator' = None, values: List[np.ndarray] = None, spike_values: List[np.ndarray] = None, 
-                   thresholds: List[float | np.ndarray] = None, *, 
+                   thresholds: List[float | np.ndarray] = None, *, neuron_layer: int = None,
                    x_scale: float = 0.2, y_scale: float = 3.0, title: str = None, plot_inputs: bool = False, 
                    color: str = "blue", cmap: str = None, cmap_range: tuple = (0, 1), layout: str = "constrained",
                    x_min = None, x_max = None, x_range: int = 100,
@@ -209,11 +209,30 @@ def plot_membranes(simulator: 'SNNSimulator' = None, values: List[np.ndarray] = 
     else:
         cm = mpl.colormaps[cmap]
 
-    if not plot_inputs:
-        thresholds = thresholds[1:] if thresholds is not None else None
-        spike_times = spike_times[1:] if spike_times is not None else None
-        values = values[1:]
-        layer_sizes = layer_sizes[1:]
+    # Decide which layers to plot
+    if neuron_layer is None:
+        layers_to_plot = []
+        for n in range(num_layers):
+            if not plot_inputs and n==0:
+                continue
+            layers_to_plot.append(n)
+    else:
+        assert 0 <= neuron_layer < num_layers, f"Invalid 'neuron_layer={neuron_layer}' index. Must be between [0, {num_layers})"
+        layers_to_plot = [neuron_layer]
+
+    # Apply the designated layers_to_plot on relevant values
+    if thresholds is not None:
+        thresholds = [thresholds[i] for i in layers_to_plot]
+    if spike_times is not None:
+        spike_times = [spike_times[i] for i in layers_to_plot]
+    values = [values[i] for i in layers_to_plot]
+    layer_sizes = [layer_sizes[i] for i in layers_to_plot]
+    # if not plot_inputs:
+    #     thresholds = thresholds[1:] if thresholds is not None else None
+    #     spike_times = spike_times[1:] if spike_times is not None else None
+    #     values = values[1:]
+    #     layer_sizes = layer_sizes[1:]
+    # Construct figure based on sizes of layers to plot
     nrows = max(layer_sizes)
     ncols = len(layer_sizes)
     if figsize is None:

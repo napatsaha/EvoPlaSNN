@@ -61,10 +61,10 @@ class PyCMAWrapper(BaseSolver):
 
     def wrapup(self, n_best, precision = None):
         self.model.stop()
+        self.model.plot()
+        cma.s.figsave(self.log_path / "pycma_plot.png")
+        # cma.s.figclose()
         return super().wrapup(n_best, precision)
 
     def close(self):
-        self.model.plot()
-        cma.s.figsave(self.log_path / "pycma_plot.png")
-        cma.s.figclose()
         return super().close()
