@@ -1,4 +1,12 @@
 ----
+v1.4
+----
+
+v1.4.0.0 (2026-09-03)
+- Very important change for experiment
+- Changed `delig += learning_rate` to multiply `*=` in `BaseLearningRule.prepare_output()`
+
+----
 v1.3
 ----
 
