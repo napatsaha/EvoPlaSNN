@@ -2,6 +2,13 @@
 v1.4
 ----
 
+v1.4.0.1 (2026-09-03)
+- Various fixes for backward compatibility with previous experiments
+- `RL_Evaluator` throws warning when a learning_rule is passed in during init, but will use that rule during evaluation to update incoming parameters
+- `BaseSpikeEncoder.generate_spikes()` converts input to array even when n_channel is only 1, and returns a tuple of (empty array, inp)
+- `SNN` relies on `update_weights_on_etrace` for checking whether to perform weight update automatically + safe `_update_lrate` input
+- `SNNSimulator.record_eligibility_custom` checks `network.use_etrace_custom` before recording
+
 v1.4.0.0 (2026-09-03)
 - Very important change for experiment
 - Changed `delig += learning_rate` to multiply `*=` in `BaseLearningRule.prepare_output()`

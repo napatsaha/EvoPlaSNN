@@ -3,6 +3,7 @@ import copy
 import time
 from pathlib import Path
 from typing import Dict, Any, List, Sequence, Union, Tuple
+import warnings
 
 import numpy as np
 from numpy.typing import ArrayLike
@@ -13,6 +14,7 @@ from snn import SNN, SNNSimulator
 # from snn.spikegen import BinaryClassGenerator
 import snn.spikegen as spkgen
 from snn.spike_coding import SpikeCoderEnvWrapper
+from rl.spike_coding import StateCoder
 # from snn.spikegen import create_spikegen, create_poisson_class_timing, create_binary_class_timing
 # import snn.spikegen
 from lrule import LearningRule
@@ -27,7 +29,7 @@ class RL_Evaluator(Evaluator):
                  log_level: int = 2,
                  record_inter_fitness: bool = True,
                  precision: int = 3,
-                #  learning_rule: LearningRule = None,
+                 learning_rule: LearningRule = None,
                  max_steps: int = None,
                  max_episodes: int = None,
                  eval_episodes: int = None,
@@ -72,8 +74,19 @@ class RL_Evaluator(Evaluator):
         self.env: BaseMaze = ENV_DICT.get(env_name)(**env_params)
         # num_states = self.env.observation_space.n
         # num_actions = self.env.action_space.n
-        self.spike_coder: SpikeCoder = SpikeCoderEnvWrapper(self.env.observation_space, self.env.action_space, 
+        if "input_delay" in params["spike_coder_params"]:
+            _new_spike_coding = False
+        elif "window_size" in params["spike_coder_params"]:
+            _new_spike_coding = True
+        else:
+            raise RuntimeError("Cannot determine whether to use the old or new spike coding regime." + \
+                               "Available keys in spike_coder_params: " + str(params["spike_coder_params"].keys()))
+        if _new_spike_coding:
+            self.spike_coder: SpikeCoder = SpikeCoderEnvWrapper(self.env.observation_space, self.env.action_space, 
                                                             **params["spike_coder_params"])
+        else:
+            self.spike_coder = StateCoder(self.env.observation_space, self.env.action_space, 
+                                      **params["spike_coder_params"])
         self.snn = SNN(input_size=self.spike_coder.input_size, output_size=self.spike_coder.output_size, 
                        **params["snn_params"])
         self.reward_collector = RewardCollector(**params["collector_params"])
@@ -98,9 +111,24 @@ class RL_Evaluator(Evaluator):
         self.logger = None
 
         # Dummy Learning Rule for some pre-calculation
-        self._lrule_params = params.get("lrule_params", {})
-        self._lrule_type = self._lrule_params.pop("type")
-        self.dummy_rule = create_learning_rule(self._lrule_type, **self._lrule_params) #if learning_rule is None else learning_rule
+        if "arule_params" in params:
+            self._lrule_params = params.get("arule_params", {})
+            self._lrule_type = "ann"
+        elif "lrule_params" in params:
+            self._lrule_params = params.get("lrule_params", {})
+            self._lrule_type = self._lrule_params.pop("type")
+        else:
+            raise RuntimeError("Cannot read learning rule params")
+        self.dummy_rule = create_learning_rule(self._lrule_type, **self._lrule_params) 
+        # For backward compatibility
+        self._use_old_learning_rule = False
+        if learning_rule is not None:
+            warnings.warn("Passing 'learning_rule' to Evaluator init is being deprecated. Please pass learning_rule to `evaluator.evaluate(genome=learning_rule)` instead")
+            self.dummy_rule = learning_rule
+            self._use_old_learning_rule = True
+            self.simulator.learning_rule = learning_rule
+
+        # Novelty Search relevant parameters
         self.measure_behaviour = measure_behaviour
         self.behaviour_params = {} if behaviour_params is None or not self.measure_behaviour else behaviour_params
         if self.measure_behaviour:
@@ -190,14 +218,23 @@ class RL_Evaluator(Evaluator):
             elif isinstance(genome, Genome):
                 rule = create_learning_rule(self._lrule_type, parameters=genome.parameters, **self._lrule_params)
             elif isinstance(genome, np.ndarray):
-                rule = create_learning_rule(self._lrule_type, parameters=genome, **self._lrule_params)
+                if self._use_old_learning_rule:
+                    rule = self.dummy_rule
+                    rule.parameters = genome
+                else:
+                    rule = create_learning_rule(self._lrule_type, parameters=genome, **self._lrule_params)
             else:
                 raise ValueError("Parameters passed into evaluate must be either 'LearningRule', 'Genome' or an 'ArrayLike' object.")
-            self.snn.learning_rule = rule
-            genome: np.ndarray = rule.parameters
+
 
         else:
+            if self._use_old_learning_rule:
+                rule = self.dummy_rule
             raise ValueError("A solution must be specified to be evaluated. Supported types: np.ndarray | LearningRule | Genome")
+
+        # Replace Network's learning rule with the one to evaluate
+        self.snn.learning_rule = rule
+        genome: np.ndarray = rule.parameters
 
         t00 = time.time()
         if self.logger is not None:

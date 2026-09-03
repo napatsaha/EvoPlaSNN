@@ -69,7 +69,7 @@ class SNNSimulator:
         self.record_eligibility_pre = record_eligibility_pre if self.network.use_etrace_pre else False
         self.record_eligibility_post = record_eligibility_post if self.network.use_etrace_post else False
         self.record_eligibility_stdp = record_eligibility_stdp if self.network.use_etrace_stdp else False
-        self.record_eligibility_custom = record_eligibility_custom
+        self.record_eligibility_custom = record_eligibility_custom if self.network.use_etrace_custom else False
 
         # Initialize recorders
         self.mem_recorder = LayerRecorder(network.layer_sizes_active) if self.record_membrane else None

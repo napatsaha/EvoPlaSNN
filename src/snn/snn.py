@@ -140,7 +140,7 @@ class SNN:
 
         self.update_weights_on_etrace = bool(update_weights_on_etrace)
         self._etrace_to_update = str(update_weights_on_etrace) if self.update_weights_on_etrace else None
-        self._update_lrate = float(update_lrate)
+        self._update_lrate = float(update_lrate) if self.update_weights_on_etrace else None
 
         # Create each neuron layers
         self.neuron_layers = []
@@ -187,6 +187,8 @@ class SNN:
             synapse.apply_learning_rule(reward)
 
     def apply_weight_updates_from_etrace(self, signal: float = None, lrate: float = 1.0):
+        if not self.update_weights_on_etrace:
+            return
         for synapse in self.synapse_layers:
             synapse.update_weights_from_etrace(signal, self._etrace_to_update, lrate=self._update_lrate)
 

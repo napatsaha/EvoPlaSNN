@@ -337,10 +337,12 @@ class BaseSpikeEncoder(ABC):
                     break
         return idx, scale
 
-    def generate_spikes(self, inp: np.ndarray) -> np.ndarray:
+    def generate_spikes(self, inp: np.ndarray | int | float) -> Tuple[np.ndarray, np.ndarray]:
+        if self.n_channels == 1 and not isinstance(inp, np.ndarray):
+            inp = np.array([inp])
         assert inp.ndim == 1, f"Parallen input encoding not yet supported. Input length must be 1-dimension of the same length as n_channels={self.n_channels}"
         assert inp.size == self.n_channels, f"Input must have the same length as encoded channels {self.n_channels}. Got input length: {inp.size}"
-        return self._empty_array.copy()
+        return self._empty_array.copy(), inp
 
     @property
     def bins(self):
@@ -353,7 +355,7 @@ class BaseSpikeEncoder(ABC):
 
 class SingleSpikeEncoder(BaseSpikeEncoder):
     def generate_spikes(self, inp: np.ndarray) -> np.ndarray:
-        out_array = super().generate_spikes(inp)
+        out_array, inp = super().generate_spikes(inp)
 
         # Find bin index of each input value and convert to flattened index
         neuron_idx, _ = self._get_neuron_index(inp, calc_scale=False)
@@ -364,7 +366,7 @@ class SingleSpikeEncoder(BaseSpikeEncoder):
 
 class TemporalEncoder(BaseSpikeEncoder):
     def generate_spikes(self, inp):
-        out_array = super().generate_spikes(inp)
+        out_array, inp = super().generate_spikes(inp)
 
         # Find bin index of each input value and convert to flattened index
         neuron_idx, scale = self._get_neuron_index(inp, calc_scale=True)
@@ -376,7 +378,7 @@ class TemporalEncoder(BaseSpikeEncoder):
 
 class MultiSpikeEncoder(BaseSpikeEncoder):
     def generate_spikes(self, inp):
-        out_array = super().generate_spikes(inp)
+        out_array, inp = super().generate_spikes(inp)
 
         # Find bin index of each input value and convert to flattened index
         neuron_idx, scale = self._get_neuron_index(inp, calc_scale=True)
@@ -389,7 +391,7 @@ class MultiSpikeEncoder(BaseSpikeEncoder):
 
 class RateEncoder(BaseSpikeEncoder):
     def generate_spikes(self, inp):
-        out_array = super().generate_spikes(inp)
+        out_array, inp = super().generate_spikes(inp)
 
         # Find bin index of each input value and convert to flattened index
         neuron_idx, scale = self._get_neuron_index(inp, calc_scale=True)
