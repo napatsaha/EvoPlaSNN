@@ -1,6 +1,6 @@
 from pathlib import Path
 import csv, pickle
-from typing import List, Literal, Sequence
+from typing import List, Literal, Sequence, Dict
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 from matplotlib.axes import Axes
