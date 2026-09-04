@@ -81,6 +81,9 @@ def main(config_file: str | Path | dict, *, config_overrides: dict = None, paren
     with open(results_path / "config.yaml", "w") as f:
         yaml.dump(config, f, sort_keys=False)
 
+    # Display run result path
+    print(f"Running experiment to be saved to {results_path}")
+
     # Begin experiment
     manager.run()
 

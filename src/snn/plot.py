@@ -650,7 +650,7 @@ def plot_env_weight_actions(simulator: 'SNNSimulator', *, dpi: int = 100, figsiz
 
 
 def plot_env_weight_greedy(simulator: 'SNNSimulator', *, 
-                            savepath=None, show=True, *kwargs):
+                            savepath=None, show=True, **kwargs):
     # Extract objects
     network = simulator.network
     env = simulator.env

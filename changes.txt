@@ -2,6 +2,10 @@
 v1.4
 ----
 
+v1.4.1.1 (2026-09-04)
+- Hotfix: plot issue with new _plot_env_action_values
+- Display result_path to terminal before running experiment
+
 v1.4.1.0 (2026-09-04)
 - Simplify NeuronLayer spiking behaviour
 - Removed functionalities of `ignore_threshold`, `spike_condition` and `delayed_wta`. Also adds Warning of deprecation
