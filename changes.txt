@@ -2,6 +2,18 @@
 v1.4
 ----
 
+v1.4.1.0 (2026-09-04)
+- Simplify NeuronLayer spiking behaviour
+- Removed functionalities of `ignore_threshold`, `spike_condition` and `delayed_wta`. Also adds Warning of deprecation
+- During `set_spike()`, deterministic and stochastic behaviour will only apply if winner-take-all
+    - If deterministic, and there are ties in membrane potential, added a new option to control behaviour:
+        `tie_handling_wta`
+- Reset behaviour depends first on WTA:
+    - If no WTA, reset all neurons that spike
+    - If WTA, depends on `reset_condition`:
+        - Also added `reset_condition="spike-and-above"` which will include union between neuron with mem>thr and which spikes
+             for cases where spiking is stochastic and neuron below threshold was chosen to spike
+
 v1.4.0.3 (2026-09-04)
 - SNN and SynapseLayer weights become settable properties
 - `BaseMaze` uses `np.random` instead of `gym.Env.np_random` for its random Generator
