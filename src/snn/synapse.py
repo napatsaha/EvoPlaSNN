@@ -154,14 +154,14 @@ class SynapseLayer(SynapseLayerProtocol):
         if self.weight_init == 'uniform':
             wmin = self.weight_init_params.get('weight_init_min', 0.0)
             wmax = self.weight_init_params.get('weight_init_max', 1.0)
-            self.weights = np.random.uniform(wmin, wmax, size=(self.pre_layer.size, self.post_layer.size))
+            self._weights = np.random.uniform(wmin, wmax, size=(self.pre_layer.size, self.post_layer.size))
         elif self.weight_init == 'normal':
             mean = self.weight_init_params.get('weight_init_mean', 0.0)
             std = self.weight_init_params.get('weight_init_std', 1.0)
-            self.weights = np.random.normal(mean, std, size=(self.pre_layer.size, self.post_layer.size))
+            self._weights = np.random.normal(mean, std, size=(self.pre_layer.size, self.post_layer.size))
         elif self.weight_init == 'constant':
             value = self.weight_init_params.get('weight_init_value', 0.0)
-            self.weights = np.full((self.pre_layer.size, self.post_layer.size), value, dtype=np.float32)
+            self._weights = np.full((self.pre_layer.size, self.post_layer.size), value, dtype=np.float32)
         else:
             raise NotImplementedError("Other weight initialisation methods not implemented yet")
 
@@ -434,7 +434,7 @@ class SynapseLayer(SynapseLayerProtocol):
             self._update_weights(dw, lrate)
 
     def _update_weights(self, dw, lrate: float = 1.0):
-        self.weights += lrate * dw
+        self._weights += lrate * dw
         # Clip the weights
         self._clip_weights()
         # Normalise the weights
@@ -442,14 +442,23 @@ class SynapseLayer(SynapseLayerProtocol):
 
     def _clip_weights(self):
         if self.clip_weights:
-            self.weights = np.clip(self.weights, self.weight_clip_min, self.weight_clip_max)
+            self._weights = np.clip(self.weights, self.weight_clip_min, self.weight_clip_max)
 
     def _normalise_weights(self):
         if self.normalise_weights:
-            self.weights = safe_norm(self.weights, self.normalise_method)
+            self._weights = safe_norm(self.weights, self.normalise_method)
 
     def __repr__(self):
         return f"SynapseLayer({self.weights.shape})"
+
+    @property
+    def weights(self) -> np.ndarray:
+        return self._weights
+    @weights.setter
+    def weights(self, value: np.ndarray):
+        assert isinstance(value, np.ndarray), "New weights must be an array"
+        assert value.shape == self._weights.shape, f"Shape mismatch. Expected {self._weights.shape}, Got {value.shape}."
+        self._weights = value
 
     @property
     def tau_syn(self) -> float:

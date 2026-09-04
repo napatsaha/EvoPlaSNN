@@ -2,6 +2,12 @@
 v1.4
 ----
 
+v1.4.0.3 (2026-09-04)
+- SNN and SynapseLayer weights become settable properties
+- `BaseMaze` uses `np.random` instead of `gym.Env.np_random` for its random Generator
+- Added `_plot_env_action_values` and `_query_SNN_membrane_from_env_position` for network > 0 hidden layers
+    - `plot_env_weight_greedy` behaves differently based on obs_type of env
+
 v1.4.0.2 (2026-09-03)
 - Hotfix for `PyCMAWrapper`: moved model plotting from `.close()` to `.wrapup()` to avoid throwing error outside try block
     (Error was thrown because `module 'cma.s' has no attribute 'figclose'`)

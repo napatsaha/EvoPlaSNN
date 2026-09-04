@@ -261,6 +261,11 @@ class SNN:
     @property
     def weights(self):
         return [synapse.weights for synapse in self.synapse_layers]
+    @weights.setter
+    def weights(self, value: List[np.ndarray]):
+        assert len(value) == self.num_syn_layers, "Layer size mismatch. New value must be of length "+self.num_syn_layers+f". Got{len(value)}"
+        for synapse, w in zip(self.synapse_layers, value):
+            synapse.weights = w
     
     @property
     def thresholds(self):

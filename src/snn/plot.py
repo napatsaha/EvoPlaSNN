@@ -593,27 +593,114 @@ def plot_env_weight_actions(simulator: 'SNNSimulator', *, dpi: int = 100, figsiz
         plt.show()
 
 
-def plot_env_weight_greedy(simulator: 'SNNSimulator', *, arrowcolors = ("white", "black"),
-                           threshold: float = 0.5,
-                           tolerance: float = 1e-10, dpi: int = 100, figsize=None, comment: str = None,
-                            savepath=None, show=True):
+# def plot_env_weight_greedy(simulator: 'SNNSimulator', *, arrowcolors = ("white", "black"),
+#                            threshold: float = 0.5,
+#                            tolerance: float = 1e-10, dpi: int = 100, figsize=None, comment: str = None,
+#                             savepath=None, show=True):
+#     # Extract objects
+#     network = simulator.network
+#     env = simulator.env
+
+    # if figsize is None:
+    #     figsize=(env.width, env.height)
+    # fig, ax = plt.subplots(1, 1, figsize=figsize, dpi=dpi)
+    # cmap = plt.get_cmap("viridis").with_extremes(bad="white")
+
+    # w = network.weights[0]
+
+    # w_maze = env.maze.copy().astype(float)
+    # w_act = w.max(axis=1)
+    # emp_maze = np.zeros_like(w_maze)
+
+    # for state, pos in env._state_pos_dict.items():
+    #     emp_maze[*pos] = w_act[state]
+
+    # ma_maze = np.ma.array(emp_maze, mask=(w_maze == 0))
+    # img = ax.imshow(ma_maze, extent=(0, env.width, 0, env.height), cmap=cmap)
+
+    # # Normalize the threshold to the images color range.
+    # threshold = img.norm(ma_maze.max())*np.clip(threshold, 0, 1)
+
+    # for state, pos in env._state_pos_dict.items():
+    #     cnt = pos + 0.5
+    #     act_vals = w[state, :]
+    #     v_max = act_vals.max()
+    #     for act, val in enumerate(act_vals):
+    #         if np.abs(val - v_max) < tolerance:
+    #             direction = env.action_map[act] * 0.5
+    #             color = arrowcolors[int(img.norm(ma_maze[*pos]) > threshold)]
+    #             ax.annotate('', xy=(cnt[1]+direction[1], env.height - (cnt[0]+direction[0])), xytext=(cnt[1], env.height - cnt[0]), 
+    #                         arrowprops=dict(arrowstyle="->", edgecolor=color))
+
+    # ax.set_xticks(np.arange(0, env.width, 1), labels=[])
+    # ax.set_yticks(np.arange(0, env.height, 1), labels=[])
+    # ax.grid(visible=True, color='black', linewidth=0.7)
+
+    # title = f"Overlaid SNN Weights for each input state (maximum across Action neurons)"
+    # if comment is not None:
+    #     title += "\n" + comment
+    # ax.set_title(title)
+    # plt.colorbar(img, ax=ax, orientation='horizontal', fraction=0.05, pad=0.1, label="Weights")
+
+    # if savepath is not None:
+    #     print(f"Saving plot to {savepath}")
+    #     plt.savefig(savepath, dpi=dpi)
+    # if show:
+    #     plt.show()
+
+
+def plot_env_weight_greedy(simulator: 'SNNSimulator', *, 
+                            savepath=None, show=True, *kwargs):
     # Extract objects
     network = simulator.network
     env = simulator.env
+
+    if env.obs_type == "state":
+        # Single-synapselayer, state-based observation
+        w = network.weights[0]
+        state_act_vals = {state: w[state, :] for state in range(env._num_state)}
+        _plot_env_action_values(env, state_act_vals, colour_code=True, savepath=savepath, show=show, 
+                                legend_label="Weights", title="SNN SynapseLayer 0 weights overlaid on Environment",
+                                **kwargs)
+    elif env.obs_type == "position":
+        encoder = simulator.spike_coder.encoder
+        state_act_vals = _query_SNN_membrane_from_env_position(network, encoder, env)
+        _plot_env_action_values(env, state_act_vals, savepath=savepath, show=show, 
+                                legend_label="Membrane Potential", title="SNN Output Layer Membrane Potential for each Env state"
+                                **kwargs)
+
+
+def _query_SNN_membrane_from_env_position(network: 'SNN', encoder: SpikeCoder, env: 'BaseMaze') -> Dict[int, np.ndarray]:
+    layer_mems = {}
+
+    for state, pos in env._state_pos_dict.items():
+        network.soft_reset()
+        inp_buffer = encoder.generate_spikes(pos)
+        spk_in = inp_buffer[:, 0]
+        spk_out = network.forward(spk_in)
+
+        layer_mems[state] = [n.membrane.copy() for n in network.neuron_layers[1:]]
+
+    state_act_vals = {st: mem[-1] for st, mem in layer_mems.items()}
+    return state_act_vals
+
+
+def _plot_env_action_values(env: 'BaseMaze', state_action_values: Dict[int, np.ndarray], colour_code: bool = False, *, arrowcolors = ("white", "black"),
+                           threshold: float = 0.5, legend_label: str = "Value", title: str = None,
+                           tolerance: float = 1e-10, dpi: int = 100, figsize=None, comment: str = None,
+                            savepath=None, show=True):
 
     if figsize is None:
         figsize=(env.width, env.height)
     fig, ax = plt.subplots(1, 1, figsize=figsize, dpi=dpi)
     cmap = plt.get_cmap("viridis").with_extremes(bad="white")
 
-    w = network.weights[0]
-
     w_maze = env.maze.copy().astype(float)
-    w_act = w.max(axis=1)
     emp_maze = np.zeros_like(w_maze)
 
-    for state, pos in env._state_pos_dict.items():
-        emp_maze[*pos] = w_act[state]
+    if colour_code:
+        for state, pos in env._state_pos_dict.items():
+            emp_maze[*pos] = state_action_values[state].max()
 
     ma_maze = np.ma.array(emp_maze, mask=(w_maze == 0))
     img = ax.imshow(ma_maze, extent=(0, env.width, 0, env.height), cmap=cmap)
@@ -623,7 +710,7 @@ def plot_env_weight_greedy(simulator: 'SNNSimulator', *, arrowcolors = ("white",
 
     for state, pos in env._state_pos_dict.items():
         cnt = pos + 0.5
-        act_vals = w[state, :]
+        act_vals = state_action_values[state]
         v_max = act_vals.max()
         for act, val in enumerate(act_vals):
             if np.abs(val - v_max) < tolerance:
@@ -636,11 +723,11 @@ def plot_env_weight_greedy(simulator: 'SNNSimulator', *, arrowcolors = ("white",
     ax.set_yticks(np.arange(0, env.height, 1), labels=[])
     ax.grid(visible=True, color='black', linewidth=0.7)
 
-    title = f"Overlaid SNN Weights for each input state (maximum across Action neurons)"
+    title = f"State-Action Potentials and Greedy Action" if title is None else title
     if comment is not None:
         title += "\n" + comment
     ax.set_title(title)
-    plt.colorbar(img, ax=ax, orientation='horizontal', fraction=0.05, pad=0.1, label="Weights")
+    plt.colorbar(img, ax=ax, orientation='horizontal', fraction=0.05, pad=0.1, label=legend_label)
 
     if savepath is not None:
         print(f"Saving plot to {savepath}")

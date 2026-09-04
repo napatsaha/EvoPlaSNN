@@ -242,7 +242,7 @@ class BaseMaze(gym.Env):
             self._valid_idx = [idx for idx, _, gd, bd in self._idx_dist_rec if gd >= self._random_min_dist and bd >= self._random_min_dist]
             # Randomly choose starting position from this list
             self.maze[*self._agent_pos] = self.EMPTY
-            rand_idx = self.np_random.choice(self._valid_idx)
+            rand_idx = np.random.choice(self._valid_idx)
             self._agent_pos = np.unravel_index(rand_idx, self.maze.shape)
             self.maze[*self._agent_pos] = self.AGENT
         else:
@@ -255,7 +255,7 @@ class BaseMaze(gym.Env):
         self.maze[*self._good_pos] = self.GOOD
         self.maze[*self._bad_pos] = self.BAD
         if self.randomise_start:
-            rand_idx = self.np_random.choice(self._valid_idx)
+            rand_idx = np.random.choice(self._valid_idx)
             self._agent_pos = np.unravel_index(rand_idx, self.maze.shape)
         else:
             self._agent_pos = self._starting_pos.copy()
