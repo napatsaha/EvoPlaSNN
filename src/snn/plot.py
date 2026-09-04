@@ -670,7 +670,7 @@ def plot_env_weight_greedy(simulator: 'SNNSimulator', *,
                                 **kwargs)
 
 
-def _query_SNN_membrane_from_env_position(network: 'SNN', encoder: SpikeCoder, env: 'BaseMaze') -> Dict[int, np.ndarray]:
+def _query_SNN_membrane_from_env_position(network: 'SNN', encoder: 'SpikeCoder', env: 'BaseMaze') -> Dict[int, np.ndarray]:
     layer_mems = {}
 
     for state, pos in env._state_pos_dict.items():

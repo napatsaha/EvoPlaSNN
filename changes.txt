@@ -2,7 +2,7 @@
 v1.4
 ----
 
-v1.4.1.1 (2026-09-04)
+v1.4.1.1, v1.4.1.2 (2026-09-04)
 - Hotfix: plot issue with new _plot_env_action_values
 - Display result_path to terminal before running experiment
 
