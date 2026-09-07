@@ -358,8 +358,7 @@ class ANN_Rule(BaseLearningRule, EvolvableLearningRule):
                     hidden_size=hidden_size, 
                     hidden_activation=self._hidden_activation if self._hidden_activation is not None else hidden_activation, 
                     output_activation=self._output_activation if self._output_activation is not None else output_activation,
-                    bias=bias, weight_dist=self._weight_dist if self._weight_dist is not None else weight_dist,
-                    **kwargs)
+                    bias=bias, weight_dist=self._weight_dist if self._weight_dist is not None else weight_dist)
 
         # self.encode_weights = True # Weights is always encoded
         # self.encode_learning_rate = encode_learning_rate

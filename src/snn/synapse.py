@@ -24,6 +24,8 @@ class SynapseLayer(SynapseLayerProtocol):
     pre_layer: NeuronLayerProtocol
     weights: np.ndarray
     _learning_rule: LearningRule
+    _internal_rule: LearningRule
+    _external_rule: LearningRule
     
     def __init__(self, pre_layer: NeuronLayerProtocol, post_layer: NeuronLayerProtocol, *, 
                  learning_rule: LearningRule = None, plastic: bool = True,

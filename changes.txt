@@ -2,6 +2,14 @@
 Branch v1.4-rule-rework
 ----
 
+0.2 (2026-09-07)
+- `lrule/dual.py`: `DualLearningRule` which is a composite of external and internal learning rule
+    - Still a work in progress
+- Removed kwargs to be passed to ANN in ANN_Rule (kwargs only apply to BaseLearningRule)
+- SmallPolynomialRule now has explicit arguments for use_* format inputs, instead of hard-coding
+    in order to allow not clashing with params from config
+- Added empty private attributes for external and internal rules in SynapseLayer
+
 0.1 (2026-09-07)
 - Moved 'update_condition' from `Simulator` to 'trigger_condition' in `LearningRule`
     - Ensured config reading in `RL_Evaluator` have backward compatibility
