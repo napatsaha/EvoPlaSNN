@@ -1,4 +1,13 @@
 ----
+Branch v1.4-rule-rework
+----
+
+0.1 (2026-09-07)
+- Moved 'update_condition' from `Simulator` to 'trigger_condition' in `LearningRule`
+    - Ensured config reading in `RL_Evaluator` have backward compatibility
+    - Simply changed which learning_rule trigger_condition is referred to during `Simulator.run` for now
+
+----
 v1.4
 ----
 

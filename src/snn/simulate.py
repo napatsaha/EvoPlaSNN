@@ -28,7 +28,7 @@ class SNNSimulator:
                  env: gym.Env = None, spike_coder: SpikeCoder = None, reward_collector: RewardCollector = None,
                 #  trajectory_collector: TrajectoryCollector = None,
                  collect_trajectory: bool = False,
-                 update_condition: Literal["on-step", "on-end"] = "on-end",
+                #  update_condition: Literal["on-step", "on-end"] = "on-end",
                  modulation: Literal["reward", "td-error"] = None, modulation_params: dict = {},
                  *, 
                 #  params: dict = {},
@@ -90,7 +90,7 @@ class SNNSimulator:
         # if hasattr(self.learning_rule, "condition") and self.learning_rule.condition == "on-spike":
         #     self._supervised = False
         self._soft_reset = self.network.use_soft_reset()
-        self.update_condition = update_condition
+        # self.update_condition = update_condition
 
         # Neuro-modulation
         self._modulation = modulation if modulation is not None else False
@@ -256,16 +256,16 @@ class SNNSimulator:
                 
                 if update:
                     # Updates at every environment step
-                    if self.update_condition == "on-step":
+                    if self.network.learning_rule.trigger_condition == "on-step":
                         signal = self.modulator.signal(locals=locals()) if self._modulation else reward
                         self.network.apply_learning_rule(reward=signal)
                     # Update upon receiving reward (require reward=None when no update is desired)
-                    elif self.update_condition == "on-reward":
+                    elif self.network.learning_rule.trigger_condition == "on-reward":
                         if reward is not None:
                             signal = self.modulator.signal(locals=locals()) if self._modulation else reward
                             self.network.apply_learning_rule(reward=signal)
                     # Update network at the end of each episode
-                    elif self.update_condition == "on-end":
+                    elif self.network.learning_rule.trigger_condition == "on-end":
                         if episode_done:
                             signal = self.modulator.signal(locals=locals()) if self._modulation else reward
                             self.network.apply_learning_rule(reward=signal)
@@ -302,7 +302,7 @@ class SNNSimulator:
                 reward = None
 
             # Apply learning rule at every timestep
-            if update and self.update_condition == "on-timestep":
+            if update and self.network.learning_rule.trigger_condition == "on-timestep":
                 # Warning: reward can be None
                 signal = self.modulator.signal(locals=locals()) if self._modulation else reward
                 self.network.apply_learning_rule(reward=signal)

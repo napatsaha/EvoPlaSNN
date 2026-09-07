@@ -63,6 +63,7 @@ class LearningRule(ABC):
     input_size: int
     output_size: int
     input_order: Sequence
+    trigger_condition: Literal["on-timestep", "on-step", "on-reward", "on-end"]
     
     def __init__(self):
         pass

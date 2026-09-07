@@ -93,6 +93,13 @@ class RL_Evaluator(Evaluator):
         # Update min and max fitness from environment
         self.reward_collector.min_fitness = self.env.get_min_reward()
         self.reward_collector.max_fitness = self.env.get_max_reward()
+
+        # Backward compatilibity -> CHeck if config has update condition from simulator_params
+        simulator_params = params.get("simulator_params", {})
+        _trigger_condition = None
+        if "update_condition" in simulator_params:
+            warnings.warn("This config uses 'update_condition' inside 'simulator_params'. Newer config should specify 'trigger_condition' within 'lrule_params'")
+            _trigger_condition = simulator_params.pop("update_condition", None)
         
         self.simulator = SNNSimulator(self.snn, self.env, self.spike_coder, self.reward_collector,
                                       record_weights=record_info, 
@@ -106,7 +113,7 @@ class RL_Evaluator(Evaluator):
                                       record_eligibility_post=record_info,
                                       record_eligibility_stdp=record_info,
                                       record_eligibility_custom=record_info,
-                                      **params.get("simulator_params", {})
+                                      **simulator_params
                                       )
         self.logger = None
 
@@ -119,6 +126,12 @@ class RL_Evaluator(Evaluator):
             self._lrule_type = self._lrule_params.pop("type")
         else:
             raise RuntimeError("Cannot read learning rule params")
+        # Move trigger condition from simulator_params
+        if _trigger_condition is not None:
+            if "trigger_condition" in self._lrule_params:
+                warnings.warn("'trigger_condition' already specified in 'lrule_params'. Ignoring 'update_condition' in 'simulator_params'")
+            else:
+                self._lrule_params["trigger_condition"] = _trigger_condition
         self.dummy_rule = create_learning_rule(self._lrule_type, **self._lrule_params) 
         # For backward compatibility
         self._use_old_learning_rule = False

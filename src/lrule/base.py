@@ -34,6 +34,7 @@ class BaseLearningRule(LearningRule):
                 }
     def __init__(self, *, 
                 learning_rate: float = 1.0, learning_rate_thr: float = 0.1, threshold_agg_func: Literal["max", "min", "mean", "sum"] = "mean",
+                trigger_condition: Literal["on-timestep", "on-step", "on-reward", "on-end"] = None,
                 delta_weight: bool = True, delta_threshold: bool = False, delta_eligibility: bool = False,
                 use_trace_pre: bool = False, use_trace_post: bool = False, use_spike_pre: bool = False, use_spike_post: bool = False,
                 use_weights: bool = True, use_reward: bool = False, 
@@ -71,6 +72,17 @@ class BaseLearningRule(LearningRule):
         self.output_size = len(self.output_order)
         if self.output_size == 0:
             raise ValueError(f"At least one output must be selected, from {self.OUTPUT_ORDER}")
+
+        # Trigger condition: when to apply the rule
+        if trigger_condition is not None:
+            assert trigger_condition in ["on-timestep", "on-step", "on-reward", "on-end"], f"'trigger_condition' is {trigger_condition}"
+            self.trigger_condition = trigger_condition
+        else:
+            if self.delta_eligibility:
+                self.trigger_condition = "on-step"
+            else:
+                self.trigger_condition = "on-reward" # Default placeholder for now
+
         
     def prepare_inputs(self, synapse: SynapseLayerProtocol, reward: float, w_shape: tuple):
         inp = []
