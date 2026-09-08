@@ -2,6 +2,13 @@
 Branch v1.4-rule-rework
 ----
 
+0.3 (2026-09-08)
+- Added `._sync_genes()` to `DualLearningRule` after instantiating `EvolvableLearningRule` parent class:
+    - It ensures that genes created from parent class are carried over to external/internal rules
+- Added `_gene_origin_flag` to track which gene belong to "external", "internal" or "shared"
+- Ensured the gene syncing is carried over when copying, mutating and crossovering genes
+- Ensured constructing by passing in either `parameters=` or `genes=` maintains gene syncing
+
 0.2 (2026-09-07)
 - `lrule/dual.py`: `DualLearningRule` which is a composite of external and internal learning rule
     - Still a work in progress
