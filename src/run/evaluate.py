@@ -50,7 +50,7 @@ def _plot_simulation_results(simulator: 'SNNSimulator', results_path, prefix, sa
                       "savepath": Path(results_path, f"{prefix}_traces.png") if save_plots else None,
                       "show": show_plots}
             kwargs.update(plot_kwargs)
-            snn_plot.plot_traces(simulator, **kwargs)
+            snn_plot.plot_traces(simulator, trace_type="neuron", **kwargs)
         except Exception as e:
             print(f"Error plotting neuronal traces: {e}")
     # Plot pre-synaptic traces
@@ -63,7 +63,7 @@ def _plot_simulation_results(simulator: 'SNNSimulator', results_path, prefix, sa
                       "savepath": Path(results_path, f"{prefix}_pre_traces.png") if save_plots else None,
                       "show": show_plots}
             kwargs.update(plot_kwargs)
-            snn_plot.plot_traces(values=simulator.trace_pre_recorder.values, **kwargs)
+            snn_plot.plot_traces(simulator, trace_type="pre", **kwargs)
         except Exception as e:
             print(f"Error plotting pre-synaptic traces: {e}")
     # Plot post-synaptic traces
@@ -76,7 +76,7 @@ def _plot_simulation_results(simulator: 'SNNSimulator', results_path, prefix, sa
                       "savepath": Path(results_path, f"{prefix}_post_traces.png") if save_plots else None,
                       "show": show_plots}
             kwargs.update(plot_kwargs)
-            snn_plot.plot_traces(values=simulator.trace_post_recorder.values, **kwargs)
+            snn_plot.plot_traces(simulator, trace_type="post", **kwargs)
         except Exception as e:
             print(f"Error plotting post-synaptic traces: {e}")
     # Plot static weight at end of simulation

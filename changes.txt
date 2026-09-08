@@ -2,7 +2,14 @@
 v1.4
 ----
 
-v1.4.1.1, v1.4.1.2 (2026-09-04)
+v1.4.2.0 (2026-09-08)
+- Minor fixes:
+    - Make sure EvoManager save all-time-best solution and fitness for reporting, regardless of whether or not check_stagnation is on
+    - Fixed issue with `plot_env_weight_greedy` for "position" obs-type
+    - Allow `trace_type` to be set in `plot_traces`, similar to how `etype` is used in `plot_eligibility_traces`
+    - Fixed incorrect reference to `etype-"post"` in `plot_eligibility_traces`
+
+v1.4.1.1, v1.4.1.2, v1.4.1.3 (2026-09-04)
 - Hotfix: plot issue with new _plot_env_action_values
 - Display result_path to terminal before running experiment
 
