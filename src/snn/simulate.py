@@ -44,7 +44,8 @@ class SNNSimulator:
                  record_eligibility_stdp: bool = False, record_eligibility_custom: bool = False,
                  **kwargs):
         # Duration params
-        self.num_steps = 0
+        self.num_steps: int = 0
+        self.num_episode: int = 0
         # self.num_steps = num_steps
         # self.num_eps = num_episodes
 
@@ -157,6 +158,7 @@ class SNNSimulator:
         """
         # Reset step count
         self.num_steps = 0
+        self.num_episode = 0
         if self._use_decay:
             self._decay = True
             self.network.set_stochastic()
@@ -189,17 +191,22 @@ class SNNSimulator:
         # Reset decay/exploration
         self._explore = self._should_explore(0)
 
-    def soft_reset(self, deterministic: bool = False, erase_recorders: bool = False):
+    def soft_reset(self, deterministic: bool = False, erase_recorders: bool = False, erase_collectors: bool = True,
+                   reset_counters: bool = True):
         """Reset only for evaluation while keeping learned weights."""
-        self.num_steps = 0
+        if reset_counters:
+            self.num_steps = 0
+            self.num_episode = 0
         # Retain network weights but reset membrane and traces
         self.network.soft_reset()
         self.spike_coder.reset()
         self.env.reset()
-        if self.reward_collector is not None:
-            self.reward_collector.soft_reset()
-        if self._log_traj:
-            self.trajectory_collector.reset()
+        # Reset episode collectors and trajectory collector
+        if erase_collectors:
+            if self.reward_collector is not None:
+                self.reward_collector.soft_reset()
+            if self._log_traj:
+                self.trajectory_collector.reset()
         # Reset other recorders
         if erase_recorders:
             self._reset_recorders()
@@ -211,6 +218,7 @@ class SNNSimulator:
 
     def run(self, num_steps: int = None, num_eps: int = None, update: bool = True, record: bool = True):
         t_start = self.num_steps
+        eps_start = self.num_episode
         if num_steps is None and num_eps is None:
             raise ValueError("Either num_steps or num_eps must be specified.")
         if num_steps is None and num_eps is not None:
@@ -223,7 +231,7 @@ class SNNSimulator:
         state, info = self.env.reset()
         starting_state = info.get("current_state", None)
         episode_done = False
-        episode_count = 0
+        # self.num_episode = 0
         for t in range(t_start, self.num_steps):
 
             # Random input spikes
@@ -280,7 +288,7 @@ class SNNSimulator:
                     if self.reward_collector is not None:
                         self.reward_collector.collect(
                             t=t,
-                            episode=episode_count,
+                            episode=self.num_episode,
                             reward=reward, 
                             episode_length=info.get('step_count', None),
                             starting_state=starting_state,
@@ -294,7 +302,7 @@ class SNNSimulator:
                     # self.env.reset()
                     state, info = self.env.reset()
                     starting_state = info.get("current_state", None)
-                    episode_count += 1
+                    self.num_episode += 1
                 else:
                     state = next_state
             else:
@@ -309,7 +317,7 @@ class SNNSimulator:
 
             # Update softmax temperature / exploration rate
             if episode_done and self._explore:
-                self._update_exploration_rate(t, episode_count)
+                self._update_exploration_rate(t, self.num_episode)
                 # # Update softmax temp at end of episode
                 # if self._explore:
                 #     if self.decay_method == "time":
@@ -378,7 +386,7 @@ class SNNSimulator:
                 self.network.soft_reset()
                 # self.spike_coder.reset()
 
-            if num_eps is not None and episode_count >= num_eps:
+            if num_eps is not None and self.num_episode >= (eps_start + num_eps):
                 self.num_steps = t
                 break
 
@@ -465,7 +473,7 @@ class SNNSimulator:
 
     def _setup_run(self, num_steps: int):
         """
-        Setup the run by initializing the recorders.
+        Increment internal timestep counter by `num_steps` and setup the recorders buffers by that amount.
         """
         self.num_steps += num_steps
         if self.record_membrane:

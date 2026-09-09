@@ -2,6 +2,13 @@
 v1.4
 ----
 
+v1.4.2.1 (2026-09-08)
+- Minor changes: `SNNSimulator` now tracks episode count (now named `.num_episode` as a variable)
+    - Unless being resetted, the episode count will continue on with another `.run()` call (similar to `.num_steps`)
+- In `SNNSimulator.soft_reset()`, Added args:
+    - `reset_counters=` for resetting both `num_steps` and `num_episode` (True by default to keep with previous behaviours)
+    - `erase_collectrs=` to reset both `reward_collector` and if present, `trajector_collector` (True by default to keep with previous behaviours)
+
 v1.4.2.0 (2026-09-08)
 - Minor fixes:
     - Make sure EvoManager save all-time-best solution and fitness for reporting, regardless of whether or not check_stagnation is on
