@@ -2,6 +2,14 @@
 Branch v1.4-rule-rework
 ----
 
+0.7 (2026-09-10)
+- Duplicate handling for gene names in external and internal rule
+    - During init of `DualLearningRule`, the gene_order, genes_to_encode, and specs are adapted and renamed to reflect any 
+    duplicates by appending either '_ext' or '_int' suffixes
+    - Only after renaming can the base class EvolvableLearningRule be initialised
+- Still not entirely sure if it will still cause problem, but I've tested manually and checked the results -- it looks like what 
+    I expected. (see `jupyter/test-lrule/260910_dual-rule-2.ipynb` part3 for testing)
+
 0.6 (2026-09-10)
 - Fixed `values` not changing when `genes` or `parameters` are changed via setters in `EvolvableLearningRule`
     - Refactored out `update_values()` method from previously `_extract_values_from_genes()` and 

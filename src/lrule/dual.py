@@ -16,32 +16,46 @@ class DualLearningRule(LearningRule, EvolvableLearningRule):
                  parameters: ArrayLike = None, genes: List[Parameter] = None, 
                  genes_to_encode: Dict[str, Dict] = None, gene_order: Sequence[str] = None,
                  ):
-        # int_rule_type = internal_rule.pop("type")
-        # ext_rule_type = external_rule.pop("type")
+
+        
         self.internal_rule: EvolvableLearningRule = create_learning_rule(**deepcopy(internal_rule))
         self.external_rule: EvolvableLearningRule = create_learning_rule(**deepcopy(external_rule))
+
+        # Deal with possibility of duplicate gene names
+        # -> The only important part to identify is in 'gene_order' of each rule
+        ext_genes = self.external_rule.gene_order
+        int_genes = self.internal_rule.gene_order
+
+        # Need to change the gene names of 3 things: gene_order, genes_to_encode, and specs
+        new_ext_gene_order = [str(g) + "_ext" if g in int_genes else g for g in ext_genes]
+        new_ext_gene_params = {str(g)+"_ext" if g in int_genes else g: v for g,v in self.external_rule.genes_to_encode.items()}
+        self._ext_specs = {str(g)+"_ext" if g in int_genes else g: v for g,v in self.external_rule.specs.items()}
+
+        new_int_gene_order = [str(g) + "_int" if g in ext_genes else g for g in int_genes]
+        new_int_gene_params = {str(g)+"_int" if g in ext_genes else g: v for g,v in self.internal_rule.genes_to_encode.items()}
+        self._int_specs = {str(g)+"_int" if g in ext_genes else g: v for g,v in self.internal_rule.specs.items()}
 
         # Update gene_order
         if gene_order is None:
             gene_order = ["external_rule", "internal_rule"]
         new_gene_order = []
         self._gene_origin_flag = []
-        for g in gene_order:
-            if g == "external_rule":
-                new_gene_order.extend(self.external_rule.gene_order)
-                self._gene_origin_flag.extend(["external" for _ in range(len(self.external_rule.gene_order))])
-            elif g == "internal_rule":
-                new_gene_order.extend(self.internal_rule.gene_order)
-                self._gene_origin_flag.extend(["internal" for _ in range(len(self.internal_rule.gene_order))])
+        for gene in gene_order:
+            if gene == "external_rule":
+                new_gene_order.extend(new_ext_gene_order)
+                self._gene_origin_flag.extend(["external" for _ in range(len(new_ext_gene_order))])
+            elif gene == "internal_rule":
+                new_gene_order.extend(new_int_gene_order)
+                self._gene_origin_flag.extend(["internal" for _ in range(len(new_int_gene_order))])
             else:
-                new_gene_order.append(g)
+                new_gene_order.append(gene)
                 self._gene_origin_flag.append("shared")
 
         # Update gene_to_encode dict
         if genes_to_encode is None:
             genes_to_encode = {}
-        genes_to_encode.update(self.internal_rule.genes_to_encode)
-        genes_to_encode.update(self.external_rule.genes_to_encode)
+        genes_to_encode.update(new_int_gene_params)
+        genes_to_encode.update(new_ext_gene_params)
 
 
         EvolvableLearningRule.__init__(self, parameters=parameters, genes=genes, genes_to_encode=genes_to_encode, gene_order=new_gene_order)
@@ -55,8 +69,8 @@ class DualLearningRule(LearningRule, EvolvableLearningRule):
 
     def _build_gene_specs(self):
         specs = super()._build_gene_specs()
-        specs.update(self.internal_rule.specs)
-        specs.update(self.external_rule.specs)
+        specs.update(self._int_specs)
+        specs.update(self._ext_specs)
         return specs
 
     def forward(self, inp):
