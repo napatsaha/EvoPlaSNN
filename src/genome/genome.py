@@ -212,8 +212,7 @@ class EvolvableLearningRule(Genome):
         self.genome = CompositeGenome(genes=self._genes)
 
         # Extract values from genes and apply values to self attributes
-        self._values = self._extract_values_from_genes()
-        self._apply_gene_values()
+        self.update_values()
 
     def _build_gene_specs(self) -> Dict[str, Dict[str, Any]]:
         specs = {}
@@ -272,8 +271,8 @@ class EvolvableLearningRule(Genome):
             params[gene_name] = default_params
         return params
 
-    def rule_specific_gene_specs(self):
-        return []
+    # def rule_specific_gene_specs(self):
+    #     return []
 
     def _genes_from_parameters(self, parameters: ArrayLike) -> List[Parameter]:
         genes = []
@@ -356,16 +355,19 @@ class EvolvableLearningRule(Genome):
         if self.encode_learning_rate:
             self.learning_rate = self.values.get("learning_rate")
 
-    # def _apply_specific_gene_values(self):
-    #     pass
+    def update_values(self):
+        """
+        When genes or parameters change, make sure this is called so internal `values` dict representation is the same
+        """
+        self._values = self._extract_values_from_genes()
+        self._apply_gene_values()
 
     def mutate(self, rate: float = 1.0, scale: float = 0.1, method: Literal["resample", "perturb"] = "resample", **kwargs) -> 'EvolvableLearningRule':
         dup = self.copy()
         genes = dup.genome.mutate(rate, scale, method, return_genes_only=True, **kwargs)
         dup.genes = genes
         # Update internal values from new gene to ensure they are not retained from previous copy
-        dup._values = dup._extract_values_from_genes()
-        dup._apply_gene_values()
+        dup.update_values()
         return dup
 
     def crossover(self, other: 'EvolvableLearningRule', rate: float = 0.5) -> 'EvolvableLearningRule':
@@ -373,8 +375,7 @@ class EvolvableLearningRule(Genome):
         genes = child.genome.crossover(other.genome, rate, return_genes_only=True)
         child.genes = genes
         # Update internal values from new gene to ensure they are not retained from previous copy
-        child._values = child._extract_values_from_genes()
-        child._apply_gene_values()
+        child.update_values()
         return child
 
     def copy(self) -> 'EvolvableLearningRule':
@@ -404,6 +405,7 @@ class EvolvableLearningRule(Genome):
     @parameters.setter
     def parameters(self, values):
         self.genome.parameters = values
+        self.update_values()
 
     @property
     def gene_order(self) -> List[str]:
@@ -439,6 +441,7 @@ class EvolvableLearningRule(Genome):
         self._genes = new_genes
         if hasattr(self.genome, "genes"):
             self.genome.genes = new_genes
+        self.update_values()
 
     @property
     def values(self) -> Dict[str, ArrayLike]:

@@ -2,6 +2,11 @@
 Branch v1.4-rule-rework
 ----
 
+0.6 (2026-09-10)
+- Fixed `values` not changing when `genes` or `parameters` are changed via setters in `EvolvableLearningRule`
+    - Refactored out `update_values()` method from previously `_extract_values_from_genes()` and 
+        `_apply_gene_values()`. It is to be called when internal values need to be updated
+
 0.5 (2026-09-10)
 - Added method `apply_genes_to_synapse()` to `EvolvableLearningRule` which takes in synapse
     - Will be called when SynapseLayer.learning_rule is being set, if the rule is an evolvable one
