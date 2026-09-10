@@ -2,6 +2,12 @@
 Branch v1.4-rule-rework
 ----
 
+0.5 (2026-09-10)
+- Added method `apply_genes_to_synapse()` to `EvolvableLearningRule` which takes in synapse
+    - Will be called when SynapseLayer.learning_rule is being set, if the rule is an evolvable one
+- Updated `common.base.SynapseLayerProtocol` to include various taus, e-traces etc
+- Added `check_trigger` condition to normal `SynapseLayer.apply_learning_rule()`
+
 0.4 (2026-09-10)
 - First part in integrating DualLearningRule with wider system
 - Added `check_trigger()` method to `common.base.LearningRule`

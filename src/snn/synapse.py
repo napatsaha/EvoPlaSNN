@@ -404,7 +404,7 @@ class SynapseLayer(SynapseLayerProtocol):
     def has_post_trace(self) -> bool:
         return self._use_post_trace
 
-    def apply_learning_rule(self, reward: float = None) -> None:
+    def apply_learning_rule(self, reward: float = None, trigger_info: Dict[str, bool] = None) -> None:
         """
         Update the synaptic information by applying the stored learning rule.  
 
@@ -413,7 +413,7 @@ class SynapseLayer(SynapseLayerProtocol):
         - threshold (of post-synaptic layer) 
         - eligibility trace (to 'eligibility_custom')
         """
-        if self.plastic:
+        if self.plastic and self._learning_rule.check_trigger(trigger_info):
             self._apply_learning_rule(self._learning_rule, reward) 
 
     def apply_external_rule(self, reward: float = None, trigger_info: Dict[str, bool] = None) -> None:
@@ -576,7 +576,8 @@ class SynapseLayer(SynapseLayerProtocol):
         #     self._use_elig_custom = True
         #     self._etrace_custom = np.zeros((self.pre_layer.size, self.post_layer.size), dtype=np.float32)
         # # Perform necessary changes based on rule encodings
-        # if isinstance(rule, EvolvableLearningRule):
+        if isinstance(rule, EvolvableLearningRule):
+            rule.apply_genes_to_synapse(self)
         # if hasattr(rule, "contains_gene") and rule.contains_gene("tau_syn"):
         #     value = rule.values["tau_syn"]
         #     self.tau_syn = value
@@ -593,6 +594,8 @@ class SynapseLayer(SynapseLayerProtocol):
         return self._use_elig_post
     def has_elig_stdp(self):
         return self._use_elig_stdp
+    def has_elig_custom(self):
+        return self._use_elig_custom
 
 
 def safe_norm(array, method, params={}, eps=1e-10):

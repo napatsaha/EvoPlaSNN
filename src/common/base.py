@@ -130,9 +130,7 @@ class SynapseLayerProtocol(Protocol):
 
     pre_layer: NeuronLayerProtocol
     post_layer: NeuronLayerProtocol
-    weights: np.ndarray
     learning_rule: LearningRule
-    eligibility_trace: np.ndarray | None
 
     def __init__(self, pre_layer: NeuronLayerProtocol, post_layer: NeuronLayerProtocol, *,
                  learning_rule: LearningRule, eligibility_trace: bool, tau_syn: float, dt: float,
@@ -155,6 +153,19 @@ class SynapseLayerProtocol(Protocol):
         Update the synaptic weights based on the learning rule.
         """
         pass
+
+    def apply_external_rule(self, reward: float = None, trigger_info: Dict[str, bool] = None) -> None:
+        """
+        Apply the currently stored External Learning Rule to the synapse.
+        (Usually triggered on reward, on episode done, or on episode step.
+        Will usually make changes to synapse's weights)
+        """
+
+    def apply_internal_rule(self, reward: float = None, trigger_info: Dict[str, bool] = None) -> None:
+        """
+        Apply the currently stored Internal Learning Rule to the synapse. 
+        (Usually triggered every timestep, and make changes to synapse's custom eligibility trace, or weights)
+        """
 
     def reset(self) -> None:
         """
@@ -187,6 +198,61 @@ class SynapseLayerProtocol(Protocol):
 
         Returns:
             np.ndarray | None: shape (pre_size, post_size)
+        """
+
+    @property
+    def weights(self) -> np.ndarray:
+        """
+        Synaptic efficacy / strength
+
+        Returns:
+            np.ndarray: Array of shape (pre-size, post-size)
+        """
+
+    @property
+    def tau_syn(self) -> float:
+        """
+        Time constant used for all types of eligibility trace
+        """
+
+    @property
+    def tau_pre(self) -> float:
+        """
+        Time constant used for pre-synaptic trace
+        """
+
+    @property
+    def tau_post(self) -> float:
+        """
+        Time constant used for post-synaptic trace
+        """
+
+    @property
+    def eligibility_pre(self) -> np.ndarray | None:
+        """
+        Calculate and return the Pre-before-Post eligibility trace if it is being used, otherwise return None.
+        Decay affected by `tau_syn`.
+        """
+
+    @property
+    def eligibility_post(self) -> np.ndarray | None:
+        """
+        Calculate and return the Post-before-Pre eligibility trace if it is being used, otherwise return None.
+        Decay affected by `tau_syn`.
+        """
+        
+    @property
+    def eligibility_stdp(self) -> np.ndarray | None:
+        """
+        Calculate and return the combined STDP eligibility trace if it is being used, otherwise return None.
+        Decay affected by `tau_syn`.
+        """
+
+    @property
+    def eligibility_custom(self) -> np.ndarray | None:
+        """
+        Custom type of eligibility traces which is changeable only via learning rule's update when `delta_eligibility` is on.
+        Decay affected by `tau_syn`.
         """
 
 

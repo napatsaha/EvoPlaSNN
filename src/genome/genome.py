@@ -7,7 +7,7 @@ from genome.parameter import GeneSpec
 import numpy as np
 from numpy.typing import ArrayLike
 
-from common.base import Genome, Parameter
+from common.base import Genome, Parameter, SynapseLayerProtocol
 
 
 class SimpleGenome(Genome):
@@ -379,6 +379,17 @@ class EvolvableLearningRule(Genome):
 
     def copy(self) -> 'EvolvableLearningRule':
         return copy.deepcopy(self)
+
+    def apply_genes_to_synapse(self, synapse: SynapseLayerProtocol) -> None:
+        """
+        Make changes to SynapseLayer evolvable attributes, e.g. tau, based on current genes 
+        """
+        if self.contains_gene("tau_syn"):
+            synapse.tau_syn = self.values["tau_syn"]
+        if self.contains_gene("tau_pre"):
+            synapse.tau_pre = self.values["tau_pre"]
+        if self.contains_gene("tau_post"):
+            synapse.tau_post = self.values["tau_post"]
 
     @property
     def size(self):
