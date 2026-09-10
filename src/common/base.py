@@ -97,6 +97,31 @@ class LearningRule(ABC):
             np.ndarray: Output array
         """
 
+    def check_trigger(self, info: Dict[str, bool]) -> bool:
+        """
+        Check whether the rule should be triggered before an update, by passing in a dictionary of boolean values for each of the flags:
+        ("on_timestep", "on_step", "on_reward", "on_end"). 
+
+        Depending on the LearningRule trigger_condition, this method will compare the current flags to tell you whether the rule's update should be
+        called or not
+
+        Args:
+            info (Dict[str, bool]): Dictionary that should have boolean for each key: ("on_timestep", "on_step", "on_reward", "on_end")
+
+        Returns:
+            bool: Whether this rule should be triggered
+        """
+        if self.trigger_condition == "on-timestep" and info.get("on_timestep", False):
+            return True
+        elif self.trigger_condition == "on-step" and info.get("on_step", False):
+            return True 
+        elif self.trigger_condition == "on-reward" and info.get("on_reward", False):
+            return True
+        elif self.trigger_condition == "on-end" and info.get("on_end", False):
+            return True
+        else:
+            return False
+
 class SynapseLayerProtocol(Protocol):
     """
     Protocol abstract class for SynapseLayer.

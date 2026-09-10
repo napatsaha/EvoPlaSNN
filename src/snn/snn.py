@@ -2,7 +2,7 @@
 Simple Network of LIF neurons
 """
 
-from typing import List, Literal, Sequence, Mapping, Any
+from typing import Dict, List, Literal, Sequence, Mapping, Any
 from copy import deepcopy
 
 import numpy as np
@@ -185,6 +185,27 @@ class SNN:
     def apply_learning_rule(self, reward=None):
         for synapse in self.synapse_layers:
             synapse.apply_learning_rule(reward)
+
+    def apply_external_rule(self, signal, trigger_info: Dict[str, bool]):
+                            # on_timestep: bool = False, on_step: bool = False, on_reward: bool = False, on_end: bool = False):
+        for synapse in self.synapse_layers:
+            synapse.apply_external_rule(signal, trigger_info)
+        # if self.learning_rule.external_rule.trigger_condition == "on-timestep" and on_timestep:
+        #     for synapse in self.synapse_layers:
+        #         synapse.apply_external_rule(signal)
+        # elif self.learning_rule.external_rule.trigger_condition == "on-step" and on_step:
+        #     for synapse in self.synapse_layers:
+        #         synapse.apply_external_rule(signal)
+        # elif self.learning_rule.external_rule.trigger_condition == "on-reward" and on_reward:
+        #     for synapse in self.synapse_layers:
+        #         synapse.apply_external_rule(signal)
+        # elif self.learning_rule.external_rule.trigger_condition == "on-end" and on_end:
+        #     for synapse in self.synapse_layers:
+        #         synapse.apply_external_rule(signal)
+
+    def apply_internal_rule(self, signal, trigger_info: Dict[str, bool]):
+        for synapse in self.synapse_layers:
+            synapse.apply_internal_rule(signal, trigger_info)
 
     def apply_weight_updates_from_etrace(self, signal: float = None, lrate: float = 1.0):
         if not self.update_weights_on_etrace:

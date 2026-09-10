@@ -255,25 +255,35 @@ class SNNSimulator:
                         info=info)
                 
                 if update:
-                    # Updates at every environment step
-                    if self.network.learning_rule.trigger_condition == "on-step":
-                        signal = self.modulator.signal(locals=locals()) if self._modulation else reward
-                        self.network.apply_learning_rule(reward=signal)
-                    # Update upon receiving reward (require reward=None when no update is desired)
-                    elif self.network.learning_rule.trigger_condition == "on-reward":
-                        if reward is not None:
-                            signal = self.modulator.signal(locals=locals()) if self._modulation else reward
-                            self.network.apply_learning_rule(reward=signal)
-                    # Update network at the end of each episode
-                    elif self.network.learning_rule.trigger_condition == "on-end":
-                        if episode_done:
-                            signal = self.modulator.signal(locals=locals()) if self._modulation else reward
-                            self.network.apply_learning_rule(reward=signal)
-                    # Perform fixed update without rule
-                    if self.network.update_weights_on_etrace:
-                        # Note to self: Need a way to control trigger (e.g. "on-reward", "on-end")
-                        signal = self.modulator.signal(locals=locals()) if self._modulation else reward
-                        self.network.apply_weight_updates_from_etrace(signal)
+                    # Apply external learning rule
+                    trigger_info = dict(
+                        on_timestep=True, 
+                        on_step=True, 
+                        on_reward=reward is not None,
+                        on_end=episode_done
+                    )
+                    signal = self.modulator.signal(locals=locals()) if self._modulation else reward
+                    self.network.apply_external_rule(signal=signal, trigger_info=trigger_info)
+                    # # Updates at every environment step
+                    # if self.network.learning_rule.trigger_condition == "on-step":
+                    #     signal = self.modulator.signal(locals=locals()) if self._modulation else reward
+                    #     self.network.apply_learning_rule(reward=signal)
+                    # # Update upon receiving reward (require reward=None when no update is desired)
+                    # elif self.network.learning_rule.trigger_condition == "on-reward":
+                    #     if reward is not None:
+                    #         signal = self.modulator.signal(locals=locals()) if self._modulation else reward
+                    #         self.network.apply_learning_rule(reward=signal)
+                    # # Update network at the end of each episode
+                    # elif self.network.learning_rule.trigger_condition == "on-end":
+                    #     if episode_done:
+                    #         signal = self.modulator.signal(locals=locals()) if self._modulation else reward
+                    #         self.network.apply_learning_rule(reward=signal)
+
+                    # # Perform fixed update without rule
+                    # if self.network.update_weights_on_etrace:
+                    #     # Note to self: Need a way to control trigger (e.g. "on-reward", "on-end")
+                    #     signal = self.modulator.signal(locals=locals()) if self._modulation else reward
+                    #     self.network.apply_weight_updates_from_etrace(signal)
 
                 # Perform episode reset or proceed to next env step
                 if episode_done:
@@ -301,11 +311,17 @@ class SNNSimulator:
                 episode_done = False
                 reward = None
 
-            # Apply learning rule at every timestep
+            # Apply internal learning rule 
             if update and self.network.learning_rule.trigger_condition == "on-timestep":
+                trigger_info = dict(
+                        on_timestep=True, 
+                        on_step=False, 
+                        on_reward=reward is not None,
+                        on_end=episode_done
+                    )
                 # Warning: reward can be None
                 signal = self.modulator.signal(locals=locals()) if self._modulation else reward
-                self.network.apply_learning_rule(reward=signal)
+                self.network.apply_internal_rule(reward=signal, trigger_info=trigger_info)
 
             # Update softmax temperature / exploration rate
             if episode_done and self._explore:

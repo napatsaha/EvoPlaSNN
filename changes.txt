@@ -2,6 +2,18 @@
 Branch v1.4-rule-rework
 ----
 
+0.4 (2026-09-10)
+- First part in integrating DualLearningRule with wider system
+- Added `check_trigger()` method to `common.base.LearningRule`
+- Simulator collects a dictionary of on_* flags which is passed down eventually to the LearningRule
+- Simulator calls network.apply_external_rule and network.apply_internal_rule at during episode step and time step, respectively
+- SNN and SynapseLayer has methods `apply_external_rule` and `apply_internal_rule`
+- SynapseLayer extracts internal and external rule during learning_rule setter if rule is a DualLearningRule
+    - Removed reliance on _out_weight, _out_*. Instead rely on whether each output of rule (dw, dth, delig) is present
+    - During apply_*_rule, calls LearningRule.check_trigger to determine if update should be made
+    - Requires importing from `lrule.dual` and `genome.genome` for now (in future will create a common Protocol)
+- Currently has no ability to apply value changes from gene to synapses (e.g. tau from genome) -> Next Update
+
 0.3 (2026-09-08)
 - Added `._sync_genes()` to `DualLearningRule` after instantiating `EvolvableLearningRule` parent class:
     - It ensures that genes created from parent class are carried over to external/internal rules

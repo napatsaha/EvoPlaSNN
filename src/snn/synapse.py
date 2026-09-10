@@ -1,9 +1,11 @@
-from typing import Literal
+from typing import Dict, Literal
 
 from common.base import LearningRule, NeuronLayerProtocol, SynapseLayerProtocol
 import numpy as np
 # from .neurons import NeuronLayer
 from lrule import Empty_Rule
+from lrule.dual import DualLearningRule
+from genome.genome import EvolvableLearningRule
 # from .utils import tile
 from .utils import Array_FIFO
 
@@ -412,14 +414,25 @@ class SynapseLayer(SynapseLayerProtocol):
         - eligibility trace (to 'eligibility_custom')
         """
         if self.plastic:
-            dw, dth, delig = self._learning_rule.update(self, reward=reward, always_return_tuple=True)
-            if self._out_weights:
-                self._update_weights(dw)
-            if self._out_thresholds: 
-                self.post_layer.update_thresholds(dth)
-            if self._out_eligibility:
-                self._etrace_custom = self._etrace_custom + delig
-                self._etrace_custom = np.clip(self._etrace_custom, self.e_min, self.e_max) 
+            self._apply_learning_rule(self._learning_rule, reward) 
+
+    def apply_external_rule(self, reward: float = None, trigger_info: Dict[str, bool] = None) -> None:
+        if self.plastic and self._external_rule.check_trigger(trigger_info):
+            self._apply_learning_rule(self._external_rule, reward) 
+
+    def apply_internal_rule(self, reward: float = None, trigger_info: Dict[str, bool] = None) -> None:
+        if self.plastic and self._internal_rule.check_trigger(trigger_info):
+            self._apply_learning_rule(self._internal_rule, reward) 
+
+    def _apply_learning_rule(self, learning_rule: LearningRule, reward):
+        dw, dth, delig = learning_rule.update(self, reward=reward, always_return_tuple=True)
+        if dw is not None:
+            self._update_weights(dw)
+        if dth is not None: 
+            self.post_layer.update_thresholds(dth)
+        if delig is not None:
+            self._etrace_custom = self._etrace_custom + delig
+            self._etrace_custom = np.clip(self._etrace_custom, self.e_min, self.e_max)
 
     def update_weights_from_etrace(self, reward: float, etrace: Literal["pre", "post", "stdp", "custom"], lrate: float = 1.0) -> None:
         """
@@ -551,23 +564,28 @@ class SynapseLayer(SynapseLayerProtocol):
     @learning_rule.setter
     def learning_rule(self, rule: LearningRule):
         self._learning_rule = rule
-        self._out_weights = getattr(rule, "delta_weight", False)
-        self._out_thresholds = getattr(rule, "delta_threshold", False)
-        self._out_eligibility = getattr(rule, "delta_eligibility", False)
-        # Recreate custom eligibility trace if necessary
-        if self._out_eligibility and not self._use_elig_custom:
-            self._use_elig_custom = True
-            self._etrace_custom = np.zeros((self.pre_layer.size, self.post_layer.size), dtype=np.float32)
-        # Perform necessary changes based on rule encodings
-        if hasattr(rule, "contains_gene") and rule.contains_gene("tau_syn"):
-            value = rule.values["tau_syn"]
-            self.tau_syn = value
-        if hasattr(rule, "contains_gene") and rule.contains_gene("tau_pre"):
-            value = rule.values["tau_pre"]
-            self.tau_pre = value
-        if hasattr(rule, "contains_gene") and rule.contains_gene("tau_post"):
-            value = rule.values["tau_post"]
-            self.tau_post = value
+        # Extract internal and external learning Rule if possible
+        if isinstance(rule, DualLearningRule): # type: ignore
+            self._external_rule = rule.external_rule
+            self._internal_rule = rule.internal_rule
+        # self._out_weights = getattr(rule, "delta_weight", False)
+        # self._out_thresholds = getattr(rule, "delta_threshold", False)
+        # self._out_eligibility = getattr(rule, "delta_eligibility", False)
+        # # Recreate custom eligibility trace if necessary
+        # if self._out_eligibility and not self._use_elig_custom:
+        #     self._use_elig_custom = True
+        #     self._etrace_custom = np.zeros((self.pre_layer.size, self.post_layer.size), dtype=np.float32)
+        # # Perform necessary changes based on rule encodings
+        # if isinstance(rule, EvolvableLearningRule):
+        # if hasattr(rule, "contains_gene") and rule.contains_gene("tau_syn"):
+        #     value = rule.values["tau_syn"]
+        #     self.tau_syn = value
+        # if hasattr(rule, "contains_gene") and rule.contains_gene("tau_pre"):
+        #     value = rule.values["tau_pre"]
+        #     self.tau_pre = value
+        # if hasattr(rule, "contains_gene") and rule.contains_gene("tau_post"):
+        #     value = rule.values["tau_post"]
+        #     self.tau_post = value
 
     def has_elig_pre(self):
         return self._use_elig_pre
