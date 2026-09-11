@@ -271,6 +271,7 @@ def create_solver(params: dict, **kwargs) -> Solver:
 
 
 TYPE_DICT = {
+    "dual": ("lrule.dual", "DualLearningRule"),
     "ann" : ("lrule.ann", "ANN_Rule"),
     "cgp" : ("lrule.cgp", "CGP_Rule"),
     "graph" : ("lrule.cgp", "CGP_Graph"),

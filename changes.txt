@@ -2,6 +2,15 @@
 Branch v1.4-rule-rework
 ----
 
+0.7.1 (2026-09-11)
+- Minor fixes:
+    - Removed Simulator `trigger_condition = 'on-timestep'` check
+    - Fixed `signal=` and `reward=` kwarg mixup error in Simulator during `network.apply_internal_rule()`
+    - Added `eligibility_custom` to `BaseLearningRule`
+    - Default args for `BaseLearningRule` is all False for `use_**` and `delta_**`
+    - `BaseLearningRule` will throw error if either no input or output variables are specified
+    - Added `dual` to learning rule `TYPE_DICT` in `common.utils`
+
 0.7 (2026-09-10)
 - Duplicate handling for gene names in external and internal rule
     - During init of `DualLearningRule`, the gene_order, genes_to_encode, and specs are adapted and renamed to reflect any 

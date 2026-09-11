@@ -312,7 +312,7 @@ class SNNSimulator:
                 reward = None
 
             # Apply internal learning rule 
-            if update and self.network.learning_rule.trigger_condition == "on-timestep":
+            if update:
                 trigger_info = dict(
                         on_timestep=True, 
                         on_step=False, 
@@ -321,7 +321,7 @@ class SNNSimulator:
                     )
                 # Warning: reward can be None
                 signal = self.modulator.signal(locals=locals()) if self._modulation else reward
-                self.network.apply_internal_rule(reward=signal, trigger_info=trigger_info)
+                self.network.apply_internal_rule(signal=signal, trigger_info=trigger_info)
 
             # Update softmax temperature / exploration rate
             if episode_done and self._explore:

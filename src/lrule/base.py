@@ -24,7 +24,7 @@ class Empty_Rule(LearningRule):
     
 
 class BaseLearningRule(LearningRule):
-    INPUT_ORDER = ("trace_pre", "trace_post", "spike_pre", "spike_post", "weights", "reward", "eligibility_pre", "eligibility_post", "eligibility_stdp")
+    INPUT_ORDER = ("trace_pre", "trace_post", "spike_pre", "spike_post", "weights", "reward", "eligibility_pre", "eligibility_post", "eligibility_stdp", "eligibility_custom")
     OUTPUT_ORDER = ("weight", "threshold", "eligibility")
     AGG_DICT = {
                 "max": np.max,
@@ -35,10 +35,11 @@ class BaseLearningRule(LearningRule):
     def __init__(self, *, 
                 learning_rate: float = 1.0, learning_rate_thr: float = 0.1, threshold_agg_func: Literal["max", "min", "mean", "sum"] = "mean",
                 trigger_condition: Literal["on-timestep", "on-step", "on-reward", "on-end"] = None,
-                delta_weight: bool = True, delta_threshold: bool = False, delta_eligibility: bool = False,
+                delta_weight: bool = False, delta_threshold: bool = False, delta_eligibility: bool = False,
                 use_trace_pre: bool = False, use_trace_post: bool = False, use_spike_pre: bool = False, use_spike_post: bool = False,
-                use_weights: bool = True, use_reward: bool = False, 
-                use_eligibility: bool = False, use_eligibility_pre: bool = False, use_eligibility_post: bool = False, use_eligibility_stdp: bool = False,
+                use_weights: bool = False, use_reward: bool = False, 
+                use_eligibility: bool = False, use_eligibility_pre: bool = False, use_eligibility_post: bool = False, 
+                use_eligibility_stdp: bool = False, use_eligibility_custom: bool = False,
                 **kwargs):
         super().__init__()
         self.learning_rate = learning_rate
@@ -59,9 +60,12 @@ class BaseLearningRule(LearningRule):
         self.use_eligibility_pre = use_eligibility or use_eligibility_pre
         self.use_eligibility_post = use_eligibility_post
         self.use_eligibility_stdp = use_eligibility_stdp
+        self.use_eligibility_custom = use_eligibility_custom
 
         self.input_order = [item for item in self.INPUT_ORDER if getattr(self, f"use_{item}")]
         self.input_size = len(self.input_order)
+        if self.input_size < 1:
+            raise ValueError("At least one input must be specified. One of the 'use_**' arguments must be True.")
 
         # Learning rule outputs
         self.delta_weight = delta_weight
@@ -81,6 +85,7 @@ class BaseLearningRule(LearningRule):
             if self.delta_eligibility:
                 self.trigger_condition = "on-step"
             else:
+                warnings.warn("No 'trigger_condition' was specified. Using 'on-reward' as default.")
                 self.trigger_condition = "on-reward" # Default placeholder for now
 
         
@@ -121,6 +126,9 @@ class BaseLearningRule(LearningRule):
         # 9 = etrace STDP
         if self.use_eligibility_stdp:
             inp.append(synapse.eligibility_stdp.reshape(-1, 1))
+        # 10 = custom eligibility trace
+        if self.use_eligibility_custom:
+            inp.append(synapse.eligibility_custom.reshape(-1, 1))
 
         inp = np.concatenate(inp, axis=1)
         return inp
@@ -199,6 +207,7 @@ class BaseLearningRule(LearningRule):
             use_eligibility_pre = self.use_eligibility_pre,
             use_eligibility_post = self.use_eligibility_post,
             use_eligibility_stdp = self.use_eligibility_stdp,
+            use_eligibility_custom = self.use_eligibility_custom,
             delta_weight = self.delta_weight,
             delta_threshold = self.delta_threshold,
         )
