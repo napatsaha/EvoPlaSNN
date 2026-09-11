@@ -2,6 +2,18 @@
 Branch v1.4-rule-rework
 ----
 
+0.9 (2026-09-11)
+- Backward compatibility with single-rule system:
+    - SynapseLayer will automatically assign a rule to:
+        1. internal rule if its trigger_condition is "on-timestep"
+        2. external rule for every other trigger_condition
+        3. No assignment if trigger_condition is None
+- Changed default `trigger_condition` without explicit argument, 
+    when rule's delta_eligibility to "on-timestep" and 
+    otherwise to None (to prevent unintentional behaviours)
+- SynapseLayer resets its internal_rule and external_rule when learning_rule property is set
+- SynapseLayer `apply_**_rule` check if that rule is available first before calling check_trigger
+
 0.8 (2026-09-11)
 - Added `lrule.arithmetic.py` module
 - Added `MultiplyLearningRule` to `arithmetic`:

@@ -14,6 +14,7 @@ class Empty_Rule(LearningRule):
     """
     def __init__(self):
         super().__init__()
+        self.trigger_condition = None
 
     def update(self, *args, **kwargs) -> float:
         # No update
@@ -83,10 +84,10 @@ class BaseLearningRule(LearningRule):
             self.trigger_condition = trigger_condition
         else:
             if self.delta_eligibility:
-                self.trigger_condition = "on-step"
+                self.trigger_condition = "on-timestep"
             else:
-                warnings.warn("No 'trigger_condition' was specified. Using 'on-reward' as default.")
-                self.trigger_condition = "on-reward" # Default placeholder for now
+                warnings.warn("No 'trigger_condition' was specified. Left as empty.")
+                self.trigger_condition = None # Better to not set default to anything, than to set it to something else
 
         
     def prepare_inputs(self, synapse: SynapseLayerProtocol, reward: float, w_shape: tuple):

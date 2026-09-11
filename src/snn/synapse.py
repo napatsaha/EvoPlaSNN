@@ -58,6 +58,8 @@ class SynapseLayer(SynapseLayerProtocol):
 
         # Learning-related params
         self.plastic = plastic
+        self._internal_rule = None
+        self._external_rule = None
         self.learning_rule = learning_rule if learning_rule is not None else Empty_Rule()
 
         # Interactions with learning rule
@@ -417,12 +419,14 @@ class SynapseLayer(SynapseLayerProtocol):
             self._apply_learning_rule(self._learning_rule, reward) 
 
     def apply_external_rule(self, reward: float = None, trigger_info: Dict[str, bool] = None) -> None:
-        if self.plastic and self._external_rule.check_trigger(trigger_info):
-            self._apply_learning_rule(self._external_rule, reward) 
+        if self.plastic:
+            if self._external_rule is not None and self._external_rule.check_trigger(trigger_info):
+                self._apply_learning_rule(self._external_rule, reward) 
 
     def apply_internal_rule(self, reward: float = None, trigger_info: Dict[str, bool] = None) -> None:
-        if self.plastic and self._internal_rule.check_trigger(trigger_info):
-            self._apply_learning_rule(self._internal_rule, reward) 
+        if self.plastic:
+            if self._internal_rule is not None and self._internal_rule.check_trigger(trigger_info):
+                self._apply_learning_rule(self._internal_rule, reward) 
 
     def _apply_learning_rule(self, learning_rule: LearningRule, reward):
         dw, dth, delig = learning_rule.update(self, reward=reward, always_return_tuple=True)
@@ -564,13 +568,23 @@ class SynapseLayer(SynapseLayerProtocol):
     @learning_rule.setter
     def learning_rule(self, rule: LearningRule):
         self._learning_rule = rule
+        # Clear previous learning rule to avoid unexpected behaviours
+        self._internal_rule = None
+        self._external_rule = None
         # Extract internal and external learning Rule if possible
         if isinstance(rule, DualLearningRule): # type: ignore
             self._external_rule = rule.external_rule
             self._internal_rule = rule.internal_rule
-        # self._out_weights = getattr(rule, "delta_weight", False)
-        # self._out_thresholds = getattr(rule, "delta_threshold", False)
-        # self._out_eligibility = getattr(rule, "delta_eligibility", False)
+        else:
+            # Backward compatibility: 
+            # # When single-rule is passed through, assign rule to internal/external rule based on trigger condtion
+            if rule.trigger_condition == "on-timestep":
+                self._internal_rule = rule
+            elif rule.trigger_condition in ("on-step", "on-reward", "on-end"):
+                self._external_rule = rule
+            else:
+                # When trigger condition is not set, do nothing
+                pass
         # # Recreate custom eligibility trace if necessary
         # if self._out_eligibility and not self._use_elig_custom:
         #     self._use_elig_custom = True
@@ -578,15 +592,6 @@ class SynapseLayer(SynapseLayerProtocol):
         # # Perform necessary changes based on rule encodings
         if isinstance(rule, EvolvableLearningRule):
             rule.apply_genes_to_synapse(self)
-        # if hasattr(rule, "contains_gene") and rule.contains_gene("tau_syn"):
-        #     value = rule.values["tau_syn"]
-        #     self.tau_syn = value
-        # if hasattr(rule, "contains_gene") and rule.contains_gene("tau_pre"):
-        #     value = rule.values["tau_pre"]
-        #     self.tau_pre = value
-        # if hasattr(rule, "contains_gene") and rule.contains_gene("tau_post"):
-        #     value = rule.values["tau_post"]
-        #     self.tau_post = value
 
     def has_elig_pre(self):
         return self._use_elig_pre
