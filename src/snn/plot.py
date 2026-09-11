@@ -888,8 +888,16 @@ def plot_intermediate_fitness(simulator: 'SNN_Simulator' = None, values: np.ndar
 
 ### Plotting functions for Learning Rule ###
 
-def plot_learning_rule(rule: 'base.LearningRule', simulator: 'SNNSimulator' = None, **kwargs):
-    input_size = getattr(rule, "input_size")
+def plot_learning_rule(rule: 'base.LearningRule', simulator: 'SNNSimulator' = None, rule_component: Literal["external", "internal"] = None, **kwargs):
+    # if isinstance(rule, DualLearningRule): # Will use this when common Protocol is available
+    if hasattr(rule, "internal_rule") and rule_component == "internal":
+        rule = rule.internal_rule
+    elif hasattr(rule, "external_rule") and rule_component == "external":
+        rule = rule.external_rule
+
+    input_size = getattr(rule, "input_size", None)
+    if input_size is None:
+        raise ValueError(f"Plot learning rule not compatible with rule type = {rule.__class__.__name__}. Rule has no `input_size`")
     if input_size == 2:
         plot_learning_rule_2D(rule, simulator, **kwargs)
     elif input_size == 3:

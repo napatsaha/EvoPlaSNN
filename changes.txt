@@ -2,6 +2,11 @@
 Branch v1.4-rule-rework
 ----
 
+0.9.1 (2026-09-11)
+- Added plot option `rule_component` in `plot_learning_rule`
+    - DualLearningRule should not plottable without specifying rule_component
+- `genes_to_encode` arg are deep-copied when passed into `EvolvableLearningRule` to prevent changing outside dict via popping
+
 0.9 (2026-09-11)
 - Backward compatibility with single-rule system:
     - SynapseLayer will automatically assign a rule to:

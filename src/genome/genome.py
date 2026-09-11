@@ -178,6 +178,7 @@ class EvolvableLearningRule(Genome):
                  genes_to_encode: List[Dict] = None, gene_order: Sequence[str] = None,
                  **kwargs):
         super().__init__()
+        genes_to_encode = copy.deepcopy(genes_to_encode) # Prevent changing outside dictionary args
 
         # Build specs based on default class GeneSpec
         # Specs control what encodings are possible by default in this subclass 
