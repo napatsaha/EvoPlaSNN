@@ -2,6 +2,12 @@
 Branch v1.4-rule-rework
 ----
 
+0.8 (2026-09-11)
+- Added `lrule.arithmetic.py` module
+- Added `MultiplyLearningRule` to `arithmetic`:
+    - Simply produces product of all inputs, regardless of what is being used
+- Added 'multiply' to `common.utils.TYPE_DICT` for creation
+
 0.7.1 (2026-09-11)
 - Minor fixes:
     - Removed Simulator `trigger_condition = 'on-timestep'` check

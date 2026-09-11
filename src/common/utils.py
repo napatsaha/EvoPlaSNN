@@ -277,7 +277,8 @@ TYPE_DICT = {
     "graph" : ("lrule.cgp", "CGP_Graph"),
     # "stdp" : ("lrule.stdp", "STDP_Rule"),
     "rstdp" : ("lrule.stdp", "R_STDP_Rule"),
-    "small-poly" : ("lrule.polynomial", "SmallPolynomialRule")
+    "small-poly" : ("lrule.polynomial", "SmallPolynomialRule"),
+    "multiply": ("lrule.arithmetic", "MultiplyLearningRule")
 }
 
 
