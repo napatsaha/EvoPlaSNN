@@ -368,13 +368,15 @@ def evaluate_and_plot(results_path: Path | str = None, *, config_path: str | Pat
 
                 # Then plot n best rule in last generation
                 num_save_best = manager_params.get("save_best", 0)
-                for rule_id in range(1, num_save_best+1):
-                    rule_id_name = f"best_rule_{rule_id:02d}.txt"
+                for r_id in range(1, num_save_best+1):
+                    if r_id == rule_id:
+                        continue
+                    rule_id_name = f"best_rule_{r_id:02d}.txt"
                     if not (results_path / rule_id_name).exists():
                         raise FileNotFoundError(f"Rule file {rule_id_name} not found in {results_path}. Please run the evolution first.")
                     # Load the best ANN learning rule
                     rule_i = read_learning_rule(results_path / rule_id_name, config_path=config_path)
-                    prefix_i = f"eval_rule_{rule_id:02d}"
+                    prefix_i = f"eval_rule_{r_id:02d}"
                     kwargs = {"savepath": Path(results_path, f"{prefix_i}_learning_rule.png") if save_plots else None,
                               "show": show_plots}
                     kwargs.update(plot_kwargs)

@@ -2,6 +2,10 @@
 v1.4
 ----
 
+v1.4.2.2 (2026-09-11)
+- Minor changes:
+- Prevent plotting learning_rule twice when the rule to evaluated is already in best n rules
+
 v1.4.2.1 (2026-09-08)
 - Minor changes: `SNNSimulator` now tracks episode count (now named `.num_episode` as a variable)
     - Unless being resetted, the episode count will continue on with another `.run()` call (similar to `.num_steps`)
