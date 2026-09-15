@@ -2,6 +2,14 @@
 Branch v1.4-rule-rework
 ----
 
+0.12 (2026-09-15)
+- Backward compatibility fixes:
+    - A multiplicative rule will be automatically created and assigned to SynapseLayer external rule during RL_Evaluator.__init__,
+        when the config contains 'update_weights_on_etrace' in 'snn_params'
+    - External & Internal rules will no longer be cleared when setting a new `learning_rule` in SynapseLayer
+    - `CompositeGenome` and `EvolvableLearningRule` can now allow "no-gene" construction (for learning rule purposes only)
+        (at least in the usage tested -- no genes, gene_order, genes_to_encode, values, parameters were created; may need to further test more rigorously)
+
 0.11 (2026-09-15)
 - Added settable limits to synapse weights and eligibility trace
 - Added new settable properties to `SynapseLayer`: `e_min`, `e_max`, `e_range`, `w_min`, `w_max`, `w_range`

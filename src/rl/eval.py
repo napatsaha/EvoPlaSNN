@@ -17,7 +17,8 @@ from snn.spike_coding import SpikeCoderEnvWrapper
 from rl.spike_coding import StateCoder
 # from snn.spikegen import create_spikegen, create_poisson_class_timing, create_binary_class_timing
 # import snn.spikegen
-from lrule import LearningRule
+# from lrule import LearningRule
+from lrule.arithmetic import MultiplyLearningRule
 from rl import ENV_DICT, RewardCollector, BaseMaze
 from common.base import SpikeCoder
 
@@ -81,14 +82,35 @@ class RL_Evaluator(Evaluator):
         else:
             raise RuntimeError("Cannot determine whether to use the old or new spike coding regime." + \
                                "Available keys in spike_coder_params: " + str(params["spike_coder_params"].keys()))
+
+        ## Spike encoder/decoder: interface between environment and SNN
         if _new_spike_coding:
             self.spike_coder: SpikeCoder = SpikeCoderEnvWrapper(self.env.observation_space, self.env.action_space, 
                                                             **params["spike_coder_params"])
         else:
             self.spike_coder = StateCoder(self.env.observation_space, self.env.action_space, 
                                       **params["spike_coder_params"])
+
+        # Backward compatibility -> Construct a normal multiplicative external rule when `update_weights_on_etrace` is enabled
+        snn_params: dict = params.get("snn_params")
+        if snn_params.get("update_weights_on_etrace", None) is not None:
+            etype = snn_params.pop("update_weights_on_etrace")
+            ext_params = {f"use_eligibility_{etype}": True, "use_reward": True, "delta_weight": True, "trigger_condition": "on-step",
+                          "gene_order": []}
+            if "update_lrate" in snn_params:
+                ext_params["learning_rate"] = snn_params.pop("update_lrate")
+            ext_rule = MultiplyLearningRule(**ext_params)
+        else:
+            ext_rule = None
+
+        ## Spiking Neural Netowrk
         self.snn = SNN(input_size=self.spike_coder.input_size, output_size=self.spike_coder.output_size, 
                        **params["snn_params"])
+        # Reapply external rule
+        if ext_rule is not None:
+            self.snn.learning_rule = ext_rule
+
+        ## Episode info collector for calculating fitness 
         self.reward_collector = RewardCollector(**params["collector_params"])
         # Update min and max fitness from environment
         self.reward_collector.min_fitness = self.env.get_min_reward()
@@ -100,7 +122,8 @@ class RL_Evaluator(Evaluator):
         if "update_condition" in simulator_params:
             warnings.warn("This config uses 'update_condition' inside 'simulator_params'. Newer config should specify 'trigger_condition' within 'lrule_params'")
             _trigger_condition = simulator_params.pop("update_condition", None)
-        
+
+        ## Simulator: Putting everything together
         self.simulator = SNNSimulator(self.snn, self.env, self.spike_coder, self.reward_collector,
                                       record_weights=record_info, 
                                       record_traces=record_info,

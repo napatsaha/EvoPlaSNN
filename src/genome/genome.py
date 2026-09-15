@@ -91,7 +91,7 @@ class CompositeGenome(Genome):
         super().__init__(**kwargs)
         self._genes = genes
         param = [g.value for g in self.genes]
-        self._parameters = np.r_[*param]
+        self._parameters = np.r_[*param] if len(param) > 0 else np.array([])
 
     def mutate(self, rate: float, scale: float, method: Literal["resample", "perturb"], *, 
                return_genes_only: bool = False) -> Genome | List[Parameter]:

@@ -650,9 +650,10 @@ class SynapseLayer(SynapseLayerProtocol):
     @learning_rule.setter
     def learning_rule(self, rule: LearningRule):
         self._learning_rule = rule
-        # Clear previous learning rule to avoid unexpected behaviours
-        self._internal_rule = None
-        self._external_rule = None
+        ## Fix: for STDP back-comp, external and internal rules may be specified at different times. Thus, cannot overwrite the other when not specified.
+        # # Clear previous learning rule to avoid unexpected behaviours
+        # self._internal_rule = None
+        # self._external_rule = None
         # Extract internal and external learning Rule if possible
         if isinstance(rule, DualLearningRule): # type: ignore
             self._external_rule = rule.external_rule
