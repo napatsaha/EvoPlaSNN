@@ -494,6 +494,16 @@ class Parameter(ABC):
         Return attributes required as kwargs to recreate this Parameter during init
         """
 
+    def get_lower_bounds(self) -> List[int | float]:
+        """
+        Return a list of lower bounds of the same length as gene's length. For gene position with no bound, will return 'None'.
+        """
+
+    def get_upper_bounds(self) -> List[int | float]:
+        """
+        Return a list of upper bounds of the same length as gene's length. For gene position with no bound, will return 'None'.
+        """
+
 
 class SpikeCoder(ABC):
     """

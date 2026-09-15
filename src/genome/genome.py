@@ -131,6 +131,11 @@ class CompositeGenome(Genome):
         else:
             return self.__class__(new_genes)
 
+    def get_bounds(self) -> Tuple[List, List]:
+        lower = [x for xs in [g.get_lower_bounds() for g in self.genes] for x in xs]
+        upper = [x for xs in [g.get_upper_bounds() for g in self.genes] for x in xs]
+        return lower, upper
+
     @property
     def parameters(self) -> np.ndarray:
         return self._parameters
@@ -392,6 +397,9 @@ class EvolvableLearningRule(Genome):
             synapse.tau_pre = self.values["tau_pre"]
         if self.contains_gene("tau_post"):
             synapse.tau_post = self.values["tau_post"]
+
+    def get_bounds(self) -> Tuple[List, List]:
+        return self.genome.get_bounds()
 
     @property
     def size(self):

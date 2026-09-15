@@ -20,6 +20,12 @@ class PyCMAWrapper(BaseSolver):
                          genome_type=genome_type, genome_params=genome_params)
         sample_sol = self._create_individual()
         self.ndim = sample_sol.size
+        if hasattr(sample_sol, "get_bounds"):
+            bounds = sample_sol.get_bounds()
+            if "bounds" in kwargs:
+                del kwargs["bounds"]
+        else:
+            bounds = kwargs.pop("bounds") if "bounds" in kwargs else None
 
         if x0 is None:
             x0 = np.zeros(self.ndim)
@@ -31,6 +37,7 @@ class PyCMAWrapper(BaseSolver):
             sigma0=sigma0,
             options=dict(
                 popsize=self.popsize,
+                bounds=bounds,
                 **kwargs
             )
         )

@@ -1,6 +1,6 @@
 from copy import copy
 import sys
-from typing import Any, Literal, Sequence, Dict
+from typing import Any, List, Literal, Sequence, Dict
 from dataclasses import dataclass
 
 import numpy as np
@@ -34,11 +34,22 @@ def create_param(kind, **kwargs) -> Parameter:
 
 class BaseParameter(Parameter):
     length: int
+    low: int | float
+    high: int | float
     value: np.typing.ArrayLike
     name: str
 
-    def __init__(self, value, length: int = 1, name: str = None, dtype: np.typing.DTypeLike = np.float32):
+    def __init__(self, value, length: int = 1, name: str = None, low: int | float = None, high: int | float = None,
+                 dtype: np.typing.DTypeLike = np.float32):
         super().__init__()
+        # Boundary creation is needed for value validation
+        self.low = low #if low is not None else -np.inf
+        self.high = high #if high is not None else np.inf
+        self._bounded = (self.low is not None) or (self.high is not None)
+        if (self.low is not None) and (self.high is not None): 
+            if self.low > self.high:
+                raise ValueError(f"'low' must be strictly less than 'high'. Got low={self.low}, high={self.high}")
+            
         if value is None:
             length = max(1, length)
             value = self._generate(length)
@@ -138,6 +149,12 @@ class BaseParameter(Parameter):
 
     def __repr__(self):
         return f"Param({self.value})"
+
+    def get_lower_bounds(self) -> List[int | float]:
+        return [self.low for _ in range(self.length)]
+
+    def get_upper_bounds(self) -> List[int | float]:
+        return [self.high for _ in range(self.length)]
     
     @property
     def value(self):
@@ -172,12 +189,12 @@ class RealParam(BaseParameter):
                  dist: Literal["uniform", "normal"] = "uniform",
                  **kwargs):
         # Can be unbounded
-        self.low = low #if low is not None else -np.inf
-        self.high = high #if high is not None else np.inf
-        self._bounded = (self.low is not None) or (self.high is not None)
-        if (self.low is not None) and (self.high is not None): 
-            if self.low >= self.high:
-                raise ValueError(f"'low' must be less than 'high'. Got low={self.low}, high={self.high}")
+        # self.low = low #if low is not None else -np.inf
+        # self.high = high #if high is not None else np.inf
+        # self._bounded = (self.low is not None) or (self.high is not None)
+        # if (self.low is not None) and (self.high is not None): 
+        #     if self.low >= self.high:
+        #         raise ValueError(f"'low' must be less than 'high'. Got low={self.low}, high={self.high}")
         
         # Distribution
         self.dist = dist
@@ -200,7 +217,7 @@ class RealParam(BaseParameter):
             # self.loc = loc if loc is not None else 0
             # self.scale = scale if scale is not None else 1
 
-        super().__init__(value, length, name, dtype=np.float32)
+        super().__init__(value=value, length=length, name=name, low=low, high=high, dtype=np.float32)
 
     def _generate(self, size):
         if self._uniform:
@@ -296,42 +313,44 @@ class DiscreteParam(BaseParameter):
     def __init__(self, value=None, length=1, name: str = None, *, 
                  low=None, high=None, n=None):
         # Make sure no value is missing assignment for some reason
-        self.low = low
-        self.high = high
+        # self.low = low
+        # self.high = high
         self.n = n
         # DONE: Deal with cases where low or high=None
 
         if n is not None:
+            # Reconstruct low/high from n
             self.n = int(n)
             assert n > 0, "'n' must be at least 1"
             if (low is None) and (high is None):
-                self.low = 0
-                self.high = self.low + self.n
+                low = 0
+                high = low + self.n
             elif (high is not None) and (low is None):
-                self.high = int(high)
-                self.low = self.high - self.n
+                high = int(high)
+                low = high - self.n
             elif (low is not None) and (high is None):
-                self.low = int(low)
-                self.high = self.low + self.n
+                low = int(low)
+                high = low + self.n
             else:
-                assert high > low, "high must be greater than low"
+                # assert high > low, "high must be greater than low" # -> This will be handled by BaseParameter
                 assert (high - low) == n, "Difference between 'high' and 'low' must be equal to 'n'"
-                self.high = high
-                self.low = low
+                # self.high = high
+                # self.low = low
         else:
+            # Reconstruct n from low/high
             if (high is not None) and (low is not None):
                 assert high > low, "high must be greater than low"
-                self.low = int(low)
-                self.high = int(high)
-                self.n = self.high - self.low
+                low = int(low)
+                high = int(high)
+                self.n = high - low
             elif (low is None) and (high is not None):
-                self.high = int(high)
-                self.low = 0
-                self.n = self.high - self.low
+                high = int(high)
+                low = 0
+                self.n = high - low
             else:
                 raise AssertionError("Insufficient information. Either one of 'n' or 'high' or both of 'high' and 'low' must be passed through.")
 
-        super().__init__(value, length, name, dtype=np.int_)
+        super().__init__(value=value, length=length, name=name, low=low, high=high, dtype=np.int_)
 
         # self._value = self._value.astype(np.int_)
 

@@ -2,6 +2,13 @@
 Branch v1.4-rule-rework
 ----
 
+0.10 (2026-09-15)
+- Added automatic bounds detection from genome to be applied to Solver
+- Added option in `pycma.PyCMAWrapper` to extract `bounds` from `sample_sol` during init, if available; Otherwise extract from kwargs, or else None
+- Moved `low` and `high` attributes in all Param to BaseParameter
+    - Added `get_lower_boudns()` and `get_upper_bounds()` to BaseParameter (and `Parameter`) which returns a list of gene's length
+- Added `get_bounds` to CompositeGenome and EvolvableLearningRule, which returns a tuple of flattened list for (lower, upper) bounds
+
 0.9.1 (2026-09-11)
 - Added plot option `rule_component` in `plot_learning_rule`
     - DualLearningRule should not plottable without specifying rule_component
