@@ -210,6 +210,25 @@ class SynapseLayerProtocol(Protocol):
         """
 
     @property
+    def w_min(self) -> float:
+        """
+        Lower bound for weight values. Only applicable if `clip_weights=True`. If unbounded, will be `-np.inf`
+        """
+
+    @property
+    def w_max(self) -> float:
+        """
+        Upper bound for weight values. Only applicable if `clip_weights=True`. If unbounded, will be `np.inf`
+        """
+
+    @property
+    def w_range(self) -> float:
+        """
+        Range between lower and upper bounds for weight values. If any direction is unbounded, range will be `np.inf`.  
+        Can be used to set `w_max` if `w_min` is defined.
+        """
+
+    @property
     def tau_syn(self) -> float:
         """
         Time constant used for all types of eligibility trace
@@ -225,6 +244,25 @@ class SynapseLayerProtocol(Protocol):
     def tau_post(self) -> float:
         """
         Time constant used for post-synaptic trace
+        """
+
+    @property
+    def e_min(self) -> float:
+        """
+        Lower bound for eligibility trace. If unbounded, will be `-np.inf`
+        """
+
+    @property
+    def e_max(self) -> float:
+        """
+        Upper bound for eligibility trace. If unbounded, will be `np.inf`
+        """
+
+    @property
+    def e_range(self) -> float:
+        """
+        Range between lower and upper bounds for eligibility trace. If any direction is unbounded, range will be `np.inf`.  
+        Can be used to set `e_max` if `e_min` is defined.
         """
 
     @property

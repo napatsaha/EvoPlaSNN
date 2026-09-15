@@ -1,4 +1,5 @@
 from typing import Dict, Literal
+import warnings
 
 from common.base import LearningRule, NeuronLayerProtocol, SynapseLayerProtocol
 import numpy as np
@@ -41,7 +42,8 @@ class SynapseLayer(SynapseLayerProtocol):
                  synaptic_delay: int = 0,
                  sim_method: Literal["event-driven", "step-wise"] = "step-wise",
                  weight_init: Literal["uniform", "normal", "constant"] = "uniform",
-                 weight_clip_min: float = 0.0, weight_clip_max: float = 1.0,
+                 weight_clip_min: float = None, weight_clip_max: float = None,
+                 w_min: float = 0.0, w_max: float = 1.0,
                  clip_weights: bool = True, normalise_weights: bool = False, 
                  normalise_method: Literal["sum", "L2", "P"] = "sum", #normalise_params: dict = None,
                  **kwargs):
@@ -138,8 +140,8 @@ class SynapseLayer(SynapseLayerProtocol):
             tau_syn = tau_syn * dt
         self._tau_syn = tau_syn if tau_syn is not None else dt
         self._beta_syn = np.exp(-self.dt / self._tau_syn)  # Decay rate for eligibility trace
-        self.e_max = e_max if e_max is not None else np.inf
-        self.e_min = e_min if e_min is not None else -np.inf
+        self._e_max = e_max if e_max is not None else np.inf
+        self._e_min = e_min if e_min is not None else -np.inf
         
         # Initialize weights
         if weight_init not in ['uniform', 'normal', 'constant']:
@@ -147,8 +149,8 @@ class SynapseLayer(SynapseLayerProtocol):
             Warning(f"Invalid weight initialisation method: {weight_init}. Using 'uniform' instead.")
         self.weight_init = weight_init
         self.weight_init_params = kwargs
-        self.weight_clip_min = weight_clip_min
-        self.weight_clip_max = weight_clip_max
+        self._w_min = w_min if weight_clip_min is None else weight_clip_min
+        self._w_max = w_max if weight_clip_max is None else weight_clip_max
         self.clip_weights = clip_weights
         self.normalise_weights = normalise_weights
         self.normalise_method = normalise_method
@@ -461,7 +463,7 @@ class SynapseLayer(SynapseLayerProtocol):
 
     def _clip_weights(self):
         if self.clip_weights:
-            self._weights = np.clip(self.weights, self.weight_clip_min, self.weight_clip_max)
+            self._weights = np.clip(self.weights, self.w_min, self.w_max)
 
     def _normalise_weights(self):
         if self.normalise_weights:
@@ -480,6 +482,41 @@ class SynapseLayer(SynapseLayerProtocol):
         self._weights = value
 
     @property
+    def w_min(self) -> float:
+        return self._w_min if self.clip_weights else -np.inf
+    @w_min.setter
+    def w_min(self, value):
+        if self.clip_weights:
+            if isinstance(value, np.ndarray):
+                assert value.size == 1, "Input must either be a scalar or array of size 1"
+                value = value.item()
+            self._w_min = value
+    @property
+    def w_max(self) -> float:
+        return self._w_max if self.clip_weights else np.inf
+    @w_max.setter
+    def w_max(self, value):
+        if self.clip_weights:
+            if isinstance(value, np.ndarray):
+                assert value.size == 1, "Input must either be a scalar or array of size 1"
+                value = value.item()
+            self._w_max = value
+    @property
+    def w_range(self) -> float:
+        return self.w_max - self.w_min
+    @w_range.setter
+    def w_range(self, value):
+        if self.clip_weights:
+            if isinstance(value, np.ndarray):
+                assert value.size == 1, "Input must either be a scalar or array of size 1"
+                value = value.item()
+            assert value > 0, f"w_range must be strictly positive. Got value={value}"
+            if not np.isinf(self.w_min):
+                self.w_max = self.w_min + value
+            else:
+                warnings.warn(f"'w_min' is currently unbounded (value={self.w_min}). Cannot apply 'w_range' to create 'w_max'")
+
+    @property
     def tau_syn(self) -> float:
         """
         Time constant used for all types of eligibility trace
@@ -487,6 +524,9 @@ class SynapseLayer(SynapseLayerProtocol):
         return self._tau_syn
     @tau_syn.setter
     def tau_syn(self, value):
+        if isinstance(value, np.ndarray):
+            assert value.size == 1, "Input must either be a scalar or array of size 1"
+            value = value.item()
         assert value > 0, f"Time constant value must be strictly posive. Got tau_syn={value}"
         self._tau_syn = value
         self._beta_syn = np.exp(-self.dt / self._tau_syn)
@@ -499,6 +539,9 @@ class SynapseLayer(SynapseLayerProtocol):
         return self._tau_pre
     @tau_pre.setter
     def tau_pre(self, value):
+        if isinstance(value, np.ndarray):
+            assert value.size == 1, "Input must either be a scalar or array of size 1"
+            value = value.item()
         assert value > 0, f"Time constant value must be strictly posive. Got tau_pre={value}"
         self._tau_pre = value
         self._beta_pre = np.exp(-self.dt / self._tau_pre)
@@ -511,9 +554,48 @@ class SynapseLayer(SynapseLayerProtocol):
         return self._tau_post
     @tau_post.setter
     def tau_post(self, value):
+        if isinstance(value, np.ndarray):
+            assert value.size == 1, "Input must either be a scalar or array of size 1"
+            value = value.item()
         assert value > 0, f"Time constant value must be strictly posive. Got tau_post={value}"
         self._tau_post = value
         self._beta_post = np.exp(-self.dt / self._tau_post)
+
+    @property
+    def e_min(self) -> float:
+        return self._e_min
+    @e_min.setter
+    def e_min(self, value: float | np.ndarray):
+        if isinstance(value, np.ndarray):
+            assert value.size == 1, "Input must either be a scalar or array of size 1"
+            value = value.item()
+        # assert value < self.e_max, f"New 'e_min' value must be strictly lower than current 'e_max'. Got e_min={value}"
+        self._e_min = value
+
+    @property
+    def e_max(self) -> float:
+        return self._e_max
+    @e_max.setter
+    def e_max(self, value: float):
+        if isinstance(value, np.ndarray):
+            assert value.size == 1, "Input must either be a scalar or array of size 1"
+            value = value.item()
+        # assert value > self.e_min, f"New 'e_max' value must be strictly higher than current 'e_min'. Got e_max={value}"
+        self._e_max = value
+
+    @property
+    def e_range(self) -> float:
+        return self.e_max - self.e_min
+    @e_range.setter
+    def e_range(self, value: float):
+        if isinstance(value, np.ndarray):
+            assert value.size == 1, "Input must either be a scalar or array of size 1"
+            value = value.item()
+        assert value > 0, f"e_range must be strictly positive. Got e_range={value}"
+        if not np.isinf(self.e_min):
+            self.e_max = self.e_min + value
+        else:
+            warnings.warn(f"'e_min' is currently unbounded (e_min={self.e_min}). Cannot apply range to create 'e_max'")
     
     @property
     def eligibility_pre(self):

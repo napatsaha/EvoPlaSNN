@@ -2,6 +2,12 @@
 Branch v1.4-rule-rework
 ----
 
+0.11 (2026-09-15)
+- Added settable limits to synapse weights and eligibility trace
+- Added new settable properties to `SynapseLayer`: `e_min`, `e_max`, `e_range`, `w_min`, `w_max`, `w_range`
+- Switched out `weight_clip_min` -> `w_min` and `weight_clip_max` to `w_max`. (Previous args still work)
+- Added the corresponding gene to `EvolvableLearningRule`
+
 0.10 (2026-09-15)
 - Added automatic bounds detection from genome to be applied to Solver
 - Added option in `pycma.PyCMAWrapper` to extract `bounds` from `sample_sol` during init, if available; Otherwise extract from kwargs, or else None
