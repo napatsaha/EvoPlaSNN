@@ -2,6 +2,9 @@
 Branch v1.4-rule-rework
 ----
 
+0.13 (2026-09-16)
+- Merged with main branch v1.4 + Minor fixes: add yaml to common.utils
+
 0.12 (2026-09-15)
 - Backward compatibility fixes:
     - A multiplicative rule will be automatically created and assigned to SynapseLayer external rule during RL_Evaluator.__init__,
