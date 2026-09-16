@@ -94,6 +94,7 @@ def plot_spikes(simulator: 'SNNSimulator' = None, values: List[np.ndarray] = Non
 
 
 def plot_traces(simulator: 'SNNSimulator' = None, values: List[np.ndarray] = None, *, 
+                trace_type: Literal["neuron", "pre", "post"] = "neuron",
                 x_scale: float = 0.2, y_scale: float = 0.8,
                 y_eps: float = 0.1, x_eps: int | float = 1, trace_scale: float = 0.8, 
                 x_min = None, x_max = None, x_range: int = 100,
@@ -105,16 +106,47 @@ def plot_traces(simulator: 'SNNSimulator' = None, values: List[np.ndarray] = Non
     Plot traces
     """
     if simulator is not None:
-        assert simulator.record_traces, "Trace recording is not enabled."
-    if values is None and simulator is None:
+        if trace_type == "neuron":
+            assert simulator.record_traces, "Neuron trace recording is not enabled."
+            values = simulator.trace_recorder.values
+            num_layers = simulator.network.num_layers
+            layer_sizes = simulator.network.layer_sizes
+        elif trace_type == "pre":
+            assert simulator.record_pre_traces, "Post-synaptic trace recording is not enabled."
+            values = simulator.trace_pre_recorder.values
+            num_layers = simulator.network.num_layers - 1
+            layer_sizes = simulator.network.layer_sizes[:-1]
+        elif trace_type == "post":
+            assert simulator.record_post_traces, "Post-synaptic trace recording is not enabled."
+            values = simulator.trace_post_recorder.values
+            num_layers = simulator.network.num_layers - 1
+            layer_sizes = simulator.network.layer_sizes[1:]
+        else:
+            raise ValueError(f"Trace type: {trace_type} not supported.")
+        
+        num_steps = simulator.num_steps
+        dt = f"{simulator.dt} s"
+    elif values is not None:
+        values = values
+        trace_type = None
+        num_steps = min([val.shape[1] for val in values])
+        num_layers = len(values)
+        layer_sizes = [val.shape[0] for val in values]
+        dt = "1 unit"
+    else:
         raise RuntimeError("Either a simulator (with trace recording enabled) or a list of recorded traces [layer_size, num_steps] * num_layers, must be provided.")
 
+    # if simulator is not None:
+    #     assert simulator.record_traces, "Trace recording is not enabled."
+    # if values is None and simulator is None:
+    #     raise RuntimeError("Either a simulator (with trace recording enabled) or a list of recorded traces [layer_size, num_steps] * num_layers, must be provided.")
+
     # Extract necessary info
-    num_steps = simulator.num_steps if simulator is not None else min([val.shape[1] for val in values])
-    values = simulator.trace_recorder.values if simulator is not None else values
-    num_layers = simulator.network.num_layers if simulator is not None else len(values)
-    layer_sizes = simulator.network.layer_sizes if simulator is not None else [val.shape[0] for val in values]
-    dt = f"{simulator.dt} s" if simulator is not None else "1 unit"
+    # num_steps = simulator.num_steps if simulator is not None else min([val.shape[1] for val in values])
+    # values = simulator.trace_recorder.values if simulator is not None else values
+    # num_layers = simulator.network.num_layers if simulator is not None else len(values)
+    # layer_sizes = simulator.network.layer_sizes if simulator is not None else [val.shape[0] for val in values]
+    # dt = f"{simulator.dt} s" if simulator is not None else "1 unit"
 
     if x_eps < 1 and x_eps > 0:
         x_eps = x_eps * num_steps
@@ -666,7 +698,7 @@ def plot_env_weight_greedy(simulator: 'SNNSimulator', *,
         encoder = simulator.spike_coder.encoder
         state_act_vals = _query_SNN_membrane_from_env_position(network, encoder, env)
         _plot_env_action_values(env, state_act_vals, savepath=savepath, show=show, 
-                                legend_label="Membrane Potential", title="SNN Output Layer Membrane Potential for each Env state"
+                                legend_label="Membrane Potential", title="SNN Output Layer Membrane Potential for each Env state",
                                 **kwargs)
 
 
@@ -746,7 +778,7 @@ def plot_eligibility_traces(simulator: 'SNNSimulator' = None, values: np.ndarray
         if etype == "pre":
             assert simulator.record_eligibility_pre, "Pre-synaptic eligibility trace recording is not enabled."
             etrace = simulator.eligibility_pre_recorder.values[synapse_layer]
-        elif etype == "pre":
+        elif etype == "post":
             assert simulator.record_eligibility_post, "Post-synaptic eligibility trace recording is not enabled."
             etrace = simulator.eligibility_post_recorder.values[synapse_layer]
         elif etype == "stdp":

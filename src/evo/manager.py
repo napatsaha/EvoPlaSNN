@@ -217,12 +217,13 @@ class EvoManager:
 
                 # Get best solutions and their fitnesses
                 best_solution, best_fitness, global_improved = self.solver.result()
-                if self._check_stagnation:
-                    if global_improved:
-                        stag_count = 0
-                        global_best_solution, global_best_fitness = self.solver.get_all_time_best()
-                    else:
-                        stag_count += 1
+                # For reporting purposes, collect global fitnesses anyway, regardless of whether or not stagnation is used to check for termination
+                # if self._check_stagnation:
+                if global_improved:
+                    stag_count = 0
+                    global_best_solution, global_best_fitness = self.solver.get_all_time_best()
+                else:
+                    stag_count += 1
 
                 # Log result
                 if gen_count % logging_freq == 0:
