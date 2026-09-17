@@ -406,7 +406,7 @@ class SNNSimulator:
                 self.num_steps = t
                 break
 
-    def get_fitness(self) -> float | None:
+    def get_fitness(self, use_decay_cutoff: bool = False, t_cutoff: int = None, eps_cutoff: int = None) -> float | None:
         # if self._post_process_type == 0:
         #     if self.fitnessor is None:
         #         Warning("Fitnessor is not set. Fitness cannot be calculated.")
@@ -422,9 +422,11 @@ class SNNSimulator:
         if self.reward_collector is None:
             Warning("Reward collector is not set. Fitness cannot be calculated.")
             return None
-        return self.reward_collector.get_fitness(cutoff=self.decay_cutoff)
+        if use_decay_cutoff and self.decay_cutoff is not None:
+            t_cutoff = self.decay_cutoff
+        return self.reward_collector.get_fitness(t_cutoff=t_cutoff, eps_cutoff=eps_cutoff)
 
-    def get_intermediate_fitness(self, use_cutoff: bool = False) -> List[float] | None:
+    def get_intermediate_fitness(self, use_decay_cutoff: bool = False, t_cutoff: int = None, eps_cutoff: int = None) -> List[float] | None:
         # if self._post_process_type == 0:
         #     if self.fitnessor is None:
         #         Warning("Fitnessor is not set. Intermediate fitness cannot be calculated.")
@@ -440,13 +442,17 @@ class SNNSimulator:
         if self.reward_collector is None:
             Warning("Reward collector is not set. Intermediate fitness cannot be calculated.")
             return None
-        return self.reward_collector.get_intermediate_fitness(cutoff=self.decay_cutoff if use_cutoff else None)
+        if use_decay_cutoff and self.decay_cutoff is not None:
+            t_cutoff = self.decay_cutoff
+        return self.reward_collector.get_intermediate_fitness(t_cutoff=t_cutoff, eps_cutoff=eps_cutoff)
 
-    def get_episode_timestamps(self, use_cutoff: bool = False) -> np.ndarray[int] | None:
+    def get_episode_timestamps(self, use_decay_cutoff: bool = False, t_cutoff: int = None, eps_cutoff: int = None) -> np.ndarray[int] | None:
         if self.reward_collector is None:
             Warning("Reward collector is not set. Episode timestamps cannot be calculated.")
             return None
-        eps_timestamp = self.reward_collector.get_timestamps(cutoff=self.decay_cutoff if use_cutoff else None)
+        if use_decay_cutoff and self.decay_cutoff is not None:
+            t_cutoff = self.decay_cutoff
+        eps_timestamp = self.reward_collector.get_timestamps(t_cutoff=t_cutoff, eps_cutoff=eps_cutoff)
         return eps_timestamp
 
     def get_target_fitness(self) -> float | None:

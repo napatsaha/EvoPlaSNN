@@ -113,6 +113,12 @@ Branch v1.4-rule-rework
 v1.4
 ----
 
+v1.4.3.1 (2026-09-17)
+- Allow episode cutoff to be specified in all methods that query RewardCollector.records
+    - t_cutoff and eps_cutoff are both options that can be specified (priority given to former)
+- All other methods in Simulator, snn.plot.plot_intermediate_fitness, and Evaluator now use the same (t_cutoff, eps_cutoff) signature
+    - Additionally, in Simulator, decay_cutoff will override t_cutoff if enabled
+
 v1.4.3.0 (2026-09-17)
 - Controls which NeuronLayer can be affected by exploration mechanics and setting deterministic/stochastic
 - Adds a `decayable` param in NeuronLayer, which prevents `spike_method` and `softmax_temp` from being changed if set to False.

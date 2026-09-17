@@ -92,55 +92,65 @@ class RewardCollector:
             trajectory = trajectory
         ))
 
-    def get_rewards(self, cutoff: int = None) -> list[float]:
-        if cutoff is not None:
-            return [r.reward for r in self.records if r.t >= cutoff]
+    def get_rewards(self, t_cutoff: int = None, eps_cutoff: int = None) -> list[float]:
+        if t_cutoff is not None:
+            return [r.reward for r in self.records if r.t >= t_cutoff]
+        elif eps_cutoff is not None:
+            return [r.reward for r in self.records if r.episode >= eps_cutoff]
         else:
             return [r.reward for r in self.records]
     
-    def get_episode_lengths(self, cutoff: int = None) -> list[int]:
-        if cutoff is not None:
-            return [r.length for r in self.records if r.t >= cutoff]
+    def get_episode_lengths(self, t_cutoff: int = None, eps_cutoff: int = None) -> list[int]:
+        if t_cutoff is not None:
+            return [r.length for r in self.records if r.t >= t_cutoff]
+        elif eps_cutoff is not None:
+            return [r.length for r in self.records if r.episode >= eps_cutoff]
         else:
             return [r.length for r in self.records]
     
-    def get_timestamps(self, cutoff: int = None) -> list[int]:
-        if cutoff is not None:
-            return [r.t for r in self.records if r.t >= cutoff]
+    def get_timestamps(self, t_cutoff: int = None, eps_cutoff: int = None) -> list[int]:
+        if t_cutoff is not None:
+            return [r.t for r in self.records if r.t >= t_cutoff]
+        elif eps_cutoff is not None:
+            return [r.t for r in self.records if r.episode >= eps_cutoff]
         else:
             return [r.t for r in self.records]
 
-    def get_explorations(self, cutoff: int = None) -> list[float]:
-        if cutoff is not None:
-            return [r.exploration for r in self.records if r.t >= cutoff]
+    def get_explorations(self, t_cutoff: int = None, eps_cutoff: int = None) -> list[float]:
+        if t_cutoff is not None:
+            return [r.exploration for r in self.records if r.t >= t_cutoff]
+        elif eps_cutoff is not None:
+            return [r.exploration for r in self.records if r.episode >= eps_cutoff]
         else:
             return [r.exploration for r in self.records]
     
-    def get_success(self, cutoff: int = None) -> list[float]:
-        if cutoff is not None:
-            return [1 if r.terminated and r.reward == self.max_fitness else 0 for r in self.records if r.t >= cutoff]
+    def get_success(self, t_cutoff: int = None, eps_cutoff: int = None) -> list[float]:
+        if t_cutoff is not None:
+            return [1 if r.terminated and r.reward == self.max_fitness else 0 for r in self.records if r.t >= t_cutoff]
+        elif eps_cutoff is not None:
+            return [1 if r.terminated and r.reward == self.max_fitness else 0 for r in self.records if r.episode >= eps_cutoff]
         else:
             return [1 if r.terminated and r.reward == self.max_fitness else 0 for r in self.records]
 
-    def get_intermediate_fitness(self, cutoff: int = None) -> List[float]:
+    def get_intermediate_fitness(self, t_cutoff: int = None, eps_cutoff: int = None) -> List[float]:
         """
         Return list of episode fitnesses before aggregation.
         """
         if self.fitness_type == "reward":
-            fitnesses = self.get_rewards(cutoff=cutoff)
+            fitnesses = self.get_rewards(t_cutoff=t_cutoff, eps_cutoff=eps_cutoff)
         elif self.fitness_type == "success_rate":
-            fitnesses = self.get_success(cutoff=cutoff)
+            fitnesses = self.get_success(t_cutoff=t_cutoff, eps_cutoff=eps_cutoff)
         elif self.fitness_type == "latency":
-            fitnesses = self.get_episode_lengths(cutoff=cutoff)
+            fitnesses = self.get_episode_lengths(t_cutoff=t_cutoff, eps_cutoff=eps_cutoff)
         else:
             fitnesses = []
         return fitnesses
 
-    def get_fitness(self, cutoff: int = None) -> float:
+    def get_fitness(self, t_cutoff: int = None, eps_cutoff: int = None) -> float:
         """
         Calculate fitness for current trial. Depends on `fitness_type`
         """
-        fitnesses = self.get_intermediate_fitness(cutoff)
+        fitnesses = self.get_intermediate_fitness(t_cutoff=t_cutoff, eps_cutoff=eps_cutoff)
         if len(fitnesses) == 0:
             return self.min_fitness
         agg = self._agg_func_dict.get(self.fitness_agg_func)

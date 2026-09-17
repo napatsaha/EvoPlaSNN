@@ -834,19 +834,19 @@ def plot_eligibility_traces(simulator: 'SNNSimulator' = None, values: np.ndarray
 
 
 def plot_intermediate_fitness(simulator: 'SNN_Simulator' = None, values: np.ndarray = None, *, plot_exploration: bool = False,
-                              use_cutoff: bool = False,
+                              t_cutoff: int = None, eps_cutoff: int = None,
                               num_steps: int = None, timestamps: np.ndarray = None,
                               x_scale: float = 0.01, y_scale: float = 1.0, x_eps: int = 1,
                               t_min: int = None, t_max: int = None, t_range: int = None, window_size: int = 10, 
                               figsize: tuple = None, dpi: int = 100,
                               savepath: str | Path = None, show: bool = True):
     if simulator is not None:
-        fts = simulator.get_intermediate_fitness(use_cutoff=use_cutoff)
+        fts = simulator.get_intermediate_fitness(t_cutoff=t_cutoff, eps_cutoff=eps_cutoff)
         ft = simulator.get_fitness()
         T = simulator.num_steps
         # eps_len = simulator.reward_collector.get_episode_lengths()
         # eps_timestamp = np.cumsum(eps_len) * simulator.spike_coder.input_delay
-        eps_timestamp = simulator.get_episode_timestamps(use_cutoff=use_cutoff)
+        eps_timestamp = simulator.get_episode_timestamps(t_cutoff=t_cutoff, eps_cutoff=eps_cutoff)
     elif values is not None:
         fts = values
         ft = np.mean(fts)
