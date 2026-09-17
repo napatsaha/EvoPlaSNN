@@ -58,6 +58,7 @@ class NeuronLayer(NeuronLayerProtocol):
                  wta: bool = False, 
                  sim_method: Literal["event-driven", "step-wise"] = "step-wise",
                  tie_handling_wta: Literal["random", "all", "first"] = "random",
+                 decayable: bool = None,
                  spike_method: Literal["deterministic", "stochastic"] = "deterministic", 
                  softmax_temp: float = 1.0, minimum_softmax_temp: float = 1e-3,
                  spike_condition: Literal["every", "input"] = None,
@@ -89,6 +90,10 @@ class NeuronLayer(NeuronLayerProtocol):
                 - If tie_handling_wta == "random": randomly choose between the winners
                 - If tie_handling_wta == "all": all winners allowed to spike (may cause problems down the line if expecting only 1 spike)
                 - If tie_handling_wta == "first": always choose the neuron with lower index (undesired behaviour)
+
+            decayable (bool): Determines whether the neuron layer can be affected by exploration mechanics (e.g. `SNN.set_exploration_rate`). Specifically,
+                if disabled, prevents the neuron `spike_method` and `softmax_temp` from being changed after init.
+                By default, if this is left as `None`, will be set to True if `spike_method="stochastic"`
 
             spike_method (Literal["deterministic", "stochastic"]): Whether to spike deterministically or stochasticity based on membrane potential. 
                 Only relevant if `wta=True`, Defaults to "deterministic".
@@ -163,7 +168,7 @@ class NeuronLayer(NeuronLayerProtocol):
         # Spiking method: Stochasticity
         self._spike_method = spike_method
         self._stochastic_spike = spike_method == "stochastic"
-        self._decayable = self._stochastic_spike # Determines if spike_method and softmax_temp can be set externally
+        self._decayable = self._stochastic_spike if decayable is None else bool(decayable) # Determines if spike_method and softmax_temp can be set externally
         self._initial_softmax_temp = softmax_temp
         self._softmax_temp = softmax_temp
         self._minimum_softmax_temp = minimum_softmax_temp
