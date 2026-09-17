@@ -113,6 +113,13 @@ Branch v1.4-rule-rework
 v1.4
 ----
 
+v1.4.3.0 (2026-09-17)
+- Controls which NeuronLayer can be affected by exploration mechanics and setting deterministic/stochastic
+- Adds a `decayable` param in NeuronLayer, which prevents `spike_method` and `softmax_temp` from being changed if set to False.
+    - By default, set to True, if set to spiking stochastically during init.
+- SNN methods `set_exploration_rate`, `set_deterministic`, `set_stochastic` now affects all neuron layers instead of only last layer. 
+    Whether or not each layer will be changed depends on its `decayable` attribute.
+
 v1.4.2.2 (2026-09-11)
 - Minor changes:
 - Prevent plotting learning_rule twice when the rule to evaluated is already in best n rules

@@ -163,6 +163,7 @@ class NeuronLayer(NeuronLayerProtocol):
         # Spiking method: Stochasticity
         self._spike_method = spike_method
         self._stochastic_spike = spike_method == "stochastic"
+        self._decayable = self._stochastic_spike # Determines if spike_method and softmax_temp can be set externally
         self._initial_softmax_temp = softmax_temp
         self._softmax_temp = softmax_temp
         self._minimum_softmax_temp = minimum_softmax_temp
@@ -452,6 +453,9 @@ class NeuronLayer(NeuronLayerProtocol):
     
     @spike_method.setter
     def spike_method(self, value: Literal["stochastic", "deterministic"]):
+        # Do not set if this layer is not stochastic in the first place
+        if not self._decayable:
+            return
         assert value in ["stochastic", "deterministic"], "New spike method model not supported."
         self._spike_method = value
         self._stochastic_spike = self._spike_method == "stochastic"
@@ -465,6 +469,9 @@ class NeuronLayer(NeuronLayerProtocol):
     
     @softmax_temp.setter
     def softmax_temp(self, value: float):
+        # Do not set if this layer is not stochastic in the first place
+        if not self._decayable:
+            return
         # Prevents a temperature too low from being set
         # Also considers deterministic spiking if temperature is too low
         if np.abs(value) < self._minimum_softmax_temp:
