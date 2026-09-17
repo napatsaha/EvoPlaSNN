@@ -113,6 +113,9 @@ Branch v1.4-rule-rework
 v1.4
 ----
 
+v1.4.3.2 (2026-09-17)
+- Added 'e_max' and 'w_max' to gene encoding options for EvolvableLearningRule
+
 v1.4.3.1 (2026-09-17)
 - Allow episode cutoff to be specified in all methods that query RewardCollector.records
     - t_cutoff and eps_cutoff are both options that can be specified (priority given to former)

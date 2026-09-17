@@ -177,8 +177,10 @@ class EvolvableLearningRule(Genome):
         "tau_pre": dict(kind="log", length=1, base=2, low=-5, high=0, dist="uniform"),
         "tau_post": dict(kind="log", length=1, base=2, low=-5, high=0, dist="uniform"),
         "e_min": dict(kind="real", length=1, low=-1, high=0, dist="uniform"),
+        "e_max": dict(kind="real", length=1, low=0, high=1, dist="uniform"),
         "e_range": dict(kind="real", length=1, low=0.0, high=2, dist="uniform"),
         "w_min": dict(kind="real", length=1, low=-10, high=0, dist="uniform"),
+        "w_max": dict(kind="real", length=1, low=0, high=10, dist="uniform"),
         "w_range": dict(kind="real", length=1, low=0.0, high=10, dist="uniform"),
     }
     default_gene_order = ("learning_rate", "tau_syn", "tau_pre", "tau_post", "e_min", "e_range", "w_min", "w_range")
@@ -403,10 +405,14 @@ class EvolvableLearningRule(Genome):
             synapse.tau_post = self.values["tau_post"]
         if self.contains_gene("e_min"):
             synapse.e_min = self.values["e_min"]
+        if self.contains_gene("e_max"):
+            synapse.e_max = self.values["e_max"]            
         if self.contains_gene("e_range"):
             synapse.e_range = self.values["e_range"]
         if self.contains_gene("w_min"):
             synapse.w_min = self.values["w_min"]
+        if self.contains_gene("w_max"):
+            synapse.w_max = self.values["w_max"]
         if self.contains_gene("w_range"):
             synapse.w_range = self.values["w_range"]
 
