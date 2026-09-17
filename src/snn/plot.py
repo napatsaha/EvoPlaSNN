@@ -1,19 +1,21 @@
 from pathlib import Path
 import csv, pickle
 from typing import List, Literal, Sequence, Dict
+import os
+
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 from matplotlib.axes import Axes
 import matplotlib.ticker as ticker
 import matplotlib.gridspec as gridspec
 from matplotlib.figure import Figure
-import numpy as np
-import os
 
+import numpy as np
 import pandas as pd
 import seaborn as sns
 
 # from .simulate import SNNSimulator
+from rl.collector import RewardCollector
 from snn.utils import get_spike_times
 from common import base
 from common.utils import get_boundaries_for_lrule_inputs, LRULE_INPUT_BOUNDS
@@ -833,27 +835,40 @@ def plot_eligibility_traces(simulator: 'SNNSimulator' = None, values: np.ndarray
     # plt.close(fig)
 
 
-def plot_intermediate_fitness(simulator: 'SNN_Simulator' = None, values: np.ndarray = None, *, plot_exploration: bool = False,
+def plot_intermediate_fitness(simulator: 'SNNSimulator' = None, values: np.ndarray = None, reward_collector: RewardCollector = None, *, 
+                              plot_exploration: bool = False,
                               t_cutoff: int = None, eps_cutoff: int = None,
                               num_steps: int = None, timestamps: np.ndarray = None,
                               x_scale: float = 0.01, y_scale: float = 1.0, x_eps: int = 1,
                               t_min: int = None, t_max: int = None, t_range: int = None, window_size: int = 10, 
                               figsize: tuple = None, dpi: int = 100,
                               savepath: str | Path = None, show: bool = True):
-    if simulator is not None:
-        fts = simulator.get_intermediate_fitness(t_cutoff=t_cutoff, eps_cutoff=eps_cutoff)
-        ft = simulator.get_fitness()
-        T = simulator.num_steps
+    if (simulator is not None) or (reward_collector is not None):
+        if simulator is not None:
+            reward_collector: RewardCollector = simulator.reward_collector
+            T = simulator.num_steps
+        else:
+            T = reward_collector.records[-1].t
+        fts = reward_collector.get_intermediate_fitness(t_cutoff=t_cutoff, eps_cutoff=eps_cutoff)
+        ft = reward_collector.get_fitness(t_cutoff=t_cutoff, eps_cutoff=eps_cutoff)
         # eps_len = simulator.reward_collector.get_episode_lengths()
         # eps_timestamp = np.cumsum(eps_len) * simulator.spike_coder.input_delay
-        eps_timestamp = simulator.get_episode_timestamps(t_cutoff=t_cutoff, eps_cutoff=eps_cutoff)
+        eps_timestamp = reward_collector.get_timestamps(t_cutoff=t_cutoff, eps_cutoff=eps_cutoff)
+        agg_func = reward_collector.fitness_agg_func
+        fts_type = reward_collector.fitness_type
+    
     elif values is not None:
+        # Assume values is a list of fitnesses
         fts = values
         ft = np.mean(fts)
         T = num_steps if num_steps is not None else len(fts)
         eps_timestamp = None
+        agg_func = "mean"
+        fts_type = "mean_reward"
         if num_steps is None:
             x_scale *= 100    
+    else:
+        raise ValueError("Either one of 'simulator', 'reward_collector' or 'values' must be passed in.")
 
     if timestamps is None and eps_timestamp is None:
         ts = np.linspace(0, T, len(fts)) if num_steps is not None else np.arange(0, len(fts))
@@ -891,11 +906,14 @@ def plot_intermediate_fitness(simulator: 'SNN_Simulator' = None, values: np.ndar
         ax.xaxis.set_major_locator(plt.MultipleLocator(100))
     ax.set_xlim(t_min - x_eps, t_max + x_eps)
     ax.set_xlabel("Time (steps)")
-    ax.set_ylabel("Episode " + simulator.reward_collector.fitness_type.title())
+    ax.set_ylabel("Episode " + fts_type.title())
     if plot_exploration:
         ax = axs[1, 0]
-        expl = simulator.reward_collector.get_explorations()
-        ts = [r.t for r in simulator.reward_collector.records]
+        if reward_collector is not None:
+            expl = reward_collector.get_explorations(t_cutoff=t_cutoff, eps_cutoff=eps_cutoff)
+            ts = reward_collector.get_timestamps(t_cutoff=t_cutoff, eps_cutoff=eps_cutoff)
+        else:
+            raise ValueError("Can only plot exploration with a valid 'reward_collector'")
         ax.plot(
             ts, expl,
             color="red", alpha=0.8,
@@ -908,7 +926,6 @@ def plot_intermediate_fitness(simulator: 'SNN_Simulator' = None, values: np.ndar
         ax.set_xlabel("Time (steps)")
         ax.set_ylabel("Exploration Rate")
     fig.text(0.5, 1.07, "Intermediate Fitness Over Time", ha='center', fontsize=20)
-    agg_func = simulator.reward_collector.fitness_agg_func
     fig.text(0.5, 1.02, f"{agg_func.title()} Fitness: {ft:.2f}", ha='center', fontsize=14)
     if savepath is not None:
         print(f"Saving plot to {savepath}")

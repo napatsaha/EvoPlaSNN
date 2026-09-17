@@ -113,6 +113,10 @@ Branch v1.4-rule-rework
 v1.4
 ----
 
+v1.4.3.3 (2026-09-17)
+- Minor fixes to `snn.plot.plot_intermediate_fitness` so it can plot without Simulator
+    - Allow passing in a reward_collector object
+
 v1.4.3.2 (2026-09-17)
 - Added 'e_max' and 'w_max' to gene encoding options for EvolvableLearningRule
 
