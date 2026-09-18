@@ -113,6 +113,18 @@ Branch v1.4-rule-rework
 v1.4
 ----
 
+v1.4.4.0 (2026-09-18)
+- Added 'eps_reward' option to `RewardCollector.fitness_type`
+    - RewardCollector min_fitness and max_fitness now based on _bound dict reference depending on fitness_type
+    - Added `eps_reward` field to `EpsInfo` namedtuple
+- Changes to `TrajectoryCollector`:
+    - `collect()` now expects `locals()` dict to be passed through from Simulator
+    - Can control which field to record via `record_<field>` during init
+    - `default_record` option control whether or not to record the other fields not explicitly mentioned during init
+    - Added `get_summed_rewards()` methods to calculate sum of each step reward
+- Simulator allows `trajectory_params` to be passed to control init of TrajectoryCollector
+    - Added `eps_reward=` calculation during RewardCollector.collect line, which utilises the `TrajectoryCollector.get_summed_rewards()`
+
 v1.4.3.3 (2026-09-17)
 - Minor fixes to `snn.plot.plot_intermediate_fitness` so it can plot without Simulator
     - Allow passing in a reward_collector object

@@ -27,7 +27,7 @@ class SNNSimulator:
     def __init__(self, network: SNN, #spike_generator: SpikeGenerator = None, 
                  env: gym.Env = None, spike_coder: SpikeCoder = None, reward_collector: RewardCollector = None,
                 #  trajectory_collector: TrajectoryCollector = None,
-                 collect_trajectory: bool = False,
+                 collect_trajectory: bool = False, trajectory_params: dict = None,
                 #  update_condition: Literal["on-step", "on-end"] = "on-end",
                  modulation: Literal["reward", "td-error"] = None, modulation_params: dict = {},
                  *, 
@@ -57,7 +57,9 @@ class SNNSimulator:
         # Episode and Trajectory collectors
         self.reward_collector = reward_collector
         self._log_traj = bool(collect_trajectory)
-        self.trajectory_collector = TrajectoryCollector() if self._log_traj else None
+        if self._log_traj and trajectory_params is None:
+            trajectory_params = {}
+        self.trajectory_collector = TrajectoryCollector(**trajectory_params) if self._log_traj else None
 
         # Flags to indicate what to record
         self.record_membrane = record_membrane
@@ -254,13 +256,15 @@ class SNNSimulator:
                 # Optional: Record step data
                 if self._log_traj:
                     self.trajectory_collector.collect(
-                        t=t,
-                        state=info.get("current_state", None) if hasattr(self.env, "get_agent_state") else None,
-                        observation=state,
-                        action=action,
-                        reward=reward,
-                        done=episode_done,
-                        info=info)
+                        locs=locals()
+                        # t=t,
+                        # state=info.get("current_state", None) if hasattr(self.env, "get_agent_state") else None,
+                        # observation=state,
+                        # action=action,
+                        # reward=reward,
+                        # done=episode_done,
+                        # info=info
+                        )
                 
                 if update:
                     # Apply external learning rule
@@ -300,6 +304,7 @@ class SNNSimulator:
                             t=t,
                             episode=self.num_episode,
                             reward=reward, 
+                            eps_reward=self.trajectory_collector.get_summed_rewards() if self._log_traj else None,
                             episode_length=info.get('step_count', None),
                             starting_state=starting_state,
                             exploration=self.network.get_exploration_rate(simplify=True),
