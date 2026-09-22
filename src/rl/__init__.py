@@ -11,5 +11,6 @@ ENV_DICT: dict[str, BaseMaze] = {
     "donut-maze": maze.DonutMaze,
     "inverted-t": maze.InvertedTMaze,
     "random-maze": maze.RandomMaze,
-    "custom-maze": maze.CustomMaze
+    "custom-maze": maze.CustomMaze,
+    "water-maze": maze.MorrisWaterMaze,
 }

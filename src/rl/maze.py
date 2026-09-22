@@ -195,3 +195,49 @@ class CustomMaze(BaseMaze):
         self.maze = loaded_maze
         self.height, self.width = self.maze.shape
         self.area = self.height * self.width
+
+
+
+class MorrisWaterMaze(BaseMaze):
+    def __init__(self, size=None, width=None, height=None, pad=1, *, 
+                 barrier_xstart = 3, barrier_ystart = 3, barrier_width = 6, barrier_height = 7,
+                 max_steps=50, randomise_start = False, random_min_dist = 0, obs_type = "position", 
+                 include_agent_pos = False, reward_step_closer = False, terminate_on_crash = False, 
+                 penalty = -0.1, reward_inter = 0.1, reward_null = 0, reward_bad = -1, reward_good = 1, reward_trunc = -1, 
+                 **kwargs):
+        # self._inner_wall_size = int(size / 3)
+        self.barrier_xstart = barrier_xstart
+        self.barrier_ystart = barrier_ystart
+        self.barrier_width = barrier_width
+        self.barrier_height = barrier_height
+
+        super().__init__(size, width, height, pad, max_steps=max_steps, 
+                         randomise_start=randomise_start, random_min_dist=random_min_dist, obs_type=obs_type, 
+                         include_agent_pos=include_agent_pos, reward_step_closer=reward_step_closer, 
+                         terminate_on_crash=terminate_on_crash, penalty=penalty, reward_inter=reward_inter, 
+                         reward_null=reward_null, reward_bad=reward_bad, reward_good=reward_good, reward_trunc=reward_trunc, **kwargs)
+
+    def _create_maze(self):
+        # Fill with empty maze
+        self.maze = np.full((self.height, self.width), dtype=np.int8, fill_value=self.EMPTY)
+        # Top inner barrier
+        self.maze[self.barrier_xstart, self.barrier_ystart:(self.barrier_ystart+self.barrier_width)] = self.WALL
+        # Left inner barrier
+        self.maze[self.barrier_xstart:(self.barrier_xstart+self.barrier_height), self.barrier_ystart] = self.WALL
+        # Bottom inner barrier
+        self.maze[self.barrier_xstart+self.barrier_height-1, self.barrier_ystart:(self.barrier_ystart+self.barrier_width)] = self.WALL
+        # Goal position based on barrier corner
+        self.maze[self.barrier_xstart+(self.barrier_height//2), self.barrier_ystart+(self.barrier_width//2)] = self.GOOD
+        # Default starting position in top left
+        self.maze[1, 1] = self.AGENT
+
+    def _create_valid_spawn_idx(self):
+        # Upper right area from barrier topleft corner
+        _idx_dist_rec = []
+        for idx in self._empty_idx:
+            x, y = np.unravel_index(idx, self.maze.shape)
+            if (x < self.barrier_xstart + self.pad) & (y < self.barrier_ystart + self.pad):
+                _idx_dist_rec.append(np.array([x,y]))
+        return _idx_dist_rec
+
+    

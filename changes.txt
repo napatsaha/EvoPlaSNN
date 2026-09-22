@@ -113,6 +113,23 @@ Branch v1.4-rule-rework
 v1.4
 ----
 
+v1.4.5.0 (2026-09-22)
+- Added `MorrisWaterMaze` to `rl/maze.py`
+    - A rudimentary version of the water maze, which includes internal params: `barrier_xstart`, `barrier_ystart`, `barrier_width`, `barrier_height`
+    - No default yet for the barrier_* params
+    - Random agent position is only in the top-left corner
+    - Added to `__init__.py/ENV_DICT` as "water-maze"
+- Refactored a lot of internal maze preparations code during init in `env/BaseMaze`
+    - `_pad_maze()`
+    - `_assign_position_from_maze()` with helper function `_extract_position()` which can return None
+    - `_prepare_position()` is much leaner, with a lot of functionalities refactored out to init level
+    - `_create_valid_spawn_idx()` for choosing random spawn positions (now returns a list of positions instead of flat index, which was inefficient)
+    - `_choose_random_agent_pos()` -- a much more simplified randomiser, which can be used both during init and `_reset_position()`
+    - `_reset_position()` now check whether _good_pos and _bad_pos exist, before replacing
+    - Similar with `get_good_state()` and `get_bad_state()`
+    - Removed the internal attribute `._idx_dist_rec`
+    - When setting new `random_min_dist`, now calls `_create_valid_spawn_idx()`
+
 v1.4.4.0 (2026-09-18)
 - Added 'eps_reward' option to `RewardCollector.fitness_type`
     - RewardCollector min_fitness and max_fitness now based on _bound dict reference depending on fitness_type

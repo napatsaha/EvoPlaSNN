@@ -8,7 +8,7 @@ import gymnasium as gym
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import colors
-from typing import Literal, Tuple
+from typing import List, Literal, Tuple
 from functools import partial
 
 
@@ -137,7 +137,7 @@ class BaseMaze(gym.Env):
         self.width = size if width is None else width
         self.height = size if height is None else height
         self.area = self.width * self.height if self.width is not None and self.height is not None else None
-        self.pad = pad
+        self.pad = max(0, int(pad))
         self.max_steps = int(max_steps)
 
         self.randomise_start = randomise_start
@@ -174,6 +174,9 @@ class BaseMaze(gym.Env):
 
         # Create important attributes
         self._create_maze()
+        self._pad_maze()
+        # Update position and state values
+        self._assign_position_from_maze()
         self._prepare_positions()
         # self._create_reward_function()
         self._calculate_min_step()
@@ -207,56 +210,89 @@ class BaseMaze(gym.Env):
 
     def _create_maze(self):
         raise NotImplementedError("Subclasses must implement the `_create_maze()` method.")
-        # # Create empty array (filled with walls, as 1's)
-        # self.maze = np.full((self.height, self.width), dtype=np.int8, fill_value=self.WALL)
-        # # Add traversing paths (as 0's)
-        # mid_width = self.width // 2
-        # self.maze[:, mid_width] = self.EMPTY
-        # self.maze[0, :] = self.EMPTY
-        # # Set agent starting position
-        # self.maze[-1, mid_width] = self.AGENT
-        # # Set good position at right wing of T
-        # self.maze[0, -1] = self.GOOD
-        # # Set bad position at left wing of T
-        # self.maze[0, 0] = self.BAD
 
-    def _prepare_positions(self):
+    def _pad_maze(self):
+        """
+        Add walls to maze from `_create_maze()`.  
+        WARNING: Will change size of maze (including width and height attributes) according to padding. Any future indexing reference will beed to take
+        this into account.
+        """
         # Add walls
         self.maze = np.pad(self.maze, self.pad, mode='constant', constant_values= self.WALL)
         self.width += 2 * self.pad
         self.height += 2 * self.pad
-        # Update position and state values
+
+    def _assign_position_from_maze(self):
+        """
+        Extract important positions from padded maze
+        """
         self._num_state = np.count_nonzero(self.maze)
         self._empty_idx = np.flatnonzero(self.maze)
-        self._agent_pos = np.argwhere(self.maze == self.AGENT)[0]
-        self._good_pos = np.argwhere(self.maze == self.GOOD)[0]
-        self._bad_pos = np.argwhere(self.maze == self.BAD)[0]
+        self._agent_pos = self._extract_position(self.maze, self.AGENT)
+        self._good_pos = self._extract_position(self.maze, self.GOOD)
+        self._bad_pos = self._extract_position(self.maze, self.BAD)
+
+    def _extract_position(self, maze: np.ndarray, item: int):
+        idx = np.argwhere(maze == item)
+        if len(idx) == 0:
+            return None
+        elif len(idx) == 1:
+            return idx[0]
+        elif len(idx) > 1:
+            raise ValueError(f"More than one match. Got indices: {idx}")
+
+    def _prepare_positions(self):
+        """
+        Initialise valid agent positions, and create state-pos lookup dictionary from empty index
+        """
         if self.randomise_start:
-            # Pre-determine list of indices which is at least `random_min_dist` away from either good or bad rewards
-            self._idx_dist_rec = []
-            for idx in self._empty_idx:
-                idx2d = np.unravel_index(idx, self.maze.shape)
-                good_dist = man_dist(self._good_pos, idx2d)
-                bad_dist = man_dist(self._bad_pos, idx2d)
-                self._idx_dist_rec.append((int(idx), idx2d, int(good_dist), int(bad_dist)))
-            self._valid_idx = [idx for idx, _, gd, bd in self._idx_dist_rec if gd >= self._random_min_dist and bd >= self._random_min_dist]
+            self._valid_idx = self._create_valid_spawn_idx()
             # Randomly choose starting position from this list
             self.maze[*self._agent_pos] = self.EMPTY
-            rand_idx = np.random.choice(self._valid_idx)
-            self._agent_pos = np.unravel_index(rand_idx, self.maze.shape)
+            self._agent_pos = self._choose_random_agent_pos()
             self.maze[*self._agent_pos] = self.AGENT
         else:
             self._starting_pos = self._agent_pos.copy()
         self._state_pos_dict = {state: self._convert_state_to_pos(state) for state in range(self._num_state)}
 
+    def _choose_random_agent_pos(self) -> np.ndarray:
+        """
+        Return a random agent position from valid agent spawning position.
+        """
+        # rand_idx = np.random.choice(self._valid_idx)
+        # return np.unravel_index(rand_idx, self.maze.shape)
+        rand_idx = np.random.randint(len(self._valid_idx))
+        return self._valid_idx[rand_idx]
+
+    def _create_valid_spawn_idx(self) -> List[np.ndarray]:
+        """
+        Initialise valid agent spawning position. Child class can override how this behaves. Default is to base on minimum distance with either good or bad positions.
+        """
+        # Pre-determine list of indices which is at least `random_min_dist` away from either good or bad rewards
+        _idx_dist_rec = []
+        for idx in self._empty_idx:
+            idx2d = np.unravel_index(idx, self.maze.shape)
+            good_dist = man_dist(self._good_pos, idx2d)
+            bad_dist = man_dist(self._bad_pos, idx2d)
+            if good_dist >= self._random_min_dist and bad_dist >= self._random_min_dist:
+                _idx_dist_rec.append(np.array(idx2d))
+        return _idx_dist_rec
+
     ## Internal functions
     def _reset_position(self):
+        """
+        Reset all positions, and randomise agent position if necessary.
+        """
+        # Reset all non-wall positions to empty
         self.maze[np.unravel_index(self._empty_idx, self.maze.shape)] = self.EMPTY
-        self.maze[*self._good_pos] = self.GOOD
-        self.maze[*self._bad_pos] = self.BAD
+        # Reapply good/bad positions if applicable
+        if self._good_pos is not None:
+            self.maze[*self._good_pos] = self.GOOD
+        if self._bad_pos is not None:
+            self.maze[*self._bad_pos] = self.BAD
+        # Reassign agent_pos, whether random or not
         if self.randomise_start:
-            rand_idx = np.random.choice(self._valid_idx)
-            self._agent_pos = np.unravel_index(rand_idx, self.maze.shape)
+            self._agent_pos = self._choose_random_agent_pos()
         else:
             self._agent_pos = self._starting_pos.copy()
         self.maze[*self._agent_pos] = self.AGENT
@@ -401,10 +437,12 @@ class BaseMaze(gym.Env):
             return obs
     
     def get_good_state(self):
-        return self._convert_pos_to_state(self._good_pos)
+        if self._good_pos is not None:
+            return self._convert_pos_to_state(self._good_pos)
     
     def get_bad_state(self):
-        return self._convert_pos_to_state(self._bad_pos)
+        if self._bad_pos is not None:
+            return self._convert_pos_to_state(self._bad_pos)
     
     def get_agent_state(self):
         return self._convert_pos_to_state(self._agent_pos)
@@ -430,7 +468,8 @@ class BaseMaze(gym.Env):
     def random_min_dist(self, value: int):
         self._random_min_dist = max(0, int(value))
         # Updates list of valid indices a set distance from either goals
-        self._valid_idx = [idx for idx, _, gd, bd in self._idx_dist_rec if gd >= self._random_min_dist and bd >= self._random_min_dist]
+        self._valid_idx = self._create_valid_spawn_idx()
+        # self._valid_idx = [idx for idx, _, gd, bd in self._idx_dist_rec if gd >= self._random_min_dist and bd >= self._random_min_dist]
 
     # def _create_reward_function(self):
     #     if self.reward_function == "A":
