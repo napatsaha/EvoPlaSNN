@@ -39,7 +39,7 @@ class SynapseLayer(SynapseLayerProtocol):
                  e_max: float = None, e_min: float = None,
                  tau_syn: float = None, tau_pre: float = None, tau_post: float = None,
                  dt: float = 1e-3,
-                 synaptic_delay: int = 0,
+                 synaptic_delay: int = 0, inhibition_prop: float = None,
                  sim_method: Literal["event-driven", "step-wise"] = "step-wise",
                  weight_init: Literal["uniform", "normal", "constant"] = "uniform",
                  weight_clip_min: float = None, weight_clip_max: float = None,
@@ -74,6 +74,19 @@ class SynapseLayer(SynapseLayerProtocol):
         self._apply_delay = synaptic_delay > 0
         if self._apply_delay:
             self.current_buffer = Array_FIFO(shape=(self.post_layer.size, ), size=synaptic_delay + 1)
+
+        # Synapse inhibition
+        if inhibition_prop is not None:
+            self.inhibition_prop = np.clip(inhibition_prop, 0, 1)
+        else:
+            self.inhibition_prop = 0.0
+        # More efficient multiplier when no inhibition mask is needed
+        if self.inhibition_prop == 0:
+            self._inh_exc_mask = 1
+        else:
+            self._inh_exc_mask = np.ones((self.pre_layer.size, self.post_layer.size), dtype=np.int8)
+            idx = np.random.binomial(1, p=self.inhibition_prop, size=self._inh_exc_mask.shape).astype(bool)
+            self._inh_exc_mask[idx] = -1
 
         # Self-retained pre- and post-neuron traces
         self._use_pre_trace = pre_trace
@@ -239,7 +252,7 @@ class SynapseLayer(SynapseLayerProtocol):
         assert spike_input.ndim == 1
 
         # Compute the output current
-        output_current = np.dot(spike_input, self.weights)
+        output_current = np.dot(spike_input, self.weights * self._inh_exc_mask)
         if self._apply_delay:
             output_current = self.current_buffer.push(output_current)
         return output_current
