@@ -113,6 +113,15 @@ Branch v1.4-rule-rework
 v1.4
 ----
 
+v1.4.5.1 (2026-09-23)
+- Random spawn via area, and ability to control spawn method:
+    - Added `random_spawn_method` arg to `BaseMaze.__init__` which can be ("dist", "area", "default"):
+    - Support specifying `spawn_area`, which is a list of (x0,y0), (x1,y1) boundaries (inclusive) for each rectangular area
+    - Added `_create_valid_spawn_idx_from_spawn_area` for creating spawn positions from the spawn area boundary indices
+    - Added `_create_valid_spawn_idx_from_empty_idx` as default for choosing all positions based on `_empty_idx`
+    - Differentiate internal methods for creating spawn idx from spawn area, minimum distance, and default
+- Removed `_create_valid_spawn_idx` override method in `MorrisWaterMaze` and from `BaseMaze` altogether
+
 v1.4.5.0 (2026-09-22)
 - Added `MorrisWaterMaze` to `rl/maze.py`
     - A rudimentary version of the water maze, which includes internal params: `barrier_xstart`, `barrier_ystart`, `barrier_width`, `barrier_height`

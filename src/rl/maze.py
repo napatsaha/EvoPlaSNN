@@ -231,13 +231,13 @@ class MorrisWaterMaze(BaseMaze):
         # Default starting position in top left
         self.maze[1, 1] = self.AGENT
 
-    def _create_valid_spawn_idx(self):
-        # Upper right area from barrier topleft corner
-        _idx_dist_rec = []
-        for idx in self._empty_idx:
-            x, y = np.unravel_index(idx, self.maze.shape)
-            if (x < self.barrier_xstart + self.pad) & (y < self.barrier_ystart + self.pad):
-                _idx_dist_rec.append(np.array([x,y]))
-        return _idx_dist_rec
+    # def _create_valid_spawn_idx(self):
+    #     # Upper right area from barrier topleft corner
+    #     _idx_dist_rec = []
+    #     for idx in self._empty_idx:
+    #         x, y = np.unravel_index(idx, self.maze.shape)
+    #         if (x < self.barrier_xstart + self.pad) & (y < self.barrier_ystart + self.pad):
+    #             _idx_dist_rec.append(np.array([x,y]))
+    #     return _idx_dist_rec
 
     

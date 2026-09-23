@@ -77,7 +77,10 @@ class BaseMaze(gym.Env):
     }
 
     def __init__(self, size=None, width=None, height=None, pad=1, *, 
-                 max_steps=50, randomise_start: bool = False, random_min_dist: int = 0,
+                 max_steps=50, 
+                 randomise_start: bool = False, random_spawn_method: Literal["dist", "area"] = "dist",
+                 random_min_dist: int = 0,
+                 spawn_area: List[Tuple[Tuple[int, int], Tuple[int, int]]] = None,
                  obs_type: Literal["state", "position", "surroundings"] = "state",
                  include_agent_pos: bool = False,
                  reward_step_closer: bool = False,
@@ -102,9 +105,18 @@ class BaseMaze(gym.Env):
 
             randomise_start (bool, optional): Whether or not to allow agent to spawn at random position at beginning of each episode. Defaults to False.
 
-            random_min_dist (int, optional): If `randomise_start=True`, this variable controls which cells are allowed for random agent spawn position. If
+            random_spawn_method (str): Controls how the agent should be randomly spawned at the beginning of each episode. Only valid if `randomise_start=True`.
+                If the method is not supported, will fall back towards a `default` method, which can spawn the agent anywhere with an empty cell.
+
+            random_min_dist (int, optional): If `randomise_start=True` and `random_spawn_method='dist'`, this variable controls which cells are allowed for random agent spawn position. If
                 the Euclidean distance between a cell and either of the good or bad reward is greater than or equal to `random_min_dist`, then that cell is included.
                 Defaults to 0.
+
+            spawn_area (list): A list of coordinate pairs for where a random agent should be spawned, if `randomise_start=True` and `random_spawn_method='area'`. 
+                Each pair of coordinates must be specified in the form `((x0,y0), (x1,y1))` where `(x0,y0)` are the upper left point (inclusive) and `(x1,y1)` are the lower right point (inclusive)
+                of each rectangular spawning area. Can specify as many pairs of coordinates as necessary. 
+                If `x0==x1` and `y0==y1`, this will be a single point.
+                The coordinates start from 0, are inclusive, and refer to maze coordinate before padding.
 
             obs_type (str, optional): Determines what type of observation to be returned:
                 - `state` returns a single integer scalar denoting the cell index of the maze the agent is in.
@@ -140,8 +152,16 @@ class BaseMaze(gym.Env):
         self.pad = max(0, int(pad))
         self.max_steps = int(max_steps)
 
+        # Randomising starting position
         self.randomise_start = randomise_start
+        if random_spawn_method not in ("dist", "area"):
+            random_spawn_method = "default"
+        self.random_spawn_method: Literal["dist", "area", "default"] = random_spawn_method
         self._random_min_dist = max(0, int(random_min_dist))
+        self.spawn_area = spawn_area
+        if self.spawn_area is not None:
+            # Adjust spawn_area indices based on padding
+            self.spawn_area = [(np.array(xx) + self.pad, np.array(yy) + self.pad) for xx, yy in self.spawn_area]
 
         # Reward parameters
         # Final episode reward
@@ -246,13 +266,24 @@ class BaseMaze(gym.Env):
         Initialise valid agent positions, and create state-pos lookup dictionary from empty index
         """
         if self.randomise_start:
-            self._valid_idx = self._create_valid_spawn_idx()
+            if self.random_spawn_method == "area":
+                assert self.spawn_area is not None, "'spawn_area' must be specified if random spawn method is 'area'"
+                self._valid_idx = self._create_valid_spawn_idx_from_spawn_area()
+            elif self.random_spawn_method == "dist":
+                self._valid_idx = self._create_valid_spawn_idx_from_dist()
+            elif self.random_spawn_method == "default":
+                self._valid_idx = self._create_valid_spawn_idx_from_empty_idx()
+            else:
+                raise ValueError(f"Unsupported random spawn method: {self.random_spawn_method}")
             # Randomly choose starting position from this list
             self.maze[*self._agent_pos] = self.EMPTY
             self._agent_pos = self._choose_random_agent_pos()
             self.maze[*self._agent_pos] = self.AGENT
         else:
-            self._starting_pos = self._agent_pos.copy()
+            if self._agent_pos is not None:
+                self._starting_pos = self._agent_pos.copy()
+            else:
+                self._starting_pos = np.array([0,0])
         self._state_pos_dict = {state: self._convert_state_to_pos(state) for state in range(self._num_state)}
 
     def _choose_random_agent_pos(self) -> np.ndarray:
@@ -264,7 +295,7 @@ class BaseMaze(gym.Env):
         rand_idx = np.random.randint(len(self._valid_idx))
         return self._valid_idx[rand_idx]
 
-    def _create_valid_spawn_idx(self) -> List[np.ndarray]:
+    def _create_valid_spawn_idx_from_dist(self) -> List[np.ndarray]:
         """
         Initialise valid agent spawning position. Child class can override how this behaves. Default is to base on minimum distance with either good or bad positions.
         """
@@ -277,6 +308,22 @@ class BaseMaze(gym.Env):
             if good_dist >= self._random_min_dist and bad_dist >= self._random_min_dist:
                 _idx_dist_rec.append(np.array(idx2d))
         return _idx_dist_rec
+
+    def _create_valid_spawn_idx_from_spawn_area(self) -> List[np.ndarray]:
+        _idx_rec = []
+        for idx in self._empty_idx:
+            x, y = np.unravel_index(idx, self.maze.shape)
+            for (x0, y0), (x1, y1) in self.spawn_area:
+                if (x0 <= x <= x1) & (y0 <= y <= y1):
+                    _idx_rec.append((x,y))
+        return _idx_rec
+
+    def _create_valid_spawn_idx_from_empty_idx(self) -> List[np.ndarray]:
+        _idx_rec = []
+        for idx in self._empty_idx:
+            x, y = np.unravel_index(idx, self.maze.shape)
+            _idx_rec.append((x,y))
+        return _idx_rec
 
     ## Internal functions
     def _reset_position(self):
