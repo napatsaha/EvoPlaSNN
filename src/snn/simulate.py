@@ -35,6 +35,7 @@ class SNNSimulator:
                 #  decoder_type: Literal["final", "rate", "latency"] = "final", decoder_params: dict = {},
                 #  fitnessor_type: Literal["accuracy", "reward", "cross-entropy", "mse"] = "accuracy", fitnessor_params: dict = {},
                 #  num_steps: int = None, num_episodes: int = None,
+                epsilon_greedy: bool = False, epsilon: float = None,
                  supervised: bool = True, decay: bool = False,
                  decay_method: Literal["time", "constant"] = "time",
                  decay_rate: float = None, decay_cutoff: Optional[int] = None, 
@@ -114,6 +115,13 @@ class SNNSimulator:
         self.decay_init_value = self.network.get_exploration_rate(simplify=True)
         # if self._decay and self.reward_collector is not None:
         #     self.reward_collector.cutoff_timestep = decay_cutoff ### *** PROBLEMATIC
+
+        # Epsilon-greedy exploration
+        self.epsilon_greedy = bool(epsilon_greedy)
+        if self.epsilon_greedy:
+            if epsilon is None:
+                epsilon = 0.0
+            self.epsilon = np.clip(float(epsilon), 0, 1)
 
         # # Initialize post-processing components
         # params = copy.deepcopy(params)
@@ -250,6 +258,9 @@ class SNNSimulator:
 
             # Increment environment step if the spike coder says so
             if self.spike_coder.ready and action is not None:
+                if self.epsilon_greedy:
+                    if np.random.rand() < self.epsilon:
+                        action = self.env.action_space.sample()
                 next_state, reward, terminated, truncated, info = self.env.step(action)
                 episode_done = terminated or truncated
 

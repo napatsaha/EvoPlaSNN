@@ -113,6 +113,11 @@ Branch v1.4-rule-rework
 v1.4
 ----
 
+v1.4.7.0 (2026-09-24)
+- Added a simple epsilon-greedy exploration in simulation-level:
+    - init param: `epsilon_greedy: bool`, `epsilon: float`
+- Note this is not supported by decaying exploration yet
+
 v1.4.6.0 (2026-09-23)
 - Synapse inhibition
     - Added `inhibition_prop` init param as a float between (0,1)
