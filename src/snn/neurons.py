@@ -60,7 +60,9 @@ class NeuronLayer(NeuronLayerProtocol):
                  tie_handling_wta: Literal["random", "all", "first"] = "random",
                  decayable: bool = None,
                  spike_method: Literal["deterministic", "stochastic"] = "deterministic", 
+                 stochastic_type: Literal["softmax", "epsilon"] = "softmax",
                  softmax_temp: float = 1.0, minimum_softmax_temp: float = 1e-3,
+                 epsilon: float = 0.1,
                  spike_condition: Literal["every", "input"] = None,
                  ignore_threshold: bool = None,
                  reset_mechanism: Literal["rest", "zero", "subtract"] = "rest", mem_rest: float = 0.0, 
@@ -100,10 +102,18 @@ class NeuronLayer(NeuronLayerProtocol):
                 - If "deterministic": neuron with highest membrane potential will spike
                 - If "stochastic": probability of spiking based on softmax of membrane potential (controlled by `softmax_temp`)
 
-            softmax_temp (float, optional): Temperature variable for softmax calculation. (Higher means more stochasticity, Lower means more deterministic).
+            stochastic_type (Literal["softmax", "epsilon"]): If `spike_method='stochastic'`, this will determine whether to use: 
+                - softmax stochasticity: probability of spiking is based on membrane potential (controlled by `softmax_temp`)
+                - epsilon-greedy stochasticity: where there is a fixed chance (controlled by `epsilon`) of spiking randomly, regardless of membrane potential.
+
+            softmax_temp (float, optional): Temperature variable for softmax calculation. Applicable when `spike_method="softmax"` and `stochastic_type="softmax"`. 
+            (Higher means more stochasticity, Lower means more deterministic).
                 Only relevant if `spike_method="stochastic"`. Defaults to 1.0.
 
             minimum_softmax_temp (float, optional): _description_. Defaults to 1e-3.
+
+            epsilon (float): Probability of spiking randomly, when `spike_method="softmax"` and `stochastic_type="epsilon"`. 
+                Needs to be between 0 and 1. Defaults to `0.1`.
 
             spike_condition (Literal["every", "input"]): DEPRECATED. When is spiking being considered. If `input`, only when there is an input current; Otherwise "every". 
                 Future versions will only use `spike_condition="every"` to avoid confusion. Defaults to "every".
@@ -168,10 +178,13 @@ class NeuronLayer(NeuronLayerProtocol):
         # Spiking method: Stochasticity
         self._spike_method = spike_method
         self._stochastic_spike = spike_method == "stochastic"
+        assert stochastic_type in ("softmax", "epsilon"), "Unsupported stochastic type. " + f"Got {stochastic_type}"
+        self._stochastic_type = stochastic_type
         self._decayable = self._stochastic_spike if decayable is None else bool(decayable) # Determines if spike_method and softmax_temp can be set externally
-        self._initial_softmax_temp = softmax_temp
-        self._softmax_temp = softmax_temp
+        # self._initial_softmax_temp = softmax_temp
+        self._softmax_temp = softmax_temp if self._stochastic_spike and self._stochastic_type == "softmax" else None
         self._minimum_softmax_temp = minimum_softmax_temp
+        self._epsilon = np.clip(epsilon, 0, 1) if self._stochastic_spike and self._stochastic_type == "epsilon" else None
         # Winner-Take-All handling
         self.wta = wta if not self._stochastic_spike else True # Assume winner take all when spiking is stochastic
         self._tie_handling = tie_handling_wta
@@ -179,8 +192,8 @@ class NeuronLayer(NeuronLayerProtocol):
         if spike_condition is not None:
             warnings.warn("'spike_condition' has now been deprecated. Neurons will spike based on its membrane, i.e. `spike_condition=every`", category=FutureWarning)
         self.spike_condition = spike_condition if spike_condition is not None else "every"
-        self._spike_cond_every = spike_condition == "every"
-        self._spike_cond_input = spike_condition == "input"
+        self._spike_cond_every = self.spike_condition == "every"
+        self._spike_cond_input = self.spike_condition == "input"
 
         if ignore_threshold is not None:
             warnings.warn("'ignore_threshold' has been deprecated. Threshold will no longer be ignored, i.e. `_ignore_threshold = False`", category=FutureWarning)
@@ -291,48 +304,68 @@ class NeuronLayer(NeuronLayerProtocol):
         """
         # Always reset previous timestep's spikes regardless of what happens next
         self.spike.fill(0)
-        # If there is no input, do not spike (only if spike_condition = "input") regardless of membrane potential
+        # # If there is no input, do not spike (only if spike_condition = "input") regardless of membrane potential
         # if self._spike_cond_input:
         #     if input_current is not None and sum(input_current) == 0:
         #         return
+        #     else:
+        #         above_thr = self.membrane >= self.threshold
+        # # Otherwise, spike_condition = "every" and spiking will be considered every timestep
+        # elif self._spike_cond_every:   
+        #     above_thr = self.membrane >= self.threshold
+        #     if sum(above_thr) == 0:
+        #         return
 
-        # If Winner-Take-All, only one neuron can spike
-        if self.wta:
-            # Deterministic spiking
-            if not self._stochastic_spike:
-                    above_thr = self.membrane >= self.threshold
-                    if sum(above_thr) == 0:
-                        return
-                    elif sum(above_thr) == 1:
-                        idx = np.where(above_thr)[0]
-                    elif sum(above_thr) > 0:
-                        where_max = self.membrane == max(self.membrane)
-                        if sum(where_max) > 1:
-                            # If ties, 
-                            if self.tie_handling_wta == "all":
-                                idx = np.where(where_max)[0]
-                            elif self.tie_handling_wta == "first":
-                                idx = np.argmax(where_max)
-                            elif self.tie_handling_wta == "random":
-                                idx = np.random.choice(np.where(where_max)[0])
-                        else:
-                            # Otherwise, spike based on highest membrane regardless of being below threshold or not
-                            idx = np.argmax(self.membrane)
-                    self.spike[idx] = 1
-
-            # Stochastic spiking
-            # Assumes WTA by default -> only one choice of neuron can spike stochastically
+        above_thr = self.membrane >= self.threshold
+        # Deterministic spiking
+        if not self._stochastic_spike:        
+            # If Winner-Take-All, only one neuron can spike
+            if self.wta:
+                self._set_spike_wta(above_thr)
             else:
-                above_thr = self.membrane >= self.threshold
+                # If not WTA, neuron with membrane above threshold will spike
+                self.spike = (above_thr).astype(np.int8)
+        # Stochastic spiking
+        # Assumes WTA by default -> only one choice of neuron can spike stochastically
+        else:
+            # above_thr = self.membrane >= self.threshold
+            if self._stochastic_type == "softmax":
                 if sum(above_thr) == 0:
                     return
                 # spike with probability based on membrane potentials (softmax with temperature)
                 probs = softmax(self.membrane, temperature=self._softmax_temp)
                 idx = np.random.choice(self.size, p=probs)
                 self.spike[idx] = 1
-        else:
-            # In any other case, neuron with membrane above threshold will spike
-            self.spike = (self.membrane >= self.threshold).astype(np.int8)
+            elif self._stochastic_type == "epsilon":
+                # epsilon-greedy stochastic spiking
+                if np.random.rand() < self._epsilon:
+                    # If explore, spike randomly regardless of threshold
+                    idx = np.random.randint(self.size)
+                    self.spike[idx] = 1
+                else:
+                    # Otherwise, only spike when at least one above threshold
+                    self._set_spike_wta(above_thr)
+
+    def _set_spike_wta(self, above_thr):
+        # above_thr = self.membrane >= self.threshold
+        if sum(above_thr) == 0:
+            return
+        elif sum(above_thr) == 1:
+            idx = np.where(above_thr)[0]
+        elif sum(above_thr) > 0:
+            where_max = self.membrane == max(self.membrane)
+            if sum(where_max) > 1:
+                # If ties, 
+                if self.tie_handling_wta == "all":
+                    idx = np.where(where_max)[0]
+                elif self.tie_handling_wta == "first":
+                    idx = np.argmax(where_max)
+                elif self.tie_handling_wta == "random":
+                    idx = np.random.choice(np.where(where_max)[0])
+            else:
+                # Otherwise, spike based on highest membrane regardless of being below threshold or not
+                idx = np.argmax(self.membrane)
+        self.spike[idx] = 1
                 
     def _update_trace(self):
         """
@@ -466,23 +499,31 @@ class NeuronLayer(NeuronLayerProtocol):
         self._stochastic_spike = self._spike_method == "stochastic"
 
     @property
-    def softmax_temp(self) -> float:
+    def exploration_rate(self) -> float:
         if self._stochastic_spike:
-            return self._softmax_temp
+            if self._stochastic_type == "softmax":
+                return self._softmax_temp
+            elif self._stochastic_type == "epsilon":
+                return self._epsilon
+            else:
+                return None
         else:
             return 0.0
     
-    @softmax_temp.setter
-    def softmax_temp(self, value: float):
+    @exploration_rate.setter
+    def exploration_rate(self, value: float):
         # Do not set if this layer is not stochastic in the first place
         if not self._decayable:
             return
-        # Prevents a temperature too low from being set
-        # Also considers deterministic spiking if temperature is too low
-        if np.abs(value) < self._minimum_softmax_temp:
-            value = 0.0
-            self.spike_method = "deterministic"
-        self._softmax_temp = value
+        if self._stochastic_type == "softmax":
+            # Prevents a temperature too low from being set
+            # Also considers deterministic spiking if temperature is too low
+            if np.abs(value) < self._minimum_softmax_temp:
+                value = 0.0
+                self.spike_method = "deterministic"
+            self._softmax_temp = value
+        elif self._stochastic_type == "epsilon":
+            self._epsilon = np.clip(value, 0, 1)
 
     def __repr__(self):
         return f"NeuronLayer(size={self.size}, tau_mem={self.tau_mem}, tau_trace={self.tau_trace}, threshold={self.threshold}, wta={self.wta})"

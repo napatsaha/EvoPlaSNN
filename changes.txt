@@ -113,6 +113,17 @@ Branch v1.4-rule-rework
 v1.4
 ----
 
+v1.4.7.1 (2026-09-25)
+- Add epsilon-greedy stochastic spiking to NeuronLayer
+- Changes to NeuronLayer:
+    - Add `stochastic_type` param
+    - Added `epsilon` param (between [0,1])
+    - Instead of softmax property, it is now referred to as `exploration_rate`. Setter will change either `_softmax_temp` or `_epsilon`
+        depending on `stochastic_type`
+    - Changed order of spiking if-else statements in `_set_spike()`: deterministic -> wta -> stochastic_type (if stochastic)
+    - Refactored setting spikes for WTA behaviour, so it can be used in more than one place 
+- SNN.set_exploration_rate / get_exploration_rate change ref to NeuronLayer accordingly
+
 v1.4.7.0 (2026-09-24)
 - Added a simple epsilon-greedy exploration in simulation-level:
     - init param: `epsilon_greedy: bool`, `epsilon: float`
