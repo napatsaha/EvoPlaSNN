@@ -112,16 +112,25 @@ class SNNSimulator:
         self.decay_rate = decay_rate
         self.decay_cutoff = decay_cutoff
         self._explore = self._should_explore(0)
-        self.decay_init_value = self.network.get_exploration_rate(simplify=True)
+        self._exploration_source = None
+
+        # Check if Network explore via stochastic spiking
+        neuron_expl = self.network.get_exploration_rate()
+        if (neuron_expl is not None) or (neuron_expl > 0.0):
+            self._exploration_source = "network"
+            self.decay_init_value = neuron_expl
         # if self._decay and self.reward_collector is not None:
         #     self.reward_collector.cutoff_timestep = decay_cutoff ### *** PROBLEMATIC
 
-        # Epsilon-greedy exploration
+        # Check if Env needs Epsilon-greedy exploration
         self.epsilon_greedy = bool(epsilon_greedy)
+        self.epsilon = None
         if self.epsilon_greedy:
+            self._exploration_source = "env"
             if epsilon is None:
                 epsilon = 0.0
             self.epsilon = np.clip(float(epsilon), 0, 1)
+            self.decay_init_value = self.epsilon
 
         # # Initialize post-processing components
         # params = copy.deepcopy(params)
@@ -171,8 +180,11 @@ class SNNSimulator:
         self.num_episode = 0
         if self._use_decay:
             self._decay = True
-            self.network.set_stochastic()
-            self.network.set_exploration_rate(self.decay_init_value)
+            if self._exploration_source == "network":
+                self.network.set_stochastic()
+                self.network.set_exploration_rate(self.decay_init_value)
+            elif self._exploration_source == "env":
+                self.epsilon = self.decay_init_value
 
         # Reset recorders
         self._reset_recorders()
@@ -258,7 +270,7 @@ class SNNSimulator:
 
             # Increment environment step if the spike coder says so
             if self.spike_coder.ready and action is not None:
-                if self.epsilon_greedy:
+                if self._explore and self._exploration_source == "env":
                     if np.random.rand() < self.epsilon:
                         action = self.env.action_space.sample()
                 next_state, reward, terminated, truncated, info = self.env.step(action)
@@ -318,7 +330,7 @@ class SNNSimulator:
                             eps_reward=self.trajectory_collector.get_summed_rewards() if self._log_traj else None,
                             episode_length=info.get('step_count', None),
                             starting_state=starting_state,
-                            exploration=self.network.get_exploration_rate(simplify=True),
+                            exploration=self._get_exploration_rate(),
                             terminated=terminated,
                             truncated=truncated,
                             trajectory=copy.deepcopy(self.trajectory_collector.records) if self._log_traj else None,
@@ -571,6 +583,12 @@ class SNNSimulator:
             return False  # Cease exploration immediately
         return t < self.decay_cutoff  # Explore until cutoff
 
+    def _get_exploration_rate(self) -> float:
+        if self._exploration_source == "network":
+            return self.network.get_exploration_rate()
+        elif self._exploration_source == "env":
+            return self.epsilon
+
     def _update_exploration_rate(self, t: int, episode_count: int):
         """
         Update the exploration rate based on the decay method and cutoff.
@@ -584,13 +602,19 @@ class SNNSimulator:
                 new_rate = self.decay_init_value * np.exp(-t * self.decay_rate / (self.decay_cutoff or self.num_steps))
             elif self.decay_method == "constant":
                 # Decay by multiplying with a constant
-                new_rate = self.network.get_exploration_rate(simplify=True) * self.decay_rate
+                new_rate = self._get_exploration_rate() * self.decay_rate
             else:
                 new_rate = None
-            self.network.set_exploration_rate(new_rate)
+            
+            # Apply changes
+            if self._exploration_source == "network":
+                self.network.set_exploration_rate(new_rate)
+            elif self._exploration_source == "env":
+                self.epsilon = new_rate
         else:
             # Cease exploration and make deterministic
-            self.network.set_deterministic()
+            if self._exploration_source == "network":
+                self.network.set_deterministic()
             self._decay = False
             self._explore = False
 

@@ -113,6 +113,16 @@ Branch v1.4-rule-rework
 v1.4
 ----
 
+v1.4.7.2 (2026-09-25)
+- Simulator now handles exploration decay similarly whether it's from env or network:
+    - Added `_exploration_source` which gets set to `network` if the network has a stochastic final layer, 
+        or `env` if `simulator.epsilon_greedy` is enabled
+    - Changed any reference to `network.set_deterministic` or `network.set_stochastic` to handle based on _exploration_source accordingly
+    - `_update_exploration_rate()` handles rate update similarly whichever the source
+    - epsilon-greedy on simulator call before env.step, now checks for whether the source is `env` and whether `_explore` is enabled
+    - System is still confusing and unintuitive. May cause further problems down the line. Need streamlining the logic as soon as feasible
+- Changed SNN.set/get_exploration_rate() to only apply to final neuron layer. Removed `simplify` arg, since output is always scalar
+
 v1.4.7.1 (2026-09-25)
 - Add epsilon-greedy stochastic spiking to NeuronLayer
 - Changes to NeuronLayer:
