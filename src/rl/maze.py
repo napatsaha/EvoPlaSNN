@@ -200,16 +200,22 @@ class CustomMaze(BaseMaze):
 
 class MorrisWaterMaze(BaseMaze):
     def __init__(self, size=None, width=None, height=None, pad=1, *, 
-                 barrier_xstart = 3, barrier_ystart = 3, barrier_width = 6, barrier_height = 7,
+                 barrier_xstart = None, barrier_ystart = None, barrier_width = None, barrier_height = None,
+                 maze_reward_pos: tuple = None, maze_barrier_pos: tuple = None, 
+                 maze_barrier_width: int = None, maze_barrier_height: int = None,
                  max_steps=50, randomise_start = False, random_min_dist = 0, obs_type = "position", 
                  include_agent_pos = False, reward_step_closer = False, terminate_on_crash = False, 
                  penalty = -0.1, reward_inter = 0.1, reward_null = 0, reward_bad = -1, reward_good = 1, reward_trunc = -1, 
                  **kwargs):
         # self._inner_wall_size = int(size / 3)
-        self.barrier_xstart = barrier_xstart
-        self.barrier_ystart = barrier_ystart
-        self.barrier_width = barrier_width
-        self.barrier_height = barrier_height
+        self.maze_barrier_x = barrier_xstart if barrier_xstart is not None else maze_barrier_pos[0] if maze_barrier_pos is not None else 1
+        self.maze_barrier_y = barrier_ystart if barrier_ystart is not None else maze_barrier_pos[1] if maze_barrier_pos is not None else 1
+        self.maze_barrier_width = barrier_width if barrier_width is not None else maze_barrier_width if maze_barrier_width is not None else 0
+        self.maze_barrier_height = barrier_height if barrier_height is not None else maze_barrier_height if maze_barrier_height is not None else 0
+        self.maze_reward_pos = maze_reward_pos if maze_reward_pos is not None else (
+            self.maze_barrier_x+(self.maze_barrier_height//2), 
+            self.maze_barrier_y+(self.maze_barrier_width//2)
+        )
 
         super().__init__(size, width, height, pad, max_steps=max_steps, 
                          randomise_start=randomise_start, random_min_dist=random_min_dist, obs_type=obs_type, 
@@ -221,15 +227,20 @@ class MorrisWaterMaze(BaseMaze):
         # Fill with empty maze
         self.maze = np.full((self.height, self.width), dtype=np.int8, fill_value=self.EMPTY)
         # Top inner barrier
-        self.maze[self.barrier_xstart, self.barrier_ystart:(self.barrier_ystart+self.barrier_width)] = self.WALL
+        if self.maze_barrier_width > 0:
+            self.maze[self.maze_barrier_x, self.maze_barrier_y:(self.maze_barrier_y+self.maze_barrier_width)] = self.WALL
         # Left inner barrier
-        self.maze[self.barrier_xstart:(self.barrier_xstart+self.barrier_height), self.barrier_ystart] = self.WALL
+        if self.maze_barrier_height > 0:
+            self.maze[self.maze_barrier_x:(self.maze_barrier_x+self.maze_barrier_height), self.maze_barrier_y] = self.WALL
         # Bottom inner barrier
-        self.maze[self.barrier_xstart+self.barrier_height-1, self.barrier_ystart:(self.barrier_ystart+self.barrier_width)] = self.WALL
+        if self.maze_barrier_width > 0:
+            self.maze[self.maze_barrier_x+self.maze_barrier_height-1, self.maze_barrier_y:(self.maze_barrier_y+self.maze_barrier_width)] = self.WALL
         # Goal position based on barrier corner
-        self.maze[self.barrier_xstart+(self.barrier_height//2), self.barrier_ystart+(self.barrier_width//2)] = self.GOOD
+        if self.maze_reward_pos is not None:
+            goal_x, goal_y = self.maze_reward_pos
+            self.maze[goal_x, goal_y] = self.GOOD
         # Default starting position in top left
-        self.maze[1, 1] = self.AGENT
+        self.maze[0, 0] = self.AGENT
 
     # def _create_valid_spawn_idx(self):
     #     # Upper right area from barrier topleft corner
@@ -240,4 +251,6 @@ class MorrisWaterMaze(BaseMaze):
     #             _idx_dist_rec.append(np.array([x,y]))
     #     return _idx_dist_rec
 
-    
+    @property
+    def maze_barrier_pos(self):
+        return self.maze_barrier_x, self.maze_barrier_y

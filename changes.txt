@@ -113,6 +113,15 @@ Branch v1.4-rule-rework
 v1.4
 ----
 
+v1.4.8.0 (2026-09-28)
+- More customisability to `MorrisWaterMaze`:
+    - Added option to control where goal is via `maze_reward_pos`
+    - `barrier_width` and `barrier_height` can now be 0 to remove associated barriers
+    - Changed naming convention: 
+        - (`barrier_xstart`, `barrier_ystart`) -> `maze_barrier_pos`
+        - `barrier_width` -> `maze_barrier_width`
+        - `barrier_height` -> `maze_barrier_height`
+
 v1.4.7.2 (2026-09-25)
 - Simulator now handles exploration decay similarly whether it's from env or network:
     - Added `_exploration_source` which gets set to `network` if the network has a stochastic final layer, 
