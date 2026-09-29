@@ -113,6 +113,13 @@ Branch v1.4-rule-rework
 v1.4
 ----
 
+v1.4.8.1 (2026-09-29)
+- Improve `snn.plot.plot_weight_over_time()`:
+    - Faster plotting times (because of shared axes)
+    - More readable axis and subplot labels
+    - Added arguments `t_min`, `t_max`, `x_scale`, `y_scale`
+    - Close fig
+
 v1.4.8.0 (2026-09-28)
 - More customisability to `MorrisWaterMaze`:
     - Added option to control where goal is via `maze_reward_pos`

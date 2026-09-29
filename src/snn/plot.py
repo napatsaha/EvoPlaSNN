@@ -487,15 +487,16 @@ def plot_weights(simulator: "SNNSimulator" = None, values: List[np.ndarray] = No
 def plot_weight_over_time(simulator: 'SNNSimulator' = None, values: List[np.ndarray] = None, *, 
                           pre_id: int | List[int] = None, post_id: int | List[int] = None,
                           figsize=None, dpi: int = 100,
-                          title: str = None, x_min=None, x_max=None,
+                          title: str = None, x_min=None, x_max=None, t_max=None, t_min=None,
+                          x_scale: float = 5, y_scale: float = 3,
                           synapse_layer: int = 0, 
                           savepath=None, show=True, line_kw={}):
     if simulator is not None:
         assert simulator.record_weights, "Weight recording is not enabled."
     values = simulator.weight_recorder.values if simulator is not None else values
     T = simulator.num_steps if simulator is not None else max([val.shape[2] for val in values])
-    x_max = T if x_max is None else x_max
-    x_min = 0 if x_min is None else x_min
+    t_max = t_max if t_max is not None else x_max if x_max is not None else T
+    t_min = t_min if t_min is not None else x_min if x_min is not None else 0
     L = synapse_layer if synapse_layer < len(values) else 0
     dt = f"{simulator.dt} s" if simulator is not None else "1 unit"
 
@@ -517,25 +518,79 @@ def plot_weight_over_time(simulator: 'SNNSimulator' = None, values: List[np.ndar
     wmax = max(np.max(w_mat), 1)
     wmin = min(np.min(w_mat), 0)
 
-    figsize=(5*ncol, 3*nrow) if figsize is None else figsize
+    figsize=(x_scale*ncol, y_scale*nrow) if figsize is None else figsize
     fig, axs = plt.subplots(nrow, ncol, figsize=figsize, dpi=dpi,
                             sharex=True, sharey=True, gridspec_kw={"hspace": 0, "wspace": 0},
                             squeeze=False)
+    x_locator = ticker.MaxNLocator(nbins=5, integer=True, prune="upper")
+    y_locator = ticker.MaxNLocator(nbins=4, prune=None)
+    # Since both x and y axes are shared across subplots, only perform limit operations once
+    axs[0,0].set_ylim(wmin, wmax)
+    x = np.arange(t_min, t_max)
     for i, pre in enumerate(pre_id):
         for j, post in enumerate(post_id):
-            ax = axs[i, j]
-            ax.plot(w_mat[i, j, :], **line_kw)
-            ax.set_ylim(wmin, wmax)
-            ax.set_xlim(x_min, x_max)
+            ax: Axes = axs[i, j]
+
+            # Line plot
+            y = w_mat[i, j, t_min:t_max]
+            ax.plot(x, y, **line_kw)
+
+            # Label visibility
+            show_y = (j == 0) & (i % (nrow-1) == 0)
+            show_x = (i == nrow - 1) & (j % (ncol-1) == 0)
+
+            # Y ticks and labels 
+            if not show_y:
+                ax.yaxis.set_tick_params(
+                    left=False,
+                    labelleft=False,
+                )
+            else:
+                ax.yaxis.set_major_locator(y_locator)
+                ax.tick_params(axis="y", labelsize=9, pad=3)
+
+            # X ticks and labels 
+            if not show_x:
+                ax.xaxis.set_tick_params(
+                    bottom=False,
+                    labelbottom=False,
+                )
+            else:
+                ax.xaxis.set_major_locator(x_locator)
+                ax.tick_params(axis="x", labelsize=9, pad=4)
+                plt.setp(
+                    ax.get_xticklabels(),
+                    rotation=45,
+                    ha="right",
+                    rotation_mode="anchor",
+                )
+
+            # Neuron ID display
             if i == 0:
-                ax.text(0.5, 1.05, f"Post Neuron {post}", transform=ax.transAxes, fontsize=16, ha="center")
+                ax.text(0.5, 1.05, f"{post}", transform=ax.transAxes, fontsize=12, ha="center")
             if j == ncol - 1:
-                ax.text(1.05, 0.5, f"Pre Neuron {pre}", transform=ax.transAxes, fontsize=16, rotation=-90, va="center")
-    plt.tight_layout()
+                ax.text(1.05, 0.5, f"{pre}", transform=ax.transAxes, fontsize=12, va="center")
+    # ax: Axes = axs[0,0]
+    # ax.set_ylim(wmin, wmax)
+    # axs[0,0].set_xlim(t_min, t_max)
+    # Ticks and labels
+    # ax.xaxis.set_major_locator(x_locator)
+    # ax.yaxis.set_major_locator(y_locator)
+    # ax.xaxis.set_major_formatter(ticker.ScalarFormatter())
+    # ax.yaxis.set_major_formatter(ticker.ScalarFormatter())
+    # axs[0,0].label_outer()
+    # ax.tick_params(axis="both", which="major", labelsize=9, length=3, pad=2)
+    # ax.tick_params(axis="x", labelrotation=45)
+    # ax.set_xticklabels(ax.get_xticklabels(), rotation=45, ha="right", rotation_mode="anchor")
+    
+    # plt.tight_layout()
+    fig.subplots_adjust(left=0.05, right=0.93, bottom=0.03, top=0.95, wspace=0, hspace=0)
     # plt.suptitle(title, y=0.9)
     # Labelling
+    fig.text(x=0.5, y=0.97, s="Post Neuron", fontsize=15, ha="center")
+    fig.text(x=0.97, y=0.45, s="Pre Neuron", fontsize=15, rotation=-90, va='center')
     fig.text(s=f"Time ({dt})", fontsize=15, x=0.5, y=0.005, ha='center')
-    fig.text(s="Weight", fontsize=15, ha='center', x=0.005, y=0.5, rotation=90, va='center')
+    fig.text(s="Weight", fontsize=15, ha='center', x=0.005, y=0.45, rotation=90, va='center')
     fig.text(s=title if title is not None else "SNN Weight over Time", fontsize=20, x=0.5, y=1.00, ha='center')
 
     if savepath is not None:
@@ -543,7 +598,7 @@ def plot_weight_over_time(simulator: 'SNNSimulator' = None, values: List[np.ndar
         plt.savefig(savepath, dpi=dpi)
     if show:
         plt.show()
-    # plt.close(fig)
+    plt.close(fig)
 
 
 def plot_weight_heatmap(simulator: 'SNNSimulator', *, x_scale: float = 0.2, y_scale: float = 0.8,
