@@ -81,12 +81,9 @@ class SynapseLayer(SynapseLayerProtocol):
         else:
             self.inhibition_prop = 0.0
         # More efficient multiplier when no inhibition mask is needed
-        if self.inhibition_prop == 0:
-            self._inh_exc_mask = 1
-        else:
-            self._inh_exc_mask = np.ones((self.pre_layer.size, self.post_layer.size), dtype=np.int8)
-            idx = np.random.binomial(1, p=self.inhibition_prop, size=self._inh_exc_mask.shape).astype(bool)
-            self._inh_exc_mask[idx] = -1
+        self._inh_exc_mask = 1
+        if self.inhibition_prop > 0:
+            self._initialise_inhibition_mask()
 
         # Self-retained pre- and post-neuron traces
         self._use_pre_trace = pre_trace
@@ -171,6 +168,11 @@ class SynapseLayer(SynapseLayerProtocol):
         self._init_weights()
         self._normalise_weights()
 
+    def _initialise_inhibition_mask(self):
+        self._inh_exc_mask = np.ones((self.pre_layer.size, self.post_layer.size), dtype=np.int8)
+        idx = np.random.binomial(1, p=self.inhibition_prop, size=self._inh_exc_mask.shape).astype(bool)
+        self._inh_exc_mask[idx] = -1
+
     def _init_weights(self):
         if self.weight_init == 'uniform':
             wmin = self.weight_init_params.get('weight_init_min', 0.0)
@@ -202,6 +204,8 @@ class SynapseLayer(SynapseLayerProtocol):
         """
         self._init_weights()
         self._normalise_weights()
+        if self.inhibition_prop > 0:
+            self._initialise_inhibition_mask()
         self.soft_reset()
 
     def soft_reset(self) -> None:

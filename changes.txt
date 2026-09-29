@@ -113,6 +113,13 @@ Branch v1.4-rule-rework
 v1.4
 ----
 
+v1.4.8.2 (2026-09-29)
+- Specifiable `exploration_source` param in SNNSimulator
+- `SNN.get_exploration_rate()` returns values from any neuron layer with `decayable=True`
+- `SNN.set_exploration_rate()` applies value to any layer with `decayable=True`
+- NeuronLayer exploration_rate setter checks for both `decayable` and `stochastic_spike` before setting value
+- SynapseLayer inhibition mask is reinitialised after every reset, via `_initialise_inhibition_mask()`
+
 v1.4.8.1 (2026-09-29)
 - Improve `snn.plot.plot_weight_over_time()`:
     - Faster plotting times (because of shared axes)

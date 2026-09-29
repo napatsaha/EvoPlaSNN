@@ -36,7 +36,7 @@ class SNNSimulator:
                 #  fitnessor_type: Literal["accuracy", "reward", "cross-entropy", "mse"] = "accuracy", fitnessor_params: dict = {},
                 #  num_steps: int = None, num_episodes: int = None,
                 epsilon_greedy: bool = False, epsilon: float = None,
-                 supervised: bool = True, decay: bool = False,
+                 decay: bool = False, exploration_source: Literal["network", "env"] = None,
                  decay_method: Literal["time", "constant"] = "time",
                  decay_rate: float = None, decay_cutoff: Optional[int] = None, 
                  record_membrane: bool = True, record_spikes: bool = True, record_traces: bool = True, record_pre_traces: bool = False, record_post_traces: bool = False,
@@ -112,13 +112,13 @@ class SNNSimulator:
         self.decay_rate = decay_rate
         self.decay_cutoff = decay_cutoff
         self._explore = self._should_explore(0)
-        self._exploration_source = None
+        self._exploration_source = exploration_source
 
         # Check if Network explore via stochastic spiking
         neuron_expl = self.network.get_exploration_rate()
         if (neuron_expl is not None) or (neuron_expl > 0.0):
-            self._exploration_source = "network"
-            self.decay_init_value = neuron_expl
+            if self._exploration_source is None:
+                self._exploration_source = "network"
         # if self._decay and self.reward_collector is not None:
         #     self.reward_collector.cutoff_timestep = decay_cutoff ### *** PROBLEMATIC
 
@@ -126,11 +126,17 @@ class SNNSimulator:
         self.epsilon_greedy = bool(epsilon_greedy)
         self.epsilon = None
         if self.epsilon_greedy:
-            self._exploration_source = "env"
             if epsilon is None:
                 epsilon = 0.0
             self.epsilon = np.clip(float(epsilon), 0, 1)
+            if self._exploration_source is None:
+                self._exploration_source = "env"
+
+        if self._exploration_source == "network":
+            self.decay_init_value = neuron_expl
+        elif self._exploration_source == "env":
             self.decay_init_value = self.epsilon
+
 
         # # Initialize post-processing components
         # params = copy.deepcopy(params)

@@ -513,7 +513,7 @@ class NeuronLayer(NeuronLayerProtocol):
     @exploration_rate.setter
     def exploration_rate(self, value: float):
         # Do not set if this layer is not stochastic in the first place
-        if not self._decayable:
+        if not self._decayable and not self._stochastic_spike:
             return
         if self._stochastic_type == "softmax":
             # Prevents a temperature too low from being set
