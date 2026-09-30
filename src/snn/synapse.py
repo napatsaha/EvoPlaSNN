@@ -39,7 +39,7 @@ class SynapseLayer(SynapseLayerProtocol):
                  e_max: float = None, e_min: float = None,
                  tau_syn: float = None, tau_pre: float = None, tau_post: float = None,
                  dt: float = 1e-3,
-                 synaptic_delay: int = 0, inhibition_prop: float = None, connectivity: float = None,
+                 synaptic_delay: int = 0, inhibition_prop: float = None, connectivity: float = None, mask_method: Literal["random", "by_pre", "by_post"] = "random",
                  sim_method: Literal["event-driven", "step-wise"] = "step-wise",
                  weight_init: Literal["uniform", "normal", "constant"] = "uniform",
                  weight_clip_min: float = None, weight_clip_max: float = None,
@@ -83,7 +83,8 @@ class SynapseLayer(SynapseLayerProtocol):
         # Connectivity - synapse connection probability
         self.connectivity = np.clip(connectivity, 0, 1) if connectivity is not None else 1.0
         # Mask for weights combining inhibition and connectivity
-        self._weight_mask = 1
+        self._weight_mask = np.ones((self.pre_layer.size, self.post_layer.size), dtype=np.int8)
+        self.mask_method = mask_method
         self._initialise_mask()
 
         # Self-retained pre- and post-neuron traces
@@ -170,13 +171,35 @@ class SynapseLayer(SynapseLayerProtocol):
         self._normalise_weights()
 
     def _initialise_mask(self):
-        self._weight_mask = np.ones((self.pre_layer.size, self.post_layer.size), dtype=np.int8)
-        if self.inhibition_prop > 0:
-            idx = np.random.binomial(1, p=self.inhibition_prop, size=self._weight_mask.shape).astype(bool)
-            self._weight_mask[idx] = -1
-        if self.connectivity < 1.0:
-            idx = np.random.binomial(1, p=1-self.connectivity, size=(self.pre_layer.size, self.post_layer.size)).astype(bool)
-            self._weight_mask[idx] = 0
+        self._weight_mask.fill(1)
+        if self.mask_method == "random":
+            # Probability applied to synapse layer as a whole
+            if self.inhibition_prop > 0:
+                idx = np.random.binomial(1, p=self.inhibition_prop, size=self._weight_mask.shape).astype(bool)
+                self._weight_mask[idx] = -1
+            if self.connectivity < 1.0:
+                idx = np.random.binomial(1, p=1-self.connectivity, size=self._weight_mask.shape).astype(bool)
+                self._weight_mask[idx] = 0
+        elif self.inhibition_prop == 0 and self.connectivity == 1.0:
+            return        
+        elif self.mask_method == "by_pre":
+            # Each pre-neuron sends a fixed number of inhib/absent/excitatory synapses (-1/0/+1)
+            n_absent = np.round((1-self.connectivity) * self.post_layer.size).astype(int)
+            n_inhib = np.round(self.inhibition_prop * self.post_layer.size).astype(int)
+            for i in range(self.pre_layer.size):
+                idx = np.arange(self.post_layer.size)
+                np.random.shuffle(idx)
+                self._weight_mask[i, idx[:n_absent]] = 0
+                self._weight_mask[i, idx[(self.post_layer.size-n_inhib):]] = -1
+        elif self.mask_method == "by_post":
+            # Each post-neuron receives a fixed number of inhib/absent/excitatory synapses (-1/0/+1)
+            n_absent = np.round((1-self.connectivity) * self.pre_layer.size).astype(int)
+            n_inhib = np.round(self.inhibition_prop * self.pre_layer.size).astype(int)
+            for j in range(self.post_layer.size):
+                idx = np.arange(self.pre_layer.size)
+                np.random.shuffle(idx)
+                self._weight_mask[idx[:n_absent], j] = 0
+                self._weight_mask[idx[(self.pre_layer.size-n_inhib):], j] = -1
 
     def _init_weights(self):
         if self.weight_init == 'uniform':
@@ -209,8 +232,7 @@ class SynapseLayer(SynapseLayerProtocol):
         """
         self._init_weights()
         self._normalise_weights()
-        if self.inhibition_prop > 0:
-            self._initialise_mask()
+        self._initialise_mask()
         self.soft_reset()
 
     def soft_reset(self) -> None:

@@ -113,6 +113,14 @@ Branch v1.4-rule-rework
 v1.4
 ----
 
+v1.4.8.4 (2026-09-30)
+- Added `mask_method` to SynapseLayer, to determine how inhibition and connectivity is calculated:
+    - "random" (default) -> binomial probability based on whole synaptic weights
+    - "by_pre" -> maintain consistent proportions among synapses from same pre-neuron
+    - "by_post" -> same but for incoming post-neurons
+- During SynapseLayer.reset(), `_initialise_mask()` is always called:
+    However, if no inhibitory synapses and no connectivity needs to be calculated, then it will skip calculation, for all 3 mask methods
+
 v1.4.8.3 (2026-09-30)
 - Membrane noise in NeuronLayer when there is input current via `membrane_noise` param
 - Synapses Connectivity in SynapseLayer via `connectivity` param:
