@@ -113,6 +113,20 @@ Branch v1.4-rule-rework
 v1.4
 ----
 
+v1.4.8.3 (2026-09-30)
+- Membrane noise in NeuronLayer when there is input current via `membrane_noise` param
+- Synapses Connectivity in SynapseLayer via `connectivity` param:
+    - `_inh_exc_mask` renamed to `_weight_mask`, which combines both inhibition and connection multiplier
+    - Renamed `_initialise_inhibition_mask` to `_initialise_mask`
+    - New method `get_masked_weights` to obtain weight efficacy multiplied by inhibition and connectivity
+- Simulator-level exploration only rely on `_explore` and `_epsilon_greedy` flags, not `_exploration_source`
+- Plot improvements:
+    - `_query_SNN_membrane_from_env_position` runs each input query for `window_size` timestep, or until output spikes are observed
+        (to account for synaptic delay)
+    - `plot_weights()` use `get_masked_weights` of synapses
+    - `plot_weights()` center cmap on zero
+    - `plot_eligibility_traces()` use each synapse layer sizes instead of network input_size and output_size
+
 v1.4.8.2 (2026-09-29)
 - Specifiable `exploration_source` param in SNNSimulator
 - `SNN.get_exploration_rate()` returns values from any neuron layer with `decayable=True`

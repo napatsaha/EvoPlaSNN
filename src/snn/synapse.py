@@ -39,7 +39,7 @@ class SynapseLayer(SynapseLayerProtocol):
                  e_max: float = None, e_min: float = None,
                  tau_syn: float = None, tau_pre: float = None, tau_post: float = None,
                  dt: float = 1e-3,
-                 synaptic_delay: int = 0, inhibition_prop: float = None,
+                 synaptic_delay: int = 0, inhibition_prop: float = None, connectivity: float = None,
                  sim_method: Literal["event-driven", "step-wise"] = "step-wise",
                  weight_init: Literal["uniform", "normal", "constant"] = "uniform",
                  weight_clip_min: float = None, weight_clip_max: float = None,
@@ -80,10 +80,11 @@ class SynapseLayer(SynapseLayerProtocol):
             self.inhibition_prop = np.clip(inhibition_prop, 0, 1)
         else:
             self.inhibition_prop = 0.0
-        # More efficient multiplier when no inhibition mask is needed
-        self._inh_exc_mask = 1
-        if self.inhibition_prop > 0:
-            self._initialise_inhibition_mask()
+        # Connectivity - synapse connection probability
+        self.connectivity = np.clip(connectivity, 0, 1) if connectivity is not None else 1.0
+        # Mask for weights combining inhibition and connectivity
+        self._weight_mask = 1
+        self._initialise_mask()
 
         # Self-retained pre- and post-neuron traces
         self._use_pre_trace = pre_trace
@@ -168,10 +169,14 @@ class SynapseLayer(SynapseLayerProtocol):
         self._init_weights()
         self._normalise_weights()
 
-    def _initialise_inhibition_mask(self):
-        self._inh_exc_mask = np.ones((self.pre_layer.size, self.post_layer.size), dtype=np.int8)
-        idx = np.random.binomial(1, p=self.inhibition_prop, size=self._inh_exc_mask.shape).astype(bool)
-        self._inh_exc_mask[idx] = -1
+    def _initialise_mask(self):
+        self._weight_mask = np.ones((self.pre_layer.size, self.post_layer.size), dtype=np.int8)
+        if self.inhibition_prop > 0:
+            idx = np.random.binomial(1, p=self.inhibition_prop, size=self._weight_mask.shape).astype(bool)
+            self._weight_mask[idx] = -1
+        if self.connectivity < 1.0:
+            idx = np.random.binomial(1, p=1-self.connectivity, size=(self.pre_layer.size, self.post_layer.size)).astype(bool)
+            self._weight_mask[idx] = 0
 
     def _init_weights(self):
         if self.weight_init == 'uniform':
@@ -205,7 +210,7 @@ class SynapseLayer(SynapseLayerProtocol):
         self._init_weights()
         self._normalise_weights()
         if self.inhibition_prop > 0:
-            self._initialise_inhibition_mask()
+            self._initialise_mask()
         self.soft_reset()
 
     def soft_reset(self) -> None:
@@ -256,7 +261,7 @@ class SynapseLayer(SynapseLayerProtocol):
         assert spike_input.ndim == 1
 
         # Compute the output current
-        output_current = np.dot(spike_input, self.weights * self._inh_exc_mask)
+        output_current = np.dot(spike_input, self.weights * self._weight_mask)
         if self._apply_delay:
             output_current = self.current_buffer.push(output_current)
         return output_current
@@ -470,6 +475,9 @@ class SynapseLayer(SynapseLayerProtocol):
             dw = getattr(self, f"eligibility_{etrace}")
             dw = dw * reward
             self._update_weights(dw, lrate)
+
+    def get_masked_weights(self) -> np.ndarray:
+        return self._weights * self._weight_mask
 
     def _update_weights(self, dw, lrate: float = 1.0):
         self._weights += lrate * dw

@@ -55,7 +55,7 @@ class NeuronLayer(NeuronLayerProtocol):
     Assumming each new spike resets the trace to its maximum value.
     """
     def __init__(self, size: int, *, tau_mem: float = None, tau_trace: float = None, dt: float = 1e-3, threshold: float = 1.0, 
-                 wta: bool = False, 
+                 wta: bool = False, membrane_noise: float = 0.0,
                  sim_method: Literal["event-driven", "step-wise"] = "step-wise",
                  tie_handling_wta: Literal["random", "all", "first"] = "random",
                  decayable: bool = None,
@@ -84,6 +84,8 @@ class NeuronLayer(NeuronLayerProtocol):
             threshold (float, optional): Spiking threshold. Defaults to 1.0.
 
             wta (bool, optional): Winner-Take-All. Defaults to False.
+
+            membrane_noise (float): Standard Deviation of zero-centered Gaussian noise to be added to membrane potential. If zero, no noise is added. Defaults to 0.
 
             sim_method (Literal["event-driven", "step-wise"]): Method of simulation update (affects onlt Trace), 
                 "event-driven" may be slower due to inefficient implementations. Defaults to "step-wise".
@@ -170,6 +172,9 @@ class NeuronLayer(NeuronLayerProtocol):
         self.mem_rest = mem_rest
         self.tau_mem = tau_mem if tau_mem is not None else tau_trace if tau_trace is not None else dt
         self.beta_mem = np.exp(-self.dt / self.tau_mem) # Decay rate
+        self._mem_noise = max(0, float(membrane_noise))
+        self._add_mem_noise = self._mem_noise > 0
+
         # Trace parameters
         self.tau_trace = tau_trace if tau_trace is not None else tau_mem if tau_mem is not None else dt
         self.trace_amp = trace_amp
@@ -292,11 +297,14 @@ class NeuronLayer(NeuronLayerProtocol):
         elif self._reset_mech_subt:
             self.membrane[cond] -= self.threshold
 
-    def _update_membrane(self, input_current):
+    def _update_membrane(self, input_current: np.ndarray):
         """
         Calculate membrane decay in respect to resting potential and add input current.
         """
         self.membrane = self.beta_mem * (self.membrane - self.mem_rest) + input_current + self.mem_rest
+        if self._add_mem_noise:
+            noise = np.random.normal(0, self._mem_noise, size=self.size)
+            self.membrane += (noise * input_current.astype(bool)) # Only apply noise to neuron with non-zero input current
 
     def _set_spike(self):
         """
@@ -441,6 +449,10 @@ class NeuronLayer(NeuronLayerProtocol):
         Update the thresholds of the neuron layer by adding delta_thr.
         """
         self.threshold += delta_thr
+
+    @property
+    def membrane_noise(self) -> float:
+        return self._mem_noise
 
     @property
     def trace(self) -> np.ndarray:

@@ -276,7 +276,7 @@ class SNNSimulator:
 
             # Increment environment step if the spike coder says so
             if self.spike_coder.ready and action is not None:
-                if self._explore and self._exploration_source == "env":
+                if self._explore and self.epsilon_greedy:
                     if np.random.rand() < self.epsilon:
                         action = self.env.action_space.sample()
                 next_state, reward, terminated, truncated, info = self.env.step(action)

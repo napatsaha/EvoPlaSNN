@@ -433,7 +433,7 @@ def plot_weights(simulator: "SNNSimulator" = None, values: List[np.ndarray] = No
     """
     if simulator is not None:
         assert simulator.record_weights, "Weight recording is not enabled."
-        values = simulator.network.weights
+        values = [s.get_masked_weights() for s in simulator.network.synapse_layers]
         num_layers = len(simulator.network.synapse_layers)
     elif values is not None:
         values = values
@@ -456,10 +456,14 @@ def plot_weights(simulator: "SNNSimulator" = None, values: List[np.ndarray] = No
     wmax = max([np.max(w) for w in values])
     if bounded_weights:
         wmax = max(wmax, 1)
+
+    colorizer = mpl.colorizer.Colorizer(cmap=cmap, norm=mpl.colors.CenteredNorm(vcenter=0))
+    colorizer.set_clim(wmin, wmax)
     
     for i in range(num_layers):
         ax = axs[0, i]
-        img = ax.imshow(values[i], cmap=cmap, vmin=wmin, vmax=wmax, aspect=1.0, norm=color_scale)
+        # img = ax.imshow(values[i], cmap=cmap, vmin=wmin, vmax=wmax, aspect=1.0, norm=color_scale)
+        img = ax.imshow(values[i], aspect=1.0, colorizer=colorizer)
         annotate_heatmap(img, valfmt="{x:.3f}", fontsize=10, textcolors=("white", "black"))
         ax.xaxis.set_major_locator(plt.MultipleLocator(1))
         ax.yaxis.set_major_locator(plt.MultipleLocator(1))
@@ -765,8 +769,11 @@ def _query_SNN_membrane_from_env_position(network: 'SNN', encoder: 'SpikeCoder',
     for state, pos in env._state_pos_dict.items():
         network.soft_reset()
         inp_buffer = encoder.generate_spikes(pos)
-        spk_in = inp_buffer[:, 0]
-        spk_out = network.forward(spk_in)
+        for t in range(encoder.window_size):
+            spk_in = inp_buffer[:, t]
+            spk_out = network.forward(spk_in)
+            if sum(spk_out) > 0:
+                break
 
         layer_mems[state] = [n.membrane.copy() for n in network.neuron_layers[1:]]
 
@@ -847,8 +854,8 @@ def plot_eligibility_traces(simulator: 'SNNSimulator' = None, values: np.ndarray
         else:
             raise ValueError(f"Eligiblity trace type: {etype} not supported.")
         
-        num_inputs = simulator.network.input_size
-        num_outputs = simulator.network.output_size
+        num_inputs = etrace.shape[0]
+        num_outputs = etrace.shape[1]
         num_steps = simulator.num_steps
     elif values is not None:
         etrace = values
@@ -874,7 +881,7 @@ def plot_eligibility_traces(simulator: 'SNNSimulator' = None, values: np.ndarray
                             squeeze=False)
 
     for i, j in enumerate(reversed(range(num_outputs))):
-        ax = axs[i, 0]
+        ax: Axes = axs[i, 0]
         m = ax.imshow(etrace[:, j, t_min:t_max], cmap=cmap, aspect='auto', origin="lower", vmin=emin, vmax=emax)
         ax.xaxis.set_ticks(np.arange(0, t_max - t_min, 10), labels= np.arange(t_min, t_max, 10))
         ax.set_ylabel(f'Neuron {j}')
