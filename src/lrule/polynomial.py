@@ -22,7 +22,7 @@ class SmallPolynomialRule(BaseLearningRule, EvolvableLearningRule):
     }
     default_gene_order = ("learning_rate", "tau_syn", "coefficients")
 
-    def __init__(self, *, 
+    def __init__(self, *, coefficients: np.ndarray | Sequence = None,
                 parameters: ArrayLike = None, genes: List[Parameter] = None, 
                 genes_to_encode: List[Dict] | Dict[str, Dict] = None, gene_order: Sequence[str] = None, 
                 learning_rate: float = 1.0, learning_rate_thr: float = 0.1, threshold_agg_func: Literal["max", "min", "mean", "sum"] = "mean",
@@ -36,6 +36,11 @@ class SmallPolynomialRule(BaseLearningRule, EvolvableLearningRule):
             raise ValueError("Only one output must be specified")
 
         # TODO: Verify the right use_* arguments are passed
+
+        # Read coefficients if supplied
+        if coefficients is not None:
+            assert len(coefficients) == 4, "Small Polynomial Rule only accept exactly 4 coefficients"
+            self.coefficients = np.array(coefficients, dtype=np.float64)
 
         BaseLearningRule.__init__(self, learning_rate=learning_rate, learning_rate_thr=learning_rate_thr, threshold_agg_func=threshold_agg_func, 
                                 delta_weight=delta_weight, delta_threshold=delta_threshold, delta_eligibility=delta_eligibility,
@@ -56,7 +61,8 @@ class SmallPolynomialRule(BaseLearningRule, EvolvableLearningRule):
 
     def _apply_gene_values(self):
         super()._apply_gene_values()
-        self.coefficients = self.values.get("coefficients")
+        if self.contains_gene("coefficients"):
+            self.coefficients = self.values.get("coefficients")
 
     def forward(self, inp: np.ndarray) -> np.ndarray:
         spk_pre = inp[:, 2]

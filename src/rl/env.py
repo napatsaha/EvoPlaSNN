@@ -303,8 +303,8 @@ class BaseMaze(gym.Env):
         _idx_dist_rec = []
         for idx in self._empty_idx:
             idx2d = np.unravel_index(idx, self.maze.shape)
-            good_dist = man_dist(self._good_pos, idx2d)
-            bad_dist = man_dist(self._bad_pos, idx2d)
+            good_dist = man_dist(self._good_pos, idx2d) if self._good_pos is not None else np.inf
+            bad_dist = man_dist(self._bad_pos, idx2d) if self._bad_pos is not None else np.inf
             if good_dist >= self._random_min_dist and bad_dist >= self._random_min_dist:
                 _idx_dist_rec.append(np.array(idx2d))
         return _idx_dist_rec

@@ -113,6 +113,10 @@ Branch v1.4-rule-rework
 v1.4
 ----
 
+v1.4.8.5 (2026-10-01)
+- Added `coefficients` to `SmallPolynomialRule` (previously only encodable by gene)
+- Fixed `BaseMaze` unable to calculate min distance for random spawning when no bad goal exists
+
 v1.4.8.4 (2026-09-30)
 - Added `mask_method` to SynapseLayer, to determine how inhibition and connectivity is calculated:
     - "random" (default) -> binomial probability based on whole synaptic weights
