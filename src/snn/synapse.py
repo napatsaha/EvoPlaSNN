@@ -39,7 +39,9 @@ class SynapseLayer(SynapseLayerProtocol):
                  e_max: float = None, e_min: float = None,
                  tau_syn: float = None, tau_pre: float = None, tau_post: float = None,
                  dt: float = 1e-3,
-                 synaptic_delay: int = 0, inhibition_prop: float = None, connectivity: float = None, mask_method: Literal["random", "by_pre", "by_post"] = "random",
+                 synaptic_delay: int = 0, 
+                 mask_method: Literal["whole", "by_pre", "by_post"] = "whole",
+                 inhibition_prop: float | int = None, excitation_prop: float | int = None, connectivity: float = None, 
                  sim_method: Literal["event-driven", "step-wise"] = "step-wise",
                  weight_init: Literal["uniform", "normal", "constant"] = "uniform",
                  weight_clip_min: float = None, weight_clip_max: float = None,
@@ -75,16 +77,15 @@ class SynapseLayer(SynapseLayerProtocol):
         if self._apply_delay:
             self.current_buffer = Array_FIFO(shape=(self.post_layer.size, ), size=synaptic_delay + 1)
 
-        # Synapse inhibition
-        if inhibition_prop is not None:
-            self.inhibition_prop = np.clip(inhibition_prop, 0, 1)
-        else:
-            self.inhibition_prop = 0.0
-        # Connectivity - synapse connection probability
-        self.connectivity = np.clip(connectivity, 0, 1) if connectivity is not None else 1.0
-        # Mask for weights combining inhibition and connectivity
-        self._weight_mask = np.ones((self.pre_layer.size, self.post_layer.size), dtype=np.int8)
+        # Synapse mask - connectivity/ inhibition/ excitation
         self.mask_method = mask_method
+        self._conn_p, self._exc_p, self._inh_p, self._conn_n, self._exc_n, self._inh_n = \
+            self._prep_inh_exc_conn_prop(inhibition_prop, excitation_prop, connectivity, 
+                                         n=self.post_layer.size if mask_method == "by_pre" else \
+                                            self.pre_layer.size if mask_method == "by_post" else \
+                                            self.pre_layer.size * self.post_layer.size)
+        # Mask for weights 
+        self._weight_mask = np.ones((self.pre_layer.size, self.post_layer.size), dtype=np.int8)
         self._initialise_mask()
 
         # Self-retained pre- and post-neuron traces
@@ -170,36 +171,122 @@ class SynapseLayer(SynapseLayerProtocol):
         self._init_weights()
         self._normalise_weights()
 
+    def _prep_inh_exc_conn_prop(self, inhibition_prop: float|int, excitation_prop: float|int, connectivity: float, n: int):
+        # (inh, exc, conn)
+        if inhibition_prop is None:
+            if excitation_prop is None:
+                if connectivity is None:
+                    # (-, -, -)
+                    p_conn = 1.0
+                    p_exc = 1.0
+                    p_inh = 0.0
+                    n_conn = n
+                    n_exc = n
+                    n_inh = 0
+                else:
+                    # (-, -, conn)
+                    p_conn = np.clip(connectivity, 0, 1)
+                    p_exc = p_conn
+                    p_inh = 0.0
+                    n_conn = round(n*p_conn)
+                    n_exc = n_conn
+                    n_inh = 0
+            else:
+                p_exc, n_exc = self._process_prop(excitation_prop, n)
+                if connectivity is None:
+                    # (-, exc, -)
+                    p_conn = 1.0
+                    p_inh = 1-p_exc
+                    n_conn = n
+                    n_inh = round(n*p_inh)
+                else:
+                    # (-, exc, conn)
+                    p_conn = np.clip(connectivity, 0, 1)
+                    n_conn = round(n*p_conn)
+                    if n_exc > n_conn:
+                        raise AssertionError(f"Number of excitatory connections {n_exc} cannot exceed number of possible connections {n_conn}")
+                    p_inh = p_conn-p_exc
+                    n_inh = round(n*p_inh)
+        else:
+            p_inh, n_inh = self._process_prop(inhibition_prop, n)
+            if excitation_prop is None:
+                if connectivity is None:
+                    # (inh, -, -)
+                    p_conn = 1.0
+                    n_conn = n
+                    p_exc = 1-p_inh
+                    n_exc = round(p_exc)    
+                else:
+                    # (inh, -, conn)
+                    p_conn = np.clip(connectivity, 0, 1)
+                    n_conn = round(n*p_conn)
+                    if n_inh > n_conn:
+                        raise AssertionError(f"Number of inhibitory connections {n_inh} cannot exceed number of possible connections {n_conn}")
+                    p_exc = p_conn-p_inh
+                    n_exc = round(p_exc)    
+            else:
+                p_exc, n_exc = self._process_prop(excitation_prop, n)
+                assert n_inh + n_exc <= n, f"Number of excitatory ({n_exc}) and inhibitory ({n_inh}) neurons cannot exceed total number of neurons {n}"
+                if connectivity is None:
+                    # (inh, exc, -)
+                    p_conn = round(p_inh+p_exc, 2)
+                    n_conn = n_inh+n_exc
+                else:
+                    # (inh, exc, conn)
+                    p_conn = np.clip(connectivity, 0, 1)
+                    n_conn = round(n*p_conn)
+                    assert n_inh + n_exc == n_conn, f"Combined total of excitatory ({n_exc}) and inhibitory ({n_inh}) synapses must equal connectable synapses ({n_conn})"
+        
+        return p_conn, p_exc, p_inh, n_conn, n_exc, n_inh
+
+    def _process_prop(self, prop: float|int, n):
+        if isinstance(prop, int):
+            assert prop <= n, f"Number of neurons {prop} must not be greater than total neurons {n}"
+            n_ = prop
+            p_ = n_ / n
+        else:
+            assert 0 <= prop <= 1, f"Proportion must be between 0 and 1. Got {prop}"
+            p_ = float(prop)
+            n_ = int(n*p_)
+        return p_, n_
+
     def _initialise_mask(self):
-        self._weight_mask.fill(1)
+        if self._inh_p == 0 and self._conn_p == 1.0:
+            self._weight_mask.fill(1)
+            return        
+        self._weight_mask.fill(0)
         if self.mask_method == "random":
             # Probability applied to synapse layer as a whole
-            if self.inhibition_prop > 0:
-                idx = np.random.binomial(1, p=self.inhibition_prop, size=self._weight_mask.shape).astype(bool)
-                self._weight_mask[idx] = -1
-            if self.connectivity < 1.0:
-                idx = np.random.binomial(1, p=1-self.connectivity, size=self._weight_mask.shape).astype(bool)
-                self._weight_mask[idx] = 0
-        elif self.inhibition_prop == 0 and self.connectivity == 1.0:
-            return        
+            idx = np.arange(self._weight_mask.size)
+            np.random.shuffle(idx)
+            self._weight_mask.flat[idx[:(self._exc_n)]] = 1
+            self._weight_mask.flat[idx[(n-self._inh_n):]] = -1
+            # if self._inh_p > 0:
+            #     idx = np.random.binomial(1, p=self._inh_p, size=self._weight_mask.shape).astype(bool)
+            #     self._weight_mask[idx] = -1
+            # if self._conn_p < 1.0:
+            #     idx = np.random.binomial(1, p=1-self._conn_p, size=self._weight_mask.shape).astype(bool)
+            #     self._weight_mask[idx] = 0
         elif self.mask_method == "by_pre":
             # Each pre-neuron sends a fixed number of inhib/absent/excitatory synapses (-1/0/+1)
-            n_absent = np.round((1-self.connectivity) * self.post_layer.size).astype(int)
-            n_inhib = np.round(self.inhibition_prop * self.post_layer.size).astype(int)
+            n = self.post_layer.size
+            # n_absent = np.round((1-self._conn_p) * self.post_layer.size).astype(int)
+            # n_inhib = np.round(self._inh_p * self.post_layer.size).astype(int)
             for i in range(self.pre_layer.size):
-                idx = np.arange(self.post_layer.size)
+                idx = np.arange(n)
                 np.random.shuffle(idx)
-                self._weight_mask[i, idx[:n_absent]] = 0
-                self._weight_mask[i, idx[(self.post_layer.size-n_inhib):]] = -1
+                self._weight_mask[i, idx[:(self._exc_n)]] = 1
+                self._weight_mask[i, idx[(n-self._inh_n):]] = -1
         elif self.mask_method == "by_post":
             # Each post-neuron receives a fixed number of inhib/absent/excitatory synapses (-1/0/+1)
-            n_absent = np.round((1-self.connectivity) * self.pre_layer.size).astype(int)
-            n_inhib = np.round(self.inhibition_prop * self.pre_layer.size).astype(int)
+            n = self.pre_layer.size
+            # n_absent = np.round((1-self._conn_p) * self.pre_layer.size).astype(int)
+            # n_inhib = np.round(self._inh_p * self.pre_layer.size).astype(int)
             for j in range(self.post_layer.size):
-                idx = np.arange(self.pre_layer.size)
+                idx = np.arange(n)
                 np.random.shuffle(idx)
-                self._weight_mask[idx[:n_absent], j] = 0
-                self._weight_mask[idx[(self.pre_layer.size-n_inhib):], j] = -1
+                self._weight_mask[idx[:(n-self._exc_n)], j] = 1
+                self._weight_mask[idx[(n-self._inh_n):], j] = -1
 
     def _init_weights(self):
         if self.weight_init == 'uniform':

@@ -113,6 +113,14 @@ Branch v1.4-rule-rework
 v1.4
 ----
 
+v1.4.8.6 (2026-10-03)
+- Added `excitation_prop` to SynapseLayer param
+- Able to specify any combination of (inhibition_prop, excitation_prop, connectivity) in SynapseLayer.__init__
+- Cases for dealing with how inh_p, exc_p and conn_p are assumed when one or more are missing (handled within `_prep_inh_exc_conn_prop()`):
+    - New internal variables `_inh_p`, `_inh_n`, `_exc_p`, `_exc_n`, `_conn_p`, `_conn_n`
+    - Changed how `_initialise_mask()` operates based on `_exc_n` and `_inh_n` (`_conn_n` is related to the sum of the former two)
+- Renamed `mask_method="random"` to `"whole"`
+
 v1.4.8.5 (2026-10-01)
 - Added `coefficients` to `SmallPolynomialRule` (previously only encodable by gene)
 - Fixed `BaseMaze` unable to calculate min distance for random spawning when no bad goal exists
