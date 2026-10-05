@@ -38,6 +38,7 @@ class SynapseLayer(SynapseLayerProtocol):
                  eligibility_custom: bool = False,
                  e_max: float = None, e_min: float = None,
                  tau_syn: float = None, tau_pre: float = None, tau_post: float = None,
+                 tau_weight: float = None,
                  dt: float = 1e-3,
                  synaptic_delay: int = 0, 
                  mask_method: Literal["whole", "by_pre", "by_post"] = "whole",
@@ -155,6 +156,17 @@ class SynapseLayer(SynapseLayerProtocol):
         self._beta_syn = np.exp(-self.dt / self._tau_syn)  # Decay rate for eligibility trace
         self._e_max = e_max if e_max is not None else np.inf
         self._e_min = e_min if e_min is not None else -np.inf
+
+        # Weight decay
+        self._decay_weight = False
+        self._tau_weight = np.inf
+        self._beta_weight = 1.0
+        if tau_weight is not None:
+            self._decay_weight = True
+            if isinstance(tau_weight, int):
+                tau_weight = tau_weight * dt
+            self._tau_weight = tau_weight
+            self._beta_weight = np.exp(-self.dt / self._tau_weight)
         
         # Initialize weights
         if weight_init not in ['uniform', 'normal', 'constant']:
@@ -374,6 +386,23 @@ class SynapseLayer(SynapseLayerProtocol):
         if self._apply_delay:
             output_current = self.current_buffer.push(output_current)
         return output_current
+
+    def update(self) -> None:
+        """
+        Perform necessary updates of internal variables if applicable, including:
+        - pre- and post-synaptic traces
+        - eligibility traces (of various forms)
+        - constant weight decay
+        """
+        self.update_traces()
+        self.update_eligibility_trace()
+        self.update_weight_decay()
+
+    def update_weight_decay(self) -> None:
+        if self._decay_weight:
+            self._weights *= self._beta_weight
+            # if new weights exceed boundaries, clip it back
+            self._clip_weights()
 
     def update_traces(self) -> None:
         """Update pre- and post-synaptic traces, if enabled"""
@@ -651,6 +680,28 @@ class SynapseLayer(SynapseLayerProtocol):
                 warnings.warn(f"'w_min' is currently unbounded (value={self.w_min}). Cannot apply 'w_range' to create 'w_max'")
 
     @property
+    def tau_weight(self) -> float:
+        """
+        Time constant for synaptic weight decay
+        """
+        return self._tau_weight
+    @tau_weight.setter
+    def tau_weight(self, value: float) -> None:
+        if value is None:
+            self._decay_weight = False
+        else:
+            if not self._decay_weight:
+                self._decay_weight = True
+            if isinstance(value, np.ndarray):
+                assert value.size == 1, "Input must either be a scalar or array of size 1"
+                value = value.item()
+            assert value > 0, f"Time constant value must be strictly posive. Got tau_weight={value}"
+            if isinstance(value, int) or value > 1:
+                value *= self.dt
+            self._tau_weight = value
+            self._beta_weight = np.exp(-self.dt / self._tau_weight)
+
+    @property
     def tau_syn(self) -> float:
         """
         Time constant used for all types of eligibility trace
@@ -662,6 +713,8 @@ class SynapseLayer(SynapseLayerProtocol):
             assert value.size == 1, "Input must either be a scalar or array of size 1"
             value = value.item()
         assert value > 0, f"Time constant value must be strictly posive. Got tau_syn={value}"
+        if isinstance(value, int) or value > 1:
+            value *= self.dt
         self._tau_syn = value
         self._beta_syn = np.exp(-self.dt / self._tau_syn)
 
@@ -677,6 +730,8 @@ class SynapseLayer(SynapseLayerProtocol):
             assert value.size == 1, "Input must either be a scalar or array of size 1"
             value = value.item()
         assert value > 0, f"Time constant value must be strictly posive. Got tau_pre={value}"
+        if isinstance(value, int) or value > 1:
+            value *= self.dt
         self._tau_pre = value
         self._beta_pre = np.exp(-self.dt / self._tau_pre)
 
@@ -692,6 +747,8 @@ class SynapseLayer(SynapseLayerProtocol):
             assert value.size == 1, "Input must either be a scalar or array of size 1"
             value = value.item()
         assert value > 0, f"Time constant value must be strictly posive. Got tau_post={value}"
+        if isinstance(value, int) or value > 1:
+            value *= self.dt
         self._tau_post = value
         self._beta_post = np.exp(-self.dt / self._tau_post)
 

@@ -177,9 +177,10 @@ class SNN:
         spike_out = self.neuron_layers[-1].forward(curr)
         # Update eligibility traces if applicable
         for synapse in self.synapse_layers:
-            synapse.update_traces()
+            synapse.update()
+            # synapse.update_traces()
             # if self.use_etrace:
-            synapse.update_eligibility_trace()
+            # synapse.update_eligibility_trace()
         return spike_out
 
     def apply_learning_rule(self, reward=None):

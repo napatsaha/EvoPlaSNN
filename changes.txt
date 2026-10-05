@@ -113,6 +113,15 @@ Branch v1.4-rule-rework
 v1.4
 ----
 
+v1.4.9.1 (2026-10-05)
+- SynapseLayer weight decay:
+    - Added `tau_weight` init param, along with property of same name and internal attributes `_tau_weight` and `_beta_weight`
+    - An internal flag `_decay_weight` will be set if `tau_weight` is not None, and will control whether weight decay will occur
+    - Added `update_weight_decay()` which should be called every timestep to perform the step-wise decay operation
+    - Weight decay can be turned off post init by setting `tau_weight` to None
+- During `SNN.forward()`, combined SynapseLayer `update_traces()` and `update_eligibility_trace()` to a single `update()` function,
+    along with `update_weight_decay()` after spike forward propagation
+
 v1.4.9.0 (2026-10-05)
 - Moved internal rule call in Simulator to before environment step
     - Removed modulation signal input from `SNN.apply_internal_rule()` and `SynapseLayer.apply_internal_rule()`
