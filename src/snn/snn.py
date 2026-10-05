@@ -203,9 +203,9 @@ class SNN:
         #     for synapse in self.synapse_layers:
         #         synapse.apply_external_rule(signal)
 
-    def apply_internal_rule(self, signal, trigger_info: Dict[str, bool]):
+    def apply_internal_rule(self, trigger_info: Dict[str, bool]):
         for synapse in self.synapse_layers:
-            synapse.apply_internal_rule(signal, trigger_info)
+            synapse.apply_internal_rule(trigger_info)
 
     def apply_weight_updates_from_etrace(self, signal: float = None, lrate: float = 1.0):
         if not self.update_weights_on_etrace:

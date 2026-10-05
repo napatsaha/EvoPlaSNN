@@ -556,10 +556,10 @@ class SynapseLayer(SynapseLayerProtocol):
             if self._external_rule is not None and self._external_rule.check_trigger(trigger_info):
                 self._apply_learning_rule(self._external_rule, reward) 
 
-    def apply_internal_rule(self, reward: float = None, trigger_info: Dict[str, bool] = None) -> None:
+    def apply_internal_rule(self, trigger_info: Dict[str, bool] = None) -> None:
         if self.plastic:
             if self._internal_rule is not None and self._internal_rule.check_trigger(trigger_info):
-                self._apply_learning_rule(self._internal_rule, reward) 
+                self._apply_learning_rule(self._internal_rule, reward=None) 
 
     def _apply_learning_rule(self, learning_rule: LearningRule, reward):
         dw, dth, delig = learning_rule.update(self, reward=reward, always_return_tuple=True)

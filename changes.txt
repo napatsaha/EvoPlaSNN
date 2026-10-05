@@ -113,6 +113,13 @@ Branch v1.4-rule-rework
 v1.4
 ----
 
+v1.4.9.0 (2026-10-05)
+- Moved internal rule call in Simulator to before environment step
+    - Removed modulation signal input from `SNN.apply_internal_rule()` and `SynapseLayer.apply_internal_rule()`
+- Added a `input_current` check during `NeuronLayer._set_spike()`
+    - If all input currents are zero, no neuron should spike when spiking method is stochastic
+        (to avoid out-of-step spiking and multiple spikes in one action window)
+
 v1.4.8.6 (2026-10-03)
 - Added `excitation_prop` to SynapseLayer param
 - Able to specify any combination of (inhibition_prop, excitation_prop, connectivity) in SynapseLayer.__init__

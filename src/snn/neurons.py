@@ -263,7 +263,7 @@ class NeuronLayer(NeuronLayerProtocol):
         # Calculate the new membrane potential
         self._update_membrane(input_current)
         # Check which neuron to spike
-        self._set_spike()
+        self._set_spike(input_current)
         # Update trace
         self._update_trace()
         # Membrane is left above threshold after spiking, because their values can both be recorded and plotted to match.
@@ -306,7 +306,7 @@ class NeuronLayer(NeuronLayerProtocol):
             noise = np.random.normal(0, self._mem_noise, size=self.size)
             self.membrane += (noise * input_current.astype(bool)) # Only apply noise to neuron with non-zero input current
 
-    def _set_spike(self):
+    def _set_spike(self, input_current: np.ndarray):
         """
         Decide on which neuron to spike based on its current membrane potential and whether winner-take-all and stochasticity are enabled.
         """
@@ -336,6 +336,9 @@ class NeuronLayer(NeuronLayerProtocol):
         # Stochastic spiking
         # Assumes WTA by default -> only one choice of neuron can spike stochastically
         else:
+            # If no incoming current, do not spike!
+            if len(input_current.nonzero()[0]) == 0:
+                return
             # above_thr = self.membrane >= self.threshold
             if self._stochastic_type == "softmax":
                 if sum(above_thr) == 0:

@@ -274,6 +274,18 @@ class SNNSimulator:
             # Decode spikes into action
             action = self.spike_coder.decode(spk_out)
 
+            # Apply internal learning rule (for on-timestep trigger condition ONLY)
+            if update:
+                trigger_info = dict(
+                        on_timestep=True, 
+                        on_step=False, 
+                        on_reward=False,
+                        on_end=False
+                    )
+                # Internal rule should not have access to modulation signals
+                # signal = self.modulator.signal(locals=locals()) if self._modulation else reward
+                self.network.apply_internal_rule(trigger_info=trigger_info)
+
             # Increment environment step if the spike coder says so
             if self.spike_coder.ready and action is not None:
                 if self._explore and self.epsilon_greedy:
@@ -353,17 +365,7 @@ class SNNSimulator:
                 episode_done = False
                 reward = None
 
-            # Apply internal learning rule 
-            if update:
-                trigger_info = dict(
-                        on_timestep=True, 
-                        on_step=False, 
-                        on_reward=reward is not None,
-                        on_end=episode_done
-                    )
-                # Warning: reward can be None
-                signal = self.modulator.signal(locals=locals()) if self._modulation else reward
-                self.network.apply_internal_rule(signal=signal, trigger_info=trigger_info)
+
 
             # Update softmax temperature / exploration rate
             if episode_done and self._explore:
