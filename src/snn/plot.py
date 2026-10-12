@@ -165,9 +165,9 @@ def plot_traces(simulator: 'SNNSimulator' = None, values: List[np.ndarray] = Non
     if figsize is None:
         figsize = ((x_max - x_min) * x_scale, sum(layer_sizes) * y_scale)
     fig, axs = plt.subplots(num_layers, 1, gridspec_kw={"hspace": 0.0}, sharex=True, height_ratios=layer_sizes[::-1], 
-                            figsize=figsize, dpi=dpi, layout="constrained")
+                            figsize=figsize, dpi=dpi, layout="constrained", squeeze=False)
     for i, layer_traces in enumerate(reversed(values)):
-        ax = axs[i]
+        ax = axs[i, 0]
         n_neurons = layer_traces.shape[0]
 
         for j in range(n_neurons):
@@ -492,7 +492,8 @@ def plot_weight_over_time(simulator: 'SNNSimulator' = None, values: List[np.ndar
                           pre_id: int | List[int] = None, post_id: int | List[int] = None,
                           figsize=None, dpi: int = 100,
                           title: str = None, x_min=None, x_max=None, t_max=None, t_min=None,
-                          x_scale: float = 5, y_scale: float = 3,
+                          x_scale: float = 1, y_scale: float = 1,
+                          sample_freq: int = 1,
                           synapse_layer: int = 0, 
                           savepath=None, show=True, line_kw={}):
     if simulator is not None:
@@ -530,51 +531,59 @@ def plot_weight_over_time(simulator: 'SNNSimulator' = None, values: List[np.ndar
     y_locator = ticker.MaxNLocator(nbins=4, prune=None)
     # Since both x and y axes are shared across subplots, only perform limit operations once
     axs[0,0].set_ylim(wmin, wmax)
-    x = np.arange(t_min, t_max)
+    x = np.arange(t_min, t_max, sample_freq)
     for i, pre in enumerate(pre_id):
         for j, post in enumerate(post_id):
             ax: Axes = axs[i, j]
 
             # Line plot
-            y = w_mat[i, j, t_min:t_max]
+            y = w_mat[i, j, t_min:t_max:sample_freq]
             ax.plot(x, y, **line_kw)
 
             # Label visibility
-            show_y = (j == 0) & (i % (nrow-1) == 0)
-            show_x = (i == nrow - 1) & (j % (ncol-1) == 0)
+            # show_y = (j == 0) & (i % (nrow-1) == 0)
+            # show_x = (i == nrow - 1) & (j % (ncol-1) == 0)
 
             # Y ticks and labels 
-            if not show_y:
-                ax.yaxis.set_tick_params(
-                    left=False,
-                    labelleft=False,
-                )
-            else:
-                ax.yaxis.set_major_locator(y_locator)
-                ax.tick_params(axis="y", labelsize=9, pad=3)
+            # if not show_y:
+            #     ax.yaxis.set_tick_params(
+            #         left=False,
+            #         labelleft=False,
+            #     )
+            # else:
+                # ax.yaxis.set_major_locator(y_locator)
+                # ax.tick_params(axis="y", labelsize=9, pad=3)
 
             # X ticks and labels 
-            if not show_x:
-                ax.xaxis.set_tick_params(
-                    bottom=False,
-                    labelbottom=False,
-                )
-            else:
-                ax.xaxis.set_major_locator(x_locator)
-                ax.tick_params(axis="x", labelsize=9, pad=4)
-                plt.setp(
-                    ax.get_xticklabels(),
-                    rotation=45,
-                    ha="right",
-                    rotation_mode="anchor",
-                )
+            # if not show_x:
+            #     ax.xaxis.set_tick_params(
+            #         bottom=False,
+            #         labelbottom=False,
+            #     )
+            # else:
+                # ax.xaxis.set_major_locator(x_locator)
+                # ax.tick_params(axis="x", labelsize=9, pad=4)
+                # plt.setp(
+                #     ax.get_xticklabels(),
+                #     rotation=45,
+                #     ha="right",
+                #     rotation_mode="anchor",
+                # )
 
             # Neuron ID display
             if i == 0:
                 ax.text(0.5, 1.05, f"{post}", transform=ax.transAxes, fontsize=12, ha="center")
             if j == ncol - 1:
                 ax.text(1.05, 0.5, f"{pre}", transform=ax.transAxes, fontsize=12, va="center")
-    # ax: Axes = axs[0,0]
+    ax: Axes = axs[0,0]
+    ax.xaxis.set_major_locator(x_locator)
+    ax.yaxis.set_major_locator(y_locator)
+    # plt.setp(
+    #     ax.get_xticklabels(),
+    #     rotation=45,
+    #     ha="right",
+    #     rotation_mode="anchor",
+    # )
     # ax.set_ylim(wmin, wmax)
     # axs[0,0].set_xlim(t_min, t_max)
     # Ticks and labels

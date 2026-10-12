@@ -106,12 +106,12 @@ class SynapseLayer(SynapseLayerProtocol):
                 self._posttrace_last = 1.0
 
         # Tau for pre-traces
-        if tau_pre is not None and tau_pre > 1:
+        if tau_pre is not None and tau_pre >= 1:
             tau_pre = tau_pre * dt
         self._tau_pre = tau_pre if tau_pre is not None else dt
         self._beta_pre = np.exp(-self.dt / self._tau_pre)
         # Tau for post-traces
-        if tau_post is not None and tau_post > 1:
+        if tau_post is not None and tau_post >= 1:
             tau_post = tau_post * dt
         self._tau_post = tau_post if tau_post is not None else dt
         self._beta_post = np.exp(-self.dt / self._tau_post)
@@ -150,7 +150,7 @@ class SynapseLayer(SynapseLayerProtocol):
 
         
         # Constants for etraces
-        if tau_syn is not None and isinstance(tau_syn, int):
+        if tau_syn is not None and tau_syn >= 1:
             tau_syn = tau_syn * dt
         self._tau_syn = tau_syn if tau_syn is not None else dt
         self._beta_syn = np.exp(-self.dt / self._tau_syn)  # Decay rate for eligibility trace
@@ -227,7 +227,7 @@ class SynapseLayer(SynapseLayerProtocol):
                     p_conn = 1.0
                     n_conn = n
                     p_exc = 1-p_inh
-                    n_exc = round(p_exc)    
+                    n_exc = round(p_exc*n)    
                 else:
                     # (inh, -, conn)
                     p_conn = np.clip(connectivity, 0, 1)
@@ -235,7 +235,7 @@ class SynapseLayer(SynapseLayerProtocol):
                     if n_inh > n_conn:
                         raise AssertionError(f"Number of inhibitory connections {n_inh} cannot exceed number of possible connections {n_conn}")
                     p_exc = p_conn-p_inh
-                    n_exc = round(p_exc)    
+                    n_exc = round(p_exc*n)    
             else:
                 p_exc, n_exc = self._process_prop(excitation_prop, n)
                 assert n_inh + n_exc <= n, f"Number of excitatory ({n_exc}) and inhibitory ({n_inh}) neurons cannot exceed total number of neurons {n}"
@@ -713,7 +713,7 @@ class SynapseLayer(SynapseLayerProtocol):
             assert value.size == 1, "Input must either be a scalar or array of size 1"
             value = value.item()
         assert value > 0, f"Time constant value must be strictly posive. Got tau_syn={value}"
-        if isinstance(value, int) or value > 1:
+        if isinstance(value, int) or value >= 1:
             value *= self.dt
         self._tau_syn = value
         self._beta_syn = np.exp(-self.dt / self._tau_syn)
@@ -730,7 +730,7 @@ class SynapseLayer(SynapseLayerProtocol):
             assert value.size == 1, "Input must either be a scalar or array of size 1"
             value = value.item()
         assert value > 0, f"Time constant value must be strictly posive. Got tau_pre={value}"
-        if isinstance(value, int) or value > 1:
+        if isinstance(value, int) or value >= 1:
             value *= self.dt
         self._tau_pre = value
         self._beta_pre = np.exp(-self.dt / self._tau_pre)
@@ -747,7 +747,7 @@ class SynapseLayer(SynapseLayerProtocol):
             assert value.size == 1, "Input must either be a scalar or array of size 1"
             value = value.item()
         assert value > 0, f"Time constant value must be strictly posive. Got tau_post={value}"
-        if isinstance(value, int) or value > 1:
+        if isinstance(value, int) or value >= 1:
             value *= self.dt
         self._tau_post = value
         self._beta_post = np.exp(-self.dt / self._tau_post)

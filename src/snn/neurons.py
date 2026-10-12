@@ -456,6 +456,9 @@ class NeuronLayer(NeuronLayerProtocol):
     @property
     def membrane_noise(self) -> float:
         return self._mem_noise
+    @membrane_noise.setter
+    def membrane_noise(self, value):
+        self._mem_noise = max(0, float(value))
 
     @property
     def trace(self) -> np.ndarray:
@@ -476,7 +479,7 @@ class NeuronLayer(NeuronLayerProtocol):
     def tau_trace(self, value: int | float):
         if value <= 0:
             raise ValueError(f"tau_mem must not be negative or zero. Got {value}")
-        if isinstance(value, int) or value > 1:
+        if isinstance(value, int) or value >= 1:
             value = value * self.dt
         self._tau_trace = value
 
@@ -492,7 +495,7 @@ class NeuronLayer(NeuronLayerProtocol):
     def tau_mem(self, value: int | float):
         if value <= 0:
             raise ValueError(f"tau_mem must not be negative or zero. Got {value}")
-        if isinstance(value, int) or value > 1:
+        if isinstance(value, int) or value >= 1:
             value = value * self.dt
         self._tau_mem = value
 

@@ -113,6 +113,15 @@ Branch v1.4-rule-rework
 v1.4
 ----
 
+v1.4.10.0 (2026-10-12)
+- When `tau_pre` etc is = 1, it will no longer be interpreted as is but as units of dt (as initially intended)
+    - Changed how tau_* is read during init and property setters by checking `value <= 1` instead of `value < 1`
+- Fixed issue when inhibition_prop is given but excitation_prop is None
+- Minor plotting changes:
+    - `plot_trace` can plot when there is only one layer
+    - `plot_weight_over_time` can now take `sample_freq` to lower temporal fidelity
+        Also temporarily removed the checks to only plot axis ticks on corner subplots (believed to be time-consuming)
+
 v1.4.9.1 (2026-10-05)
 - SynapseLayer weight decay:
     - Added `tau_weight` init param, along with property of same name and internal attributes `_tau_weight` and `_beta_weight`
