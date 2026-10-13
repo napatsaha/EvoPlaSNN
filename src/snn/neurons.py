@@ -60,8 +60,8 @@ class NeuronLayer(NeuronLayerProtocol):
                  tie_handling_wta: Literal["random", "all", "first"] = "random",
                  decayable: bool = None,
                  spike_method: Literal["deterministic", "stochastic"] = "deterministic", 
-                 stochastic_type: Literal["softmax", "epsilon"] = "softmax",
-                 softmax_temp: float = 1.0, minimum_softmax_temp: float = 1e-3,
+                 stochastic_type: Literal["softmax", "epsilon", "membrane_noise"] = "softmax",
+                 softmax_temp: float = 1.0, minimum_exploration_rate: float = 1e-3,
                  epsilon: float = 0.1,
                  spike_condition: Literal["every", "input"] = None,
                  ignore_threshold: bool = None,
@@ -112,7 +112,7 @@ class NeuronLayer(NeuronLayerProtocol):
             (Higher means more stochasticity, Lower means more deterministic).
                 Only relevant if `spike_method="stochastic"`. Defaults to 1.0.
 
-            minimum_softmax_temp (float, optional): _description_. Defaults to 1e-3.
+            minimum_exploration_rate (float, optional): _description_. Defaults to 1e-3.
 
             epsilon (float): Probability of spiking randomly, when `spike_method="softmax"` and `stochastic_type="epsilon"`. 
                 Needs to be between 0 and 1. Defaults to `0.1`.
@@ -172,8 +172,6 @@ class NeuronLayer(NeuronLayerProtocol):
         self.mem_rest = mem_rest
         self.tau_mem = tau_mem if tau_mem is not None else tau_trace if tau_trace is not None else dt
         self.beta_mem = np.exp(-self.dt / self.tau_mem) # Decay rate
-        self._mem_noise = max(0, float(membrane_noise))
-        self._add_mem_noise = self._mem_noise > 0
 
         # Trace parameters
         self.tau_trace = tau_trace if tau_trace is not None else tau_mem if tau_mem is not None else dt
@@ -183,13 +181,19 @@ class NeuronLayer(NeuronLayerProtocol):
         # Spiking method: Stochasticity
         self._spike_method = spike_method
         self._stochastic_spike = spike_method == "stochastic"
-        assert stochastic_type in ("softmax", "epsilon"), "Unsupported stochastic type. " + f"Got {stochastic_type}"
-        self._stochastic_type = stochastic_type
-        self._decayable = self._stochastic_spike if decayable is None else bool(decayable) # Determines if spike_method and softmax_temp can be set externally
-        # self._initial_softmax_temp = softmax_temp
+        assert stochastic_type in ("softmax", "epsilon", "membrane_noise"), "Unsupported stochastic type. " + f"Got {stochastic_type}"
+        self._stochastic_type = stochastic_type if self._stochastic_spike else None
+        self._decayable = bool(decayable) if self._stochastic_spike else None  # Determines if spike_method and softmax_temp can be set externally
+        # Stochastic: softmax
         self._softmax_temp = softmax_temp if self._stochastic_spike and self._stochastic_type == "softmax" else None
-        self._minimum_softmax_temp = minimum_softmax_temp
+        self._min_expl_rate = minimum_exploration_rate
+        # Stochastic: epsilon
         self._epsilon = np.clip(epsilon, 0, 1) if self._stochastic_spike and self._stochastic_type == "epsilon" else None
+        # Stochastic: membrane_noise
+        self._add_mem_noise = (self._stochastic_type == "membrane_noise") or (membrane_noise > 0)
+        self._mem_noise = max(0, float(membrane_noise)) if self._add_mem_noise else None
+        
+        
         # Winner-Take-All handling
         self.wta = wta if not self._stochastic_spike else True # Assume winner take all when spiking is stochastic
         self._tie_handling = tie_handling_wta
@@ -341,8 +345,8 @@ class NeuronLayer(NeuronLayerProtocol):
                 return
             # above_thr = self.membrane >= self.threshold
             if self._stochastic_type == "softmax":
-                if sum(above_thr) == 0:
-                    return
+                # if sum(above_thr) == 0:
+                #     return
                 # spike with probability based on membrane potentials (softmax with temperature)
                 probs = softmax(self.membrane, temperature=self._softmax_temp)
                 idx = np.random.choice(self.size, p=probs)
@@ -356,6 +360,8 @@ class NeuronLayer(NeuronLayerProtocol):
                 else:
                     # Otherwise, only spike when at least one above threshold
                     self._set_spike_wta(above_thr)
+            elif self._stochastic_type == "membrane_noise":
+                self._set_spike_wta(above_thr)
 
     def _set_spike_wta(self, above_thr):
         # above_thr = self.membrane >= self.threshold
@@ -457,7 +463,8 @@ class NeuronLayer(NeuronLayerProtocol):
     def membrane_noise(self) -> float:
         return self._mem_noise
     @membrane_noise.setter
-    def membrane_noise(self, value):
+    def membrane_noise(self, value: int | float):
+        self._add_mem_noise = value > 0
         self._mem_noise = max(0, float(value))
 
     @property
@@ -523,6 +530,8 @@ class NeuronLayer(NeuronLayerProtocol):
                 return self._softmax_temp
             elif self._stochastic_type == "epsilon":
                 return self._epsilon
+            elif self._stochastic_type == "membrane_noise":
+                return self.membrane_noise
             else:
                 return None
         else:
@@ -533,15 +542,16 @@ class NeuronLayer(NeuronLayerProtocol):
         # Do not set if this layer is not stochastic in the first place
         if not self._decayable and not self._stochastic_spike:
             return
+        # Also considers deterministic spiking if temperature is too low
+        if np.abs(value) < self._min_expl_rate:
+            value = 0.0
+            self.spike_method = "deterministic"
         if self._stochastic_type == "softmax":
-            # Prevents a temperature too low from being set
-            # Also considers deterministic spiking if temperature is too low
-            if np.abs(value) < self._minimum_softmax_temp:
-                value = 0.0
-                self.spike_method = "deterministic"
             self._softmax_temp = value
         elif self._stochastic_type == "epsilon":
             self._epsilon = np.clip(value, 0, 1)
+        elif self._stochastic_type == "membrane_noise":
+            self.membrane_noise = value
 
     def __repr__(self):
         return f"NeuronLayer(size={self.size}, tau_mem={self.tau_mem}, tau_trace={self.tau_trace}, threshold={self.threshold}, wta={self.wta})"

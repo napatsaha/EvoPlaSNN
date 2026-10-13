@@ -113,6 +113,14 @@ Branch v1.4-rule-rework
 v1.4
 ----
 
+v1.4.10.1 (2026-10-13)
+- Added `membrane_noise` to `stochastic_type` in NeuronLayer
+    - `membrane_noise` can still be set and decayed manually
+    - During `_set_spike()`, if stochastic via membrane_noise, the spiking will be the same as deterministic WTA
+    - `exploration_rate` getter and setter for membrane noise
+    - If setting `exploration_rate=0.0`, set `spike_method` to deterministic
+- Changed dependency: `_add_mem_noise` depends on `_stochastic_type` which depends on `_stochastic_spike`
+
 v1.4.10.0 (2026-10-12)
 - When `tau_pre` etc is = 1, it will no longer be interpreted as is but as units of dt (as initially intended)
     - Changed how tau_* is read during init and property setters by checking `value <= 1` instead of `value < 1`
