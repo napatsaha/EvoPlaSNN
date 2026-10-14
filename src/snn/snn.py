@@ -10,6 +10,7 @@ import numpy as np
 from .synapse import SynapseLayer
 from .neurons import NeuronLayer
 from lrule import Empty_Rule
+from lrule.dual import LayeredRule
 from common.utils import solve_hidden
 from common.base import LearningRule
 
@@ -319,8 +320,14 @@ class SNN:
     @learning_rule.setter
     def learning_rule(self, rule: LearningRule):
         self._learning_rule = rule
-        for synapse in self.synapse_layers:
-            synapse.learning_rule = rule
+        for i, synapse in enumerate(self.synapse_layers):
+            if synapse.plastic:
+                if isinstance(rule, LayeredRule):
+                    layer_rule = rule.get_rule_from_layer(i)
+                    if layer_rule is not None:
+                        synapse.learning_rule = layer_rule
+                else:
+                    synapse.learning_rule = rule
 
     @property
     def tau_trace(self) -> List[float]:

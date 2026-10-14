@@ -113,6 +113,15 @@ Branch v1.4-rule-rework
 v1.4
 ----
 
+v1.4.11.2 (2026-10-14)
+- Created `LayeredRule` in `lrule.dual` for assigning multiple rules to each layer of SNN:
+    - Methods for `mutate()`, `crossover()`, `parameters.setter` and `genes.setter` still not yet implemented
+    - Contains the method `get_rule_from_layer()` which will return the rule assigned to that layer id, or None if no rule is assigned
+- `snn.snn` depends on `lrule.dual` to check if rule is a LayeredRule:
+    - During `SNN.learning_rule.setter`, if the passed in rule is a LayeredRule, for each synapse layer, it will use the rule assigned to that layer id if available.
+        Otherwise, no learning rule will be set to that layer.
+- SNN will only assign learning rule to synapse layer where `plastic=True`
+
 v1.4.11.1 (2026-10-14)
 - Made `STDP_Rule` a child of `EvolvableLearningRule` so it can be used as an internal rule in `DualLearningRule`:
     - It can encode `coef_ltp` and `coef_ltd` as genes

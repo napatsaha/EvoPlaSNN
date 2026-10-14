@@ -1,9 +1,10 @@
 from typing import List, Dict, Sequence
 from copy import deepcopy
 
+import numpy as np
 from numpy.typing import ArrayLike
 
-from common.base import LearningRule, Parameter
+from common.base import LearningRule, Parameter, Genome
 from genome.genome import EvolvableLearningRule
 from common.utils import create_learning_rule
 
@@ -95,3 +96,63 @@ class DualLearningRule(LearningRule, EvolvableLearningRule):
         offspring = super().mutate(rate, scale, method, **kwargs)
         offspring._sync_genes()
         return offspring
+
+
+class LayeredRule(LearningRule, Genome):
+    """
+    Container with separate rule for each synapse layer.
+    """
+    def __init__(self, rules: List[LearningRule | Genome], layers: List[int] = None):
+        super().__init__()
+        for i, r in enumerate(rules):
+            assert isinstance(r, LearningRule), f"Item no {i} must be a learning rule. Got type={type(r)}"
+        self._rules = rules
+
+        if layers is None:
+            self._layers = [*range(len(self._rules))]
+        else:
+            assert len(layers) == len(self._rules), f"Length of layers ({len(layers)}) must be the same as number of rules ({len(self._rules)})"
+            self._layers = layers
+
+    def get_rule_from_layer(self, layer_id: int) -> LearningRule | None:
+        if layer_id not in self._layers:
+            return None
+        else:
+            idx = self._layers.index(int(layer_id))
+            return self._rules[idx]
+
+    def forward(self):
+        raise TypeError("LayeredRule does not support 'forward' method. Please call 'forward' of constituent rule individually.")
+
+    def update(self):
+        raise TypeError("LayeredRule does not support 'update' method. Please call 'update' of constituent rule individually.")
+
+    def mutate(self, rate, scale, method, **kwargs):
+        raise NotImplementedError()
+
+    def crossover(self, other, rate):
+        raise NotImplementedError()
+
+    @property
+    def rules(self):
+        return self._rules
+
+    @property
+    def layers(self):
+        return self._layers
+
+    @property
+    def parameters(self):
+        return np.array([p for r in self.rules for p in r.parameters])
+
+    @property
+    def genes(self):
+        return np.array([g for r in self.rules for g in r.genes])
+
+    @property
+    def size(self):
+        return sum([r.size for r in self.rules])
+
+    def __repr__(self):
+        return f"LayeredRule({self.rules}, layers={self.layers})"
+
