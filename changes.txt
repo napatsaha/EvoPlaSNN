@@ -113,6 +113,10 @@ Branch v1.4-rule-rework
 v1.4
 ----
 
+v1.4.11.1 (2026-10-14)
+- Made `STDP_Rule` a child of `EvolvableLearningRule` so it can be used as an internal rule in `DualLearningRule`:
+    - It can encode `coef_ltp` and `coef_ltd` as genes
+
 v1.4.11.0 (2026-10-14)
 - Changed DualLearningRule.__init__ so that it only accepts two learning rule objects.
     - If needing to construct via internal/external rule config, use `.from_params()` constructor

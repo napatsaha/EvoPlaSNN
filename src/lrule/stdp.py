@@ -1,11 +1,14 @@
-from typing import Literal
+from typing import Literal, List, Tuple, Dict, Sequence
 import numpy as np
 from abc import ABC, abstractmethod
+from numpy.typing import ArrayLike
 
+from common.base import LearningRule, Parameter
 # from snn.base import SynapseLayerProtocol
 from common.base import LearningRule, SynapseLayerProtocol
-from .utils import tile_array
-from .base import BaseLearningRule
+# from lrule.utils import tile_array
+from lrule.base import BaseLearningRule
+from genome.genome import EvolvableLearningRule
 
 
 class R_STDP_Rule(BaseLearningRule):
@@ -48,23 +51,34 @@ class R_STDP_Rule(BaseLearningRule):
         return None
 
 
-class STDP_Rule(BaseLearningRule):
+class STDP_Rule(BaseLearningRule, EvolvableLearningRule):
     """
     Unsupervised STDP_Rule that just depends on pre-/post- traces and spike presence. 
     Update-condition should be "on-timestep".
     """
-    def __init__(self, coef_ltp: float = 1.0, coef_ltd: float = -1.0, *, 
-                learning_rate: float = 1.0, learning_rate_thr: float = 0.1, threshold_agg_func: Literal["max", "min", "mean", "sum"] = "mean",
-                delta_weight: bool = True, delta_threshold: bool = False,
-                **kwargs):
-        super().__init__(learning_rate=learning_rate, learning_rate_thr=learning_rate_thr, threshold_agg_func=threshold_agg_func, 
+    _new_specs = {
+        "coef_ltp": dict(kind="real", length=1, dist="normal", dist_params=dict(loc=1, scale=1)),
+        "coef_ltd": dict(kind="real", length=1, dist="normal", dist_params=dict(loc=-1, scale=1)),
+    }
+    default_gene_order = ()
+    def __init__(self, *, 
+                 parameters: ArrayLike = None, genes: List[Parameter] = None, 
+                 genes_to_encode: List[Dict] | Dict[str, Dict] = None, gene_order: Sequence[str] = None, 
+                 coef_ltp: float = 1.0, coef_ltd: float = -1.0, 
+                 learning_rate: float = 1.0, learning_rate_thr: float = 0.1, threshold_agg_func: Literal["max", "min", "mean", "sum"] = "mean",
+                 delta_weight: bool = True, delta_threshold: bool = False,
+                 **kwargs):
+        self.coef_ltp = coef_ltp
+        self.coef_ltd = coef_ltd
+
+        BaseLearningRule.__init__(self, learning_rate=learning_rate, learning_rate_thr=learning_rate_thr, threshold_agg_func=threshold_agg_func, 
                          delta_weight=delta_weight, delta_threshold=delta_threshold, 
                          use_trace_pre=True, use_trace_post=True, use_spike_pre=True, use_spike_post=True,
                          use_weights=False, use_reward=False, 
                          use_eligibility=False, use_eligibility_pre=False, use_eligibility_post=False, use_eligibility_stdp=False, 
                          **kwargs)
-        self.coef_ltp = coef_ltp
-        self.coef_ltd = coef_ltd
+        EvolvableLearningRule.__init__(self, parameters=parameters, genes=genes, genes_to_encode=genes_to_encode, gene_order=gene_order)
+
 
     def forward(self, inp: np.ndarray):
         spk_pre = inp[:, 2]
@@ -74,6 +88,17 @@ class STDP_Rule(BaseLearningRule):
         dw = self.coef_ltp * spk_post * trace_pre + self.coef_ltd * spk_pre * trace_post
         return dw
 
+    def _build_gene_specs(self):
+        specs = super()._build_gene_specs()
+        specs.update(self._new_specs)
+        return specs
+
+    def _apply_gene_values(self):
+        super()._apply_gene_values()
+        if self.contains_gene("coef_ltp"):
+            self.coef_ltp = self.values.get("coef_ltp")
+        if self.contains_gene("coef_ltd"):
+            self.coef_ltd = self.values.get("coef_ltd")
 
 # class STDP_Rule(LearningRule):
 #     """
