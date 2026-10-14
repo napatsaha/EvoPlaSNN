@@ -12,14 +12,14 @@ class DualLearningRule(LearningRule, EvolvableLearningRule):
     """
     A composite learning rule system which contains two learning rules in one genome.
     """
-    def __init__(self, internal_rule: Dict, external_rule: Dict, *, 
+    def __init__(self, internal_rule: EvolvableLearningRule, external_rule: EvolvableLearningRule, *, 
                  parameters: ArrayLike = None, genes: List[Parameter] = None, 
                  genes_to_encode: Dict[str, Dict] = None, gene_order: Sequence[str] = None,
                  ):
 
         
-        self.internal_rule: EvolvableLearningRule = create_learning_rule(**deepcopy(internal_rule))
-        self.external_rule: EvolvableLearningRule = create_learning_rule(**deepcopy(external_rule))
+        self.internal_rule = internal_rule
+        self.external_rule = external_rule
 
         # Deal with possibility of duplicate gene names
         # -> The only important part to identify is in 'gene_order' of each rule
@@ -72,6 +72,13 @@ class DualLearningRule(LearningRule, EvolvableLearningRule):
         specs.update(self._int_specs)
         specs.update(self._ext_specs)
         return specs
+
+    @classmethod
+    def from_params(cls, internal_rule: Dict, external_rule: Dict, **kwargs):
+        internal_rule: EvolvableLearningRule = create_learning_rule(**deepcopy(internal_rule))
+        external_rule: EvolvableLearningRule = create_learning_rule(**deepcopy(external_rule))
+
+        return cls(internal_rule, external_rule, **kwargs)
 
     def forward(self, inp):
         pass

@@ -302,7 +302,10 @@ def create_learning_rule(type_: str = None, **kwargs) -> LearningRule:
         else:
             raise KeyError("\'type\' must be provided in params")
     rule_cls = _get_lrule_class(type_)
-    instance = rule_cls(**kwargs)
+    if type_ == "dual":
+        instance = rule_cls.from_params(**kwargs)
+    else:
+        instance = rule_cls(**kwargs)
     return instance
 
 

@@ -113,6 +113,13 @@ Branch v1.4-rule-rework
 v1.4
 ----
 
+v1.4.11.0 (2026-10-14)
+- Changed DualLearningRule.__init__ so that it only accepts two learning rule objects.
+    - If needing to construct via internal/external rule config, use `.from_params()` constructor
+- `create_learning_rule` in `common.utils` now uses `.from_params` constructor if rule type is dual
+- Changed how flattened `parameters` is extracted from genes in CompositeGenome (__init__, genes.setter, parameters.setter):
+    - Uses [nested for loops] instead of `np.r_[*[]]` for cases when `_genes` is empty
+
 v1.4.10.1 (2026-10-13)
 - Added `membrane_noise` to `stochastic_type` in NeuronLayer
     - `membrane_noise` can still be set and decayed manually

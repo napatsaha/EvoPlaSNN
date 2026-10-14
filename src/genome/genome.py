@@ -90,8 +90,9 @@ class CompositeGenome(Genome):
     def __init__(self, genes: List[Parameter], **kwargs):
         super().__init__(**kwargs)
         self._genes = genes
-        param = [g.value for g in self.genes]
-        self._parameters = np.r_[*param] if len(param) > 0 else np.array([])
+        self._parameters = np.array([v for g in self._genes for v in g.value])
+        # param = [g.value for g in self.genes]
+        # self._parameters = np.r_[*param] if len(param) > 0 else np.array([])
 
     def mutate(self, rate: float, scale: float, method: Literal["resample", "perturb"], *, 
                return_genes_only: bool = False) -> Genome | List[Parameter]:
@@ -149,7 +150,8 @@ class CompositeGenome(Genome):
             val = values[i:(i+l)]
             gene.value = val
             i += l
-        self._parameters = np.r_[*[g.value for g in self._genes]]
+        # self._parameters = np.r_[*[g.value for g in self._genes]]
+        self._parameters = np.array([v for g in self._genes for v in g.value])
 
     @property
     def genes(self) -> List[Parameter]:
@@ -158,7 +160,8 @@ class CompositeGenome(Genome):
     @genes.setter
     def genes(self, value: List[Parameter]):
         self._genes = value
-        self._parameters = np.r_[*[g.value for g in self._genes]]
+        # self._parameters = np.r_[*[g.value for g in self._genes]]
+        self._parameters = np.array([v for g in self._genes for v in g.value])
 
     @property
     def size(self) -> int:
