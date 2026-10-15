@@ -113,6 +113,12 @@ Branch v1.4-rule-rework
 v1.4
 ----
 
+v1.4.11.3 (2026-10-14)
+- Added "stdp" and "layered" to `common.utils.TYPE_DICT`
+    - `create_learning_rule()` uses `rule_cls.from_params()` for constructing layered rule
+- Added/Edited a simple descriptive `__repr__` in LayeredRule, DualLearningRule, STDP_Rule and MultiplyLearningRule
+- Added constructor `.from_params()` in `LayeredRule` where `rules=` is a list of dictionary configs
+
 v1.4.11.2 (2026-10-14)
 - Created `LayeredRule` in `lrule.dual` for assigning multiple rules to each layer of SNN:
     - Methods for `mutate()`, `crossover()`, `parameters.setter` and `genes.setter` still not yet implemented

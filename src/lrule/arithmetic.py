@@ -42,3 +42,6 @@ class MultiplyLearningRule(BaseLearningRule, EvolvableLearningRule):
     def forward(self, inp: np.ndarray) -> np.ndarray:
         dw = np.prod(inp, axis=1)
         return dw
+
+    def __repr__(self):
+        return f"MultiplyLearningRule(learning_rate={self.learning_rate}, trigger_condition={self.trigger_condition})"

@@ -273,10 +273,11 @@ def create_solver(params: dict, **kwargs) -> Solver:
 
 TYPE_DICT = {
     "dual": ("lrule.dual", "DualLearningRule"),
+    "layered": ("lrule.dual", "LayeredRule"),
     "ann" : ("lrule.ann", "ANN_Rule"),
     "cgp" : ("lrule.cgp", "CGP_Rule"),
     "graph" : ("lrule.cgp", "CGP_Graph"),
-    # "stdp" : ("lrule.stdp", "STDP_Rule"),
+    "stdp" : ("lrule.stdp", "STDP_Rule"),
     "rstdp" : ("lrule.stdp", "R_STDP_Rule"),
     "small-poly" : ("lrule.polynomial", "SmallPolynomialRule"),
     "multiply": ("lrule.arithmetic", "MultiplyLearningRule")
@@ -302,7 +303,7 @@ def create_learning_rule(type_: str = None, **kwargs) -> LearningRule:
         else:
             raise KeyError("\'type\' must be provided in params")
     rule_cls = _get_lrule_class(type_)
-    if type_ == "dual":
+    if type_ == "dual" or type_ == "layered":
         instance = rule_cls.from_params(**kwargs)
     else:
         instance = rule_cls(**kwargs)

@@ -97,6 +97,10 @@ class DualLearningRule(LearningRule, EvolvableLearningRule):
         offspring._sync_genes()
         return offspring
 
+    def __repr__(self):
+        return f"DualLearningRule(\n\tinternal_rule={self.internal_rule}, \n\texternal_rule={self.external_rule}, " + \
+            f"gene_order={self.gene_order})"
+
 
 class LayeredRule(LearningRule, Genome):
     """
@@ -120,6 +124,11 @@ class LayeredRule(LearningRule, Genome):
         else:
             idx = self._layers.index(int(layer_id))
             return self._rules[idx]
+
+    @classmethod
+    def from_params(cls, rules: List[dict], layers: List[int] = None):
+        rule_list = [create_learning_rule(**r_params) for r_params in rules]
+        return cls(rules=rule_list, layers=layers)
 
     def forward(self):
         raise TypeError("LayeredRule does not support 'forward' method. Please call 'forward' of constituent rule individually.")
@@ -154,5 +163,7 @@ class LayeredRule(LearningRule, Genome):
         return sum([r.size for r in self.rules])
 
     def __repr__(self):
-        return f"LayeredRule({self.rules}, layers={self.layers})"
+        return "LayeredRule(rules=[\n\t" + \
+            ",\n\t".join([repr(r).replace("\n", "\n\t") for r in self.rules]) + "\n\t]," + \
+            f"\n\tlayers={self.layers})"
 

@@ -100,6 +100,9 @@ class STDP_Rule(BaseLearningRule, EvolvableLearningRule):
         if self.contains_gene("coef_ltd"):
             self.coef_ltd = self.values.get("coef_ltd")
 
+    def __repr__(self):
+        return f"STDP_Rule(learning_rate={self.learning_rate}, coef_ltp={self.coef_ltp}, coef_ltd={self.coef_ltd}, trigger_condition={self.trigger_condition})"
+
 # class STDP_Rule(LearningRule):
 #     """
 #     This version of STDP using local variables is based on:
