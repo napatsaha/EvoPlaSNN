@@ -35,6 +35,7 @@ class RL_Evaluator(Evaluator):
                  max_episodes: int = None,
                  eval_episodes: int = None,
                  plastic_on_eval: bool = True,
+                 replace_parameters: bool = False,
                  measure_behaviour: bool = False,
                  behaviour_params: dict = None,
                  **kwargs
@@ -46,6 +47,7 @@ class RL_Evaluator(Evaluator):
         self.max_episodes = max_episodes
         self.eval_episodes = eval_episodes
         self.plastic_on_eval = plastic_on_eval
+        self.replace_parameters = replace_parameters
         # if self.num_simulation_steps is None:
         #     max_steps_per_eps = params.get("env_params", {}).get("max_steps", 0)
         #     if self.num_episodes is not None:
@@ -257,6 +259,9 @@ class RL_Evaluator(Evaluator):
                 if self._use_old_learning_rule:
                     rule = self.dummy_rule
                     rule.parameters = genome
+                elif self.replace_parameters:
+                    rule = self.dummy_rule
+                    rule.parameters = genome
                 else:
                     rule = create_learning_rule(self._lrule_type, parameters=genome, **self._lrule_params)
             else:
@@ -296,11 +301,12 @@ class RL_Evaluator(Evaluator):
             t1 = time.time()
 
             # Evaluation
-            self.simulator.soft_reset(deterministic=True)
-            self.simulator.run(num_eps=self.eval_episodes, update=self.plastic_on_eval)
+            if self.eval_episodes > 0:
+                self.simulator.soft_reset(deterministic=True)
+                self.simulator.run(num_eps=self.eval_episodes, update=self.plastic_on_eval)
 
             # Final Fitness
-            fitness = self.reward_collector.get_fitness()
+            fitness = self.reward_collector.get_fitness(t_cutoff=self.simulator.decay_cutoff)
             fitnesses.append(fitness)
 
             if self.logger is not None:

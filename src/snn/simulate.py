@@ -396,15 +396,18 @@ class SNNSimulator:
             # Record traces
             if record and self.record_traces:
                 for i, traces in enumerate(self.network.traces):
-                    self.trace_recorder.record(i, t, traces)
+                    if traces is not None:
+                        self.trace_recorder.record(i, t, traces)
             # Pre-synaptic Traces
             if record and self.record_pre_traces:
                 for i, traces in enumerate(self.network.pre_trace):
-                    self.trace_pre_recorder.record(i, t, traces)
+                    if traces is not None:
+                        self.trace_pre_recorder.record(i, t, traces)
             # Post-synaptic Traces
             if record and self.record_post_traces:
                 for i, traces in enumerate(self.network.post_trace):
-                    self.trace_post_recorder.record(i, t, traces)
+                    if traces is not None:
+                        self.trace_post_recorder.record(i, t, traces)
 
             # Record thresholds
             if record and self.record_thresholds:
@@ -419,16 +422,20 @@ class SNNSimulator:
             # Record eligibility traces
             if record and self.record_eligibility_pre:
                 for i, etraces in enumerate(self.network.eligibility_traces_pre):
-                    self.eligibility_pre_recorder.record(i, t, etraces)
+                    if etraces is not None:
+                        self.eligibility_pre_recorder.record(i, t, etraces)
             if record and self.record_eligibility_post:
                 for i, etraces in enumerate(self.network.eligibility_traces_post):
-                    self.eligibility_post_recorder.record(i, t, etraces)
+                    if etraces is not None:
+                        self.eligibility_post_recorder.record(i, t, etraces)
             if record and self.record_eligibility_stdp:
                 for i, etraces in enumerate(self.network.eligibility_traces_stdp):
-                    self.eligibility_stdp_recorder.record(i, t, etraces)
+                    if etraces is not None:
+                        self.eligibility_stdp_recorder.record(i, t, etraces)
             if record and self.record_eligibility_custom:
                 for i, etraces in enumerate(self.network.eligibility_traces_custom):
-                    self.eligibility_custom_recorder.record(i, t, etraces)
+                    if etraces is not None:
+                        self.eligibility_custom_recorder.record(i, t, etraces)
             
             # # Check for start of new sample
             # _new_sample = self.spike_generator.is_final()
@@ -604,7 +611,7 @@ class SNNSimulator:
         if not self._decay:
             return
 
-        if self._should_explore(t if self.decay_method == "time" else episode_count):
+        if self._should_explore(t):
             if self.decay_method == "time":
                 # Decay based on timestep
                 new_rate = self.decay_init_value * np.exp(-t * self.decay_rate / (self.decay_cutoff or self.num_steps))

@@ -113,6 +113,21 @@ Branch v1.4-rule-rework
 v1.4
 ----
 
+v1.4.12.0 (2026-10-20)
+- Preparing code for evolution run
+- Fix exploring via decay_cutoff
+- Fix recording e-trace and pre/post trace when not all layers enable traces
+- SNN.use_*_trace flag returns True even if some layers disable trace
+- RL_Evaluator:
+    - allows setting `replace_parameters` to set parameters to existing dummy_rule instead of creating new one during `evaluate()`
+    - eval_episode simulation run can be skipped if `eval_episode=0`
+    - Incorporate `t_cutoff` into fitness calculation
+- `lrule.utils.read_learning_rule()` use new constructor `.from_params()` with DualLearningRule and LayeredRule
+- Changes to LayeredRule:
+    - Added `get_bounds()`
+    - `from_params()` constructor now support setting parameters during init (but not yet `genes`)
+    - Added parameters.setter
+
 v1.4.11.3 (2026-10-14)
 - Added "stdp" and "layered" to `common.utils.TYPE_DICT`
     - `create_learning_rule()` uses `rule_cls.from_params()` for constructing layered rule

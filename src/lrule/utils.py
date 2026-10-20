@@ -45,6 +45,10 @@ def read_learning_rule(parameter_path: str | Path, config_path: str | Path) -> L
     parameters = np.loadtxt(parameter_path, delimiter=',')
     lrule_class = _get_lrule_class(lrule_type)
 
-    return lrule_class(parameters=parameters, **lrule_params)
+    if lrule_type == "dual" or lrule_type == "layered":
+        instance = lrule_class.from_params(parameters=parameters, **lrule_params)
+    else:
+        instance = lrule_class(parameters=parameters, **lrule_params)
 
+    return instance
     

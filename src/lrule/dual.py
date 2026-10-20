@@ -1,4 +1,4 @@
-from typing import List, Dict, Sequence
+from typing import List, Dict, Sequence, Tuple
 from copy import deepcopy
 
 import numpy as np
@@ -126,9 +126,25 @@ class LayeredRule(LearningRule, Genome):
             return self._rules[idx]
 
     @classmethod
-    def from_params(cls, rules: List[dict], layers: List[int] = None):
-        rule_list = [create_learning_rule(**r_params) for r_params in rules]
-        return cls(rules=rule_list, layers=layers)
+    def from_params(cls, rules: List[dict], layers: List[int] = None, 
+                    parameters: ArrayLike = None, genes: List[Parameter] = None, 
+                    **kwargs):
+        rule_list = []
+        i = 0
+        for r_params in rules:
+            rule = create_learning_rule(**r_params)
+            if parameters is not None:
+                # Since it is difficult to estimate genome size before creating the rule, to use for slicing 'parameters',
+                #  temp solution is to replace the parameters of each rule after creation
+                l = rule.size
+                p = parameters[i:(i+l)]
+                rule.parameters = p
+                i += l
+            elif genes is not None:
+                raise NotImplementedError("Setting 'genes' during init is not yet supported in LayeredRule")
+            rule_list.append(rule)
+        # rule_list = [create_learning_rule(**r_params) for r_params in rules]
+        return cls(rules=rule_list, layers=layers, **kwargs)
 
     def forward(self):
         raise TypeError("LayeredRule does not support 'forward' method. Please call 'forward' of constituent rule individually.")
@@ -142,27 +158,44 @@ class LayeredRule(LearningRule, Genome):
     def crossover(self, other, rate):
         raise NotImplementedError()
 
+    def get_bounds(self) -> Tuple[List, List]:
+        lower, upper = [], []
+        for rule in self.rules:
+            low, upp = rule.get_bounds()
+            lower.extend(low)
+            upper.extend(upp)
+        return lower, upper
+
     @property
-    def rules(self):
+    def rules(self) -> List[EvolvableLearningRule]:
         return self._rules
 
     @property
-    def layers(self):
+    def layers(self) -> List[int]:
         return self._layers
 
     @property
-    def parameters(self):
+    def parameters(self) -> np.ndarray:
         return np.array([p for r in self.rules for p in r.parameters])
+    @parameters.setter
+    def parameters(self, value: np.ndarray):
+        assert len(value) == self.size, f"Parameter length must be {self.size}. Got length={len(value)}"
+        i=0
+        for rule in self.rules:
+            l = rule.size
+            p = value[i:(i+l)]
+            rule.parameters = p
+            i += l
 
     @property
-    def genes(self):
+    def genes(self) -> List[Genome]:
         return np.array([g for r in self.rules for g in r.genes])
 
     @property
-    def size(self):
+    def size(self) -> int:
         return sum([r.size for r in self.rules])
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return "LayeredRule(rules=[\n\t" + \
             ",\n\t".join([repr(r).replace("\n", "\n\t") for r in self.rules]) + "\n\t]," + \
             f"\n\tlayers={self.layers})"

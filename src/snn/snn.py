@@ -163,9 +163,9 @@ class SNN:
             self.synapse_layers.append(synapse)
 
         # Which trace we're collecting
-        self.use_neuronal_trace = all(n.has_spike_trace() for n in self.neuron_layers)
-        self.use_presynaptic_trace = all(s.has_pre_trace() for s in self.synapse_layers)
-        self.use_postsynaptic_trace = all(s.has_post_trace() for s in self.synapse_layers)
+        self.use_neuronal_trace = any(n.has_spike_trace() for n in self.neuron_layers)
+        self.use_presynaptic_trace = any(s.has_pre_trace() for s in self.synapse_layers)
+        self.use_postsynaptic_trace = any(s.has_post_trace() for s in self.synapse_layers)
 
         # Other parameters
         self._soft_reset = soft_reset
