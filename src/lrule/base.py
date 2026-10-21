@@ -95,8 +95,8 @@ class BaseLearningRule(LearningRule):
         # 1, 2 = trace pre, post
         if self.use_trace_pre or self.use_trace_post:
             # trace_pre, trace_post = tile_array(w_shape, synapse.pre_layer.get_trace(), synapse.post_layer.get_trace())
-            trace_pre = synapse.get_pre_trace()
-            trace_post = synapse.get_post_trace()
+            trace_pre = synapse.get_pre_trace(flatten=False)
+            trace_post = synapse.get_post_trace(flatten=False)
             if self.use_trace_pre:
                 inp.append(trace_pre.reshape(-1, 1))
             if self.use_trace_post:

@@ -542,24 +542,42 @@ class SynapseLayer(SynapseLayerProtocol):
             # only the decay part is updated here, the 'rise' part will be added when learning_rule is called
             self._etrace_custom = self._etrace_custom * self._beta_syn
 
-    def get_pre_trace(self) -> np.ndarray | None:
+    def get_pre_trace(self, flatten: bool = False) -> np.ndarray | None:
         if self._use_pre_trace:
             if self._step_wise:
+                if flatten:
+                    return self._pre_trace[:, 0]
                 return self._pre_trace
             else:
-                return self._pretrace_last * np.exp(-self._pretrace_tssp * self.dt / self._tau_pre)
+                x = self._pretrace_last * np.exp(-self._pretrace_tssp * self.dt / self._tau_pre)
+                if flatten:
+                    return x[:, 0]
+                return x
         else:
+            if not self.pre_layer.has_spike_trace():
+                return None
             pre_trace = self.pre_layer.get_trace()
+            if flatten:
+                return pre_trace
             return np.broadcast_to(pre_trace[:, np.newaxis], (self.pre_layer.size, self.post_layer.size))
 
-    def get_post_trace(self) -> np.ndarray | None:
+    def get_post_trace(self, flatten: bool = False) -> np.ndarray | None:
         if self._use_post_trace:
             if self._step_wise:
+                if flatten:
+                    return self._post_trace[0, :]
                 return self._post_trace
             else:
-                return self._posttrace_last * np.exp(-self._posttrace_tssp * self.dt / self._tau_post)
+                x = self._posttrace_last * np.exp(-self._posttrace_tssp * self.dt / self._tau_post)
+                if flatten:
+                    return x[0, :]
+                return x
         else:
             post_trace = self.post_layer.get_trace()
+            if post_trace is None:
+                return None
+            if flatten:
+                return post_trace
             return np.broadcast_to(post_trace[np.newaxis, :], (self.pre_layer.size, self.post_layer.size))
 
     def has_pre_trace(self) -> bool:

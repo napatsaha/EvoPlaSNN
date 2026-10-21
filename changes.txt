@@ -113,6 +113,13 @@ Branch v1.4-rule-rework
 v1.4
 ----
 
+v1.4.12.1 (2026-10-21)
+- Fixed issue with synaptic pre- and post-trace when disabled
+- Added `flatten` argument to `SynapseLayer.get_pre_trace()` and `.get_post_trace()` to safely return flattened version of synaptic traces
+- `SNN.pre_trace` and `.post_trace` properties no longer slice traces. Instead, it calls `get_*_trace(flatten=True)`
+- Added documentation to `SynapseLayerProtocol` for above two methods
+- BaseLearningRule calls `get_*_trace(flatten=False)`
+
 v1.4.12.0 (2026-10-20)
 - Preparing code for evolution run
 - Fix exploring via decay_cutoff

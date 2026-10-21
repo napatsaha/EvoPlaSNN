@@ -279,10 +279,10 @@ class SNN:
 
     @property
     def pre_trace(self):
-        return [synapse.get_pre_trace()[:, 0] for synapse in self.synapse_layers]
+        return [synapse.get_pre_trace(flatten=True) for synapse in self.synapse_layers]
     @property
     def post_trace(self):
-        return [synapse.get_post_trace()[0, :] for synapse in self.synapse_layers]
+        return [synapse.get_post_trace(flatten=True) for synapse in self.synapse_layers]
     
     @property
     def weights(self):

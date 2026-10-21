@@ -184,20 +184,31 @@ class SynapseLayerProtocol(Protocol):
         """
         pass
 
-    def get_pre_trace(self) -> np.ndarray | None:
+    def get_pre_trace(self, flatten: bool) -> np.ndarray | None:
         """
-        Return pre-synaptic spike traces of shape (pre_size, post_size)
+        Return Pre-synaptic Trace calculated by the synapse layer if `pre_trace` is enabled. 
+        Otherwise, return neuronal trace of pre-synaptic layer if enabled. Otherwise, return None.
+
+        Args:
+            flatten (bool, optional): If True, return a flattened array of size pre-layer. 
+                Otherwise, returns an expanded array of synapse layer size. Defaults to False.
 
         Returns:
-            np.ndarray | None: shape (pre_size, post_size)
+            np.ndarray | None: Pre-synaptic trace, either of shape (pre-size, ) if flattened, or (pre-size, post-size) if not.
         """
 
-    def get_post_trace(self) -> np.ndarray | None:
+    def get_post_trace(self, flatten: bool) -> np.ndarray | None:
         """
-        Return post-synaptic spike traces of shape (pre_size, post_size)
+        Returns Post-synaptic trace calculated by the synapse layer if `post_trace` is enabled. 
+        Otherwise, return neuronal trace of post-layer if enabled.
+        Otherwise return None.
+
+        Args:
+            flatten (bool, optional): Whether to return as a flat array the shape of post-layer (True),
+                or as the shape synapse layer (pre, post). Defaults to False.
 
         Returns:
-            np.ndarray | None: shape (pre_size, post_size)
+            np.ndarray | None: Post-synaptic trace, either of shape (post-size, ) if flattened, or (pre-size, post-size) if not.
         """
 
     @property
