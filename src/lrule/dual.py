@@ -4,7 +4,7 @@ from copy import deepcopy
 import numpy as np
 from numpy.typing import ArrayLike
 
-from common.base import LearningRule, Parameter, Genome
+from common.base import LearningRule, Parameter, Genome, EvolvableRuleProtocol
 from genome.genome import EvolvableLearningRule
 from common.utils import create_learning_rule
 
@@ -102,7 +102,7 @@ class DualLearningRule(LearningRule, EvolvableLearningRule):
             f"gene_order={self.gene_order})"
 
 
-class LayeredRule(LearningRule, Genome):
+class LayeredRule(LearningRule, EvolvableRuleProtocol):
     """
     Container with separate rule for each synapse layer.
     """
@@ -167,7 +167,7 @@ class LayeredRule(LearningRule, Genome):
         return lower, upper
 
     @property
-    def rules(self) -> List[EvolvableLearningRule]:
+    def rules(self) -> List[EvolvableRuleProtocol]:
         return self._rules
 
     @property
@@ -190,6 +190,10 @@ class LayeredRule(LearningRule, Genome):
     @property
     def genes(self) -> List[Genome]:
         return np.array([g for r in self.rules for g in r.genes])
+
+    @property
+    def gene_order(self) -> List[str]:
+        return [f"l{i:02}_{g}" for i, r in zip(self.layers, self.rules) for g in r.gene_order]
 
     @property
     def size(self) -> int:

@@ -5,54 +5,114 @@ from numpy.typing import ArrayLike
 from typing import Any, Literal, Protocol, List, Sequence, Tuple, Dict, Union
 
 
-class NeuronLayerProtocol(Protocol):
+# Genome and Learning Rules
+
+class Genome(ABC):
     """
-    Protocol class for NeuronLayer.
-    Defines the public attributes and methods with their descriptions.
+    Base class to allow for genetic-related operations in evolutionary Solver.
     """
+    # def __init__(self, **kwargs):
+    #     super().__init__()
+        # self._parameters = parameters
+    # genes: List['Parameter']
 
-    size: int
-    dt: float
-    membrane: np.ndarray
-    spike: np.ndarray
-    tssp: np.ndarray
-    _trace: np.ndarray
+    @abstractmethod
+    def mutate(self, rate: float, scale: float, method: str, **kwargs) -> 'Genome':
+        """
+        Create a modified copy of itself
 
-    def __init__(self, size: int, *, tau_mem: float, tau_trace: float, dt: float, threshold: float,
-                 wta: bool, membrane_start: float, reset_mechanism: Literal["zero", "subtract"],
-                 trace_amp: float, trace_type: Literal["dx1", "dx2", "dx3"]) -> None:
+        Args:
+            rate (float): mutation rate
         """
-        Initialize the neuron layer with the given parameters.
-        """
-        pass
 
-    def reset(self) -> None:
+    @abstractmethod
+    def crossover(self, other: 'Genome', rate: float) -> 'Genome' | List['Parameter']:
         """
-        Reset the neuron layer state, including membrane potential, spike status, time since last spike, and trace.
+        Crossover between two Genomes
         """
-        pass
 
-    def forward(self, input_current: np.ndarray) -> np.ndarray:
+    @property
+    @abstractmethod
+    def parameters(self) -> np.ndarray:
         """
-        Update the neuron layer state based on the input current and time step.
-        Returns the spike status as an array.
+        Returns a 1D genetic blueprint of the genome
         """
-        pass
+        # return self._parameters 
 
-    def get_trace(self) -> np.ndarray:
+    @property
+    @abstractmethod
+    def size(self) -> int:
         """
-        Return the trace of the neuron layer, which decays since the last spike.
+        Returns the number of parameters that exists in the genome
         """
-        pass
+        # return len(self._parameters)
 
-    def update_thresholds(self, delta_thr: np.ndarray):
-        """
-        Update the firing thresholds of the neurons by adding delta_thr.
-        """
-        pass
+    # def __repr__(self) -> str:
+        # return f"Genome({self.parameters})"
 
 
-# from .snn import NeuronLayer
+class Parameter(ABC):
+    """
+    A Parameter (aka Gene) is a component of a Genome with specific value type, bounds and distribution.
+    """
+    length: int
+    value: np.typing.ArrayLike
+    name: str
+
+    @abstractmethod
+    def mutate(self, flags: bool | List | ArrayLike, method: Literal["resample", "perturb"], scale: float) -> 'Parameter':
+        """
+        Mutate and create a modified Paramter with the same distribution and bounds
+
+        Args:
+            flags (bool | List | ArrayLike): an array of boolean flags to determine which location of gene
+            to modify. (Must have same length as `Parameter.length`). If a scalar boolean value is passed through,
+            the entire length of Paramter will be affected altogether.
+
+        Returns:
+            Parameter: new Paramter
+        """
+    
+    @abstractmethod
+    def crossover(self, other: 'Parameter', flags: bool | List | ArrayLike) -> 'Parameter':
+        """
+        Perform a point crossover with another Parameter given an array of flags where crossover should occur.
+
+        Args:
+            other (Parameter): The other Parameter
+            flags (bool | List | ArrayLike): where to recombine the genes
+
+        Returns:
+            Parameter: New recombined Parameter
+        """
+
+    @abstractmethod
+    def get_value(self) -> Any:
+        """
+        Extract value represented by this gene (This may be different from value encoded in genome)
+        """
+        
+    @abstractmethod
+    def copy(self) -> 'Parameter':
+        """
+        Make a copy of this gene
+        """
+    
+    @abstractmethod
+    def to_dict(self) -> 'Dict':
+        """
+        Return attributes required as kwargs to recreate this Parameter during init
+        """
+
+    def get_lower_bounds(self) -> List[int | float]:
+        """
+        Return a list of lower bounds of the same length as gene's length. For gene position with no bound, will return 'None'.
+        """
+
+    def get_upper_bounds(self) -> List[int | float]:
+        """
+        Return a list of upper bounds of the same length as gene's length. For gene position with no bound, will return 'None'.
+        """
 
 
 class LearningRule(ABC):
@@ -121,6 +181,80 @@ class LearningRule(ABC):
             return True
         else:
             return False
+
+
+class EvolvableRuleProtocol(Genome):
+    size: int
+    parameters: np.ndarray
+    gene_order: List[str]
+    genes_to_encode: Dict[str, Dict[str, Any]]
+    genes: List['Parameter']
+    values: Dict[str, ArrayLike]
+
+    def contains_gene(self, gene_name: str) -> bool:
+        """
+        Check whether this rule is encoding a certain gene in its genome
+        """
+
+    def get_bounds(self) -> Tuple[List, List]:
+        """
+        Returns (lower, upper) boundaries of each genome location.
+        """
+
+    def copy(self) -> 'EvolvableRuleProtocol':
+        """
+        Returns a copy of self with identical but unlinked genes and parameters.
+        """
+
+
+# SNN Components
+
+class NeuronLayerProtocol(Protocol):
+    """
+    Protocol class for NeuronLayer.
+    Defines the public attributes and methods with their descriptions.
+    """
+
+    size: int
+    dt: float
+    membrane: np.ndarray
+    spike: np.ndarray
+    tssp: np.ndarray
+    _trace: np.ndarray
+
+    def __init__(self, size: int, *, tau_mem: float, tau_trace: float, dt: float, threshold: float,
+                 wta: bool, membrane_start: float, reset_mechanism: Literal["zero", "subtract"],
+                 trace_amp: float, trace_type: Literal["dx1", "dx2", "dx3"]) -> None:
+        """
+        Initialize the neuron layer with the given parameters.
+        """
+        pass
+
+    def reset(self) -> None:
+        """
+        Reset the neuron layer state, including membrane potential, spike status, time since last spike, and trace.
+        """
+        pass
+
+    def forward(self, input_current: np.ndarray) -> np.ndarray:
+        """
+        Update the neuron layer state based on the input current and time step.
+        Returns the spike status as an array.
+        """
+        pass
+
+    def get_trace(self) -> np.ndarray:
+        """
+        Return the trace of the neuron layer, which decays since the last spike.
+        """
+        pass
+
+    def update_thresholds(self, delta_thr: np.ndarray):
+        """
+        Update the firing thresholds of the neurons by adding delta_thr.
+        """
+        pass
+
 
 class SynapseLayerProtocol(Protocol):
     """
@@ -322,6 +456,8 @@ class SimulatorProtocol(Protocol):
     environment: Any # Will fix later
 
 
+# Evolutionary Algorithm components
+
 class Solver(Protocol):
     """
     Base solver for all Evolutionary Algorithms.
@@ -445,113 +581,6 @@ class Evaluator(Protocol):
     #     pass
 
 
-class Genome(ABC):
-    """
-    Base class to allow for genetic-related operations in evolutionary Solver.
-    """
-    # def __init__(self, **kwargs):
-    #     super().__init__()
-        # self._parameters = parameters
-    # genes: List['Parameter']
-
-    @abstractmethod
-    def mutate(self, rate: float, scale: float, method: str, **kwargs) -> 'Genome':
-        """
-        Create a modified copy of itself
-
-        Args:
-            rate (float): mutation rate
-        """
-
-    @abstractmethod
-    def crossover(self, other: 'Genome', rate: float) -> 'Genome' | List['Parameter']:
-        """
-        Crossover between two Genomes
-        """
-
-    @property
-    @abstractmethod
-    def parameters(self) -> np.ndarray:
-        """
-        Returns a 1D genetic blueprint of the genome
-        """
-        # return self._parameters 
-
-    @property
-    @abstractmethod
-    def size(self) -> int:
-        """
-        Returns the number of parameters that exists in the genome
-        """
-        # return len(self._parameters)
-
-    # def __repr__(self) -> str:
-        # return f"Genome({self.parameters})"
-
-    
-
-class Parameter(ABC):
-    """
-    A Parameter (aka Gene) is a component of a Genome with specific value type, bounds and distribution.
-    """
-    length: int
-    value: np.typing.ArrayLike
-    name: str
-
-    @abstractmethod
-    def mutate(self, flags: bool | List | ArrayLike, method: Literal["resample", "perturb"], scale: float) -> 'Parameter':
-        """
-        Mutate and create a modified Paramter with the same distribution and bounds
-
-        Args:
-            flags (bool | List | ArrayLike): an array of boolean flags to determine which location of gene
-            to modify. (Must have same length as `Parameter.length`). If a scalar boolean value is passed through,
-            the entire length of Paramter will be affected altogether.
-
-        Returns:
-            Parameter: new Paramter
-        """
-    
-    @abstractmethod
-    def crossover(self, other: 'Parameter', flags: bool | List | ArrayLike) -> 'Parameter':
-        """
-        Perform a point crossover with another Parameter given an array of flags where crossover should occur.
-
-        Args:
-            other (Parameter): The other Parameter
-            flags (bool | List | ArrayLike): where to recombine the genes
-
-        Returns:
-            Parameter: New recombined Parameter
-        """
-
-    @abstractmethod
-    def get_value(self) -> Any:
-        """
-        Extract value represented by this gene (This may be different from value encoded in genome)
-        """
-        
-    @abstractmethod
-    def copy(self) -> 'Parameter':
-        """
-        Make a copy of this gene
-        """
-    
-    @abstractmethod
-    def to_dict(self) -> 'Dict':
-        """
-        Return attributes required as kwargs to recreate this Parameter during init
-        """
-
-    def get_lower_bounds(self) -> List[int | float]:
-        """
-        Return a list of lower bounds of the same length as gene's length. For gene position with no bound, will return 'None'.
-        """
-
-    def get_upper_bounds(self) -> List[int | float]:
-        """
-        Return a list of upper bounds of the same length as gene's length. For gene position with no bound, will return 'None'.
-        """
 
 
 class SpikeCoder(ABC):

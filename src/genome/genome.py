@@ -7,7 +7,7 @@ from genome.parameter import GeneSpec
 import numpy as np
 from numpy.typing import ArrayLike
 
-from common.base import Genome, Parameter, SynapseLayerProtocol
+from common.base import Genome, Parameter, SynapseLayerProtocol, EvolvableRuleProtocol
 
 
 class SimpleGenome(Genome):
@@ -171,7 +171,7 @@ class CompositeGenome(Genome):
         return "CompositeGenome(" + ', '.join([repr(g) for g in self.genes]) + ")"
 
 
-class EvolvableLearningRule(Genome):
+class EvolvableLearningRule(EvolvableRuleProtocol):
     genome: CompositeGenome
     _specs: Dict[str, Dict[str, Any]]
     default_gene_specs = {
