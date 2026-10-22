@@ -92,7 +92,7 @@ def plot_spikes(simulator: 'SNNSimulator' = None, values: List[np.ndarray] = Non
         plt.savefig(savepath, dpi=dpi)
     if show:
         plt.show()
-    # plt.close(fig)
+    plt.close(fig)
 
 
 def plot_traces(simulator: 'SNNSimulator' = None, values: List[np.ndarray] = None, *, 
@@ -198,7 +198,7 @@ def plot_traces(simulator: 'SNNSimulator' = None, values: List[np.ndarray] = Non
         plt.savefig(savepath, dpi=dpi)
     if show:
         plt.show()
-    # plt.close(fig)
+    plt.close(fig)
 
 
 def plot_membranes(simulator: 'SNNSimulator' = None, values: List[np.ndarray] = None, spike_values: List[np.ndarray] = None, 
@@ -307,7 +307,7 @@ def plot_membranes(simulator: 'SNNSimulator' = None, values: List[np.ndarray] = 
         plt.savefig(savepath, dpi=dpi)
     if show:
         plt.show()
-    # plt.close(fig)
+    plt.close(fig)
 
 
 def _plot_neuron(fig: Figure, gs: gridspec.GridSpec, mem: np.ndarray, *, 
@@ -485,7 +485,7 @@ def plot_weights(simulator: "SNNSimulator" = None, values: List[np.ndarray] = No
         plt.savefig(savepath, dpi=dpi)
     if show:
         plt.show()
-    # plt.close(fig)
+    plt.close(fig)
 
 
 def plot_weight_over_time(simulator: 'SNNSimulator' = None, values: List[np.ndarray] = None, *, 
@@ -648,7 +648,7 @@ def plot_weight_heatmap(simulator: 'SNNSimulator', *, x_scale: float = 0.2, y_sc
         plt.savefig(savepath, dpi=dpi)
     if show:
         plt.show()
-    # plt.close(fig)
+    plt.close(fig)
 
 
 def plot_env_weight_actions(simulator: 'SNNSimulator', *, dpi: int = 100, figsize=None, comment: str = None,
@@ -693,6 +693,7 @@ def plot_env_weight_actions(simulator: 'SNNSimulator', *, dpi: int = 100, figsiz
         plt.savefig(savepath, dpi=dpi)
     if show:
         plt.show()
+    plt.close(fig)
 
 
 # def plot_env_weight_greedy(simulator: 'SNNSimulator', *, arrowcolors = ("white", "black"),
@@ -839,6 +840,7 @@ def _plot_env_action_values(env: 'BaseMaze', state_action_values: Dict[int, np.n
         plt.savefig(savepath, dpi=dpi)
     if show:
         plt.show()
+    plt.close(fig)
 
 
 def plot_eligibility_traces(simulator: 'SNNSimulator' = None, values: np.ndarray = None, *, 
@@ -903,7 +905,7 @@ def plot_eligibility_traces(simulator: 'SNNSimulator' = None, values: np.ndarray
         plt.savefig(savepath, dpi=dpi)
     if show:
         plt.show()
-    # plt.close(fig)
+    plt.close(fig)
 
 
 def plot_intermediate_fitness(simulator: 'SNNSimulator' = None, values: np.ndarray = None, reward_collector: RewardCollector = None, *, 
@@ -1003,7 +1005,7 @@ def plot_intermediate_fitness(simulator: 'SNNSimulator' = None, values: np.ndarr
         plt.savefig(savepath, dpi=dpi)
     if show:
         plt.show()
-    # plt.close(fig)
+    plt.close(fig)
 
 
 ### Plotting functions for Learning Rule ###
@@ -1652,7 +1654,7 @@ def plot_compare_run(exp_dir: str | Path, x_var: str, hue_var: str = None, col_v
         plt.savefig(savepath, dpi=300, bbox_inches='tight')
     if show:
         plt.show()
-    # plt.close(fig)
+    plt.close(fig)
 
 
 ### Helper functions ###

@@ -261,7 +261,7 @@ class SNN:
                 for neuron_layer in self.neuron_layers:
                     if not neuron_layer._decayable:
                         continue
-                    neuron_layer.exploration_rate = value[0]
+                    neuron_layer.exploration_rate = value[i]
                     i += 1
 
     def set_deterministic(self):

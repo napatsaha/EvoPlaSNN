@@ -113,6 +113,10 @@ Branch v1.4-rule-rework
 v1.4
 ----
 
+v1.4.12.4 (2026-10-22)
+- Fixed indexing issue with multiple exploration rate in SNN
+- Added `plt.close(fig)` to every plot in `snn.plot`
+
 v1.4.12.3 (2026-10-22)
 - Support multiple values for exploration rate and decay rate 
 - In `SNNSimulator`, `decay_rate` and `decay_init_value` can be more than one in length, but must be either a scalar or of same length
