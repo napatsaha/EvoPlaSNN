@@ -113,6 +113,9 @@ Branch v1.4-rule-rework
 v1.4
 ----
 
+v1.4.12.5 (2026-10-22)
+- Hotfix: remove assertion of decay_rate and decay_init_value to be of same size -> difficult to check length when input could be either array or scalar
+
 v1.4.12.4 (2026-10-22)
 - Fixed indexing issue with multiple exploration rate in SNN
 - Added `plt.close(fig)` to every plot in `snn.plot`

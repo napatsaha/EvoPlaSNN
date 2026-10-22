@@ -137,9 +137,9 @@ class SNNSimulator:
         elif self._exploration_source == "env":
             self.decay_init_value = self.epsilon
 
-        if isinstance(self.decay_rate, np.ndarray | Sequence) and len(self.decay_rate) > 1:
-            assert len(self.decay_rate) == len(self.decay_init_value), "When more than 1 exploration value and decay is being used, they must be of equal length. \n" + \
-                f"Got decay_rate={self.decay_rate}, decay_init_value={self.decay_init_value}"
+        # if hasattr(self.decay_rate, np.ndarray | Sequence) and len(self.decay_rate) > 1:
+        #     assert len(self.decay_rate) == len(self.decay_init_value), "When more than 1 exploration value and decay is being used, they must be of equal length. \n" + \
+        #         f"Got decay_rate={self.decay_rate}, decay_init_value={self.decay_init_value}"
 
 
         # # Initialize post-processing components
