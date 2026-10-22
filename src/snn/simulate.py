@@ -1,6 +1,6 @@
 import copy
 from pathlib import Path
-from typing import List, Literal, Optional
+from typing import List, Literal, Optional, Sequence
 from matplotlib import ticker
 import numpy as np
 import matplotlib.pyplot as plt
@@ -38,7 +38,7 @@ class SNNSimulator:
                 epsilon_greedy: bool = False, epsilon: float = None,
                  decay: bool = False, exploration_source: Literal["network", "env"] = None,
                  decay_method: Literal["time", "constant"] = "time",
-                 decay_rate: float = None, decay_cutoff: Optional[int] = None, 
+                 decay_rate: float | Sequence = None, decay_cutoff: Optional[int] = None, 
                  record_membrane: bool = True, record_spikes: bool = True, record_traces: bool = True, record_pre_traces: bool = False, record_post_traces: bool = False,
                  record_thresholds: bool = False,
                  record_weights: bool = False, record_eligibility_pre: bool = False, record_eligibility_post: bool = False, 
@@ -109,13 +109,13 @@ class SNNSimulator:
         self._use_decay = decay
         self._decay = decay
         self.decay_method = decay_method
-        self.decay_rate = decay_rate
+        self.decay_rate = np.asarray(decay_rate)
         self.decay_cutoff = decay_cutoff
         self._explore = self._should_explore(0)
         self._exploration_source = exploration_source
 
         # Check if Network explore via stochastic spiking
-        neuron_expl = self.network.get_exploration_rate()
+        neuron_expl = self.network.get_exploration_rate(simplify=False)
         if (neuron_expl is not None) or (neuron_expl > 0.0):
             if self._exploration_source is None:
                 self._exploration_source = "network"
@@ -136,6 +136,10 @@ class SNNSimulator:
             self.decay_init_value = neuron_expl
         elif self._exploration_source == "env":
             self.decay_init_value = self.epsilon
+
+        if isinstance(self.decay_rate, np.ndarray | Sequence) and len(self.decay_rate) > 1:
+            assert len(self.decay_rate) == len(self.decay_init_value), "When more than 1 exploration value and decay is being used, they must be of equal length. \n" + \
+                f"Got decay_rate={self.decay_rate}, decay_init_value={self.decay_init_value}"
 
 
         # # Initialize post-processing components
@@ -600,7 +604,7 @@ class SNNSimulator:
 
     def _get_exploration_rate(self) -> float:
         if self._exploration_source == "network":
-            return self.network.get_exploration_rate()
+            return self.network.get_exploration_rate(simplify=False)
         elif self._exploration_source == "env":
             return self.epsilon
 

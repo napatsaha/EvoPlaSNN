@@ -542,6 +542,7 @@ class NeuronLayer(NeuronLayerProtocol):
         # Do not set if this layer is not stochastic in the first place
         if not self._decayable and not self._stochastic_spike:
             return
+        assert isinstance(value, float | int) or len(value) == 1, "Only a scalar exploration rate can be passed to each neuron layer"
         # Also considers deterministic spiking if temperature is too low
         if np.abs(value) < self._min_expl_rate:
             value = 0.0

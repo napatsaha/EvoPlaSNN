@@ -239,7 +239,7 @@ class SNN:
         """
         return self._soft_reset
 
-    def get_exploration_rate(self):
+    def get_exploration_rate(self, simplify: bool = True) -> float | Sequence:
         # return self.neuron_layers[-1].exploration_rate
         values = []
         for neuron_layer in self.neuron_layers:
@@ -247,15 +247,22 @@ class SNN:
                 continue
             value = neuron_layer.exploration_rate
             values.append(value)
-        if len(set(values)) == 1:
+        if simplify and len(set(values)) == 1:
             return values[0]
         return np.asarray(values)
 
-    def set_exploration_rate(self, value: float = None):
+    def set_exploration_rate(self, value: float | Sequence = None):
         if value is not None:
-            # self.neuron_layers[-1].exploration_rate = value
-            for neuron_layer in self.neuron_layers:
-                neuron_layer.exploration_rate = value
+            if isinstance(value, float) or len(value) == 1:
+                for neuron_layer in self.neuron_layers:
+                    neuron_layer.exploration_rate = value
+            elif len(value) > 1:
+                i = 0
+                for neuron_layer in self.neuron_layers:
+                    if not neuron_layer._decayable:
+                        continue
+                    neuron_layer.exploration_rate = value[0]
+                    i += 1
 
     def set_deterministic(self):
         for neuron_layer in self.neuron_layers:

@@ -113,6 +113,13 @@ Branch v1.4-rule-rework
 v1.4
 ----
 
+v1.4.12.3 (2026-10-22)
+- Support multiple values for exploration rate and decay rate 
+- In `SNNSimulator`, `decay_rate` and `decay_init_value` can be more than one in length, but must be either a scalar or of same length
+- `SNN.set_exploration_rate()` can be set with more than one value, if more than one neuron layer is 'decayble'
+    - Added `simplify=True` to `SNN.get_exploration_rate()` to allow consistent outputs
+- `NeuronLayer.exploration_rate` can only be set with a scalar or size-one array 
+
 v1.4.12.2 (2026-10-21)
 - Added `EvolvableRuleProtocol` to `common.base` as a child of `Genome`
     - Also reordered base classes in `common.base`
