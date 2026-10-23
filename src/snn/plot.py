@@ -909,12 +909,12 @@ def plot_eligibility_traces(simulator: 'SNNSimulator' = None, values: np.ndarray
 
 
 def plot_intermediate_fitness(simulator: 'SNNSimulator' = None, values: np.ndarray = None, reward_collector: RewardCollector = None, *, 
-                              plot_exploration: bool = False,
+                              plot_exploration: bool = False, exploration_labels: List[str] = None,
                               t_cutoff: int = None, eps_cutoff: int = None,
                               num_steps: int = None, timestamps: np.ndarray = None,
                               x_scale: float = 0.01, y_scale: float = 1.0, x_eps: int = 1,
                               t_min: int = None, t_max: int = None, t_range: int = None, window_size: int = 10, 
-                              figsize: tuple = None, dpi: int = 100,
+                              figsize: tuple = None, dpi: int = 100, title: str = None,
                               savepath: str | Path = None, show: bool = True):
     if (simulator is not None) or (reward_collector is not None):
         if simulator is not None:
@@ -965,7 +965,7 @@ def plot_intermediate_fitness(simulator: 'SNNSimulator' = None, values: np.ndarr
         figsize = (((t_max - t_min) * x_scale, 10 * y_scale * (int(plot_exploration) + 1)))
     fig, axs = plt.subplots(1 + int(plot_exploration), 1, figsize=figsize, dpi=dpi,
                             layout="constrained", squeeze=False)
-    ax = axs[0, 0]
+    ax: Axes = axs[0, 0]
     ax.plot(
         ts, fts,
         color="gray", alpha=0.8,
@@ -981,24 +981,38 @@ def plot_intermediate_fitness(simulator: 'SNNSimulator' = None, values: np.ndarr
     ax.set_xlabel("Time (steps)")
     ax.set_ylabel("Episode " + fts_type.title())
     if plot_exploration:
-        ax = axs[1, 0]
+        ax: Axes = axs[1, 0]
         if reward_collector is not None:
             expl = reward_collector.get_explorations(t_cutoff=t_cutoff, eps_cutoff=eps_cutoff)
+            expl = np.array(expl)
+            multi_expl = expl.ndim > 1 and expl.shape[1] > 1
             ts = reward_collector.get_timestamps(t_cutoff=t_cutoff, eps_cutoff=eps_cutoff)
         else:
             raise ValueError("Can only plot exploration with a valid 'reward_collector'")
-        ax.plot(
-            ts, expl,
-            color="red", alpha=0.8,
-            drawstyle="steps-pre",
-            linewidth=2.5, 
-        )
+        if multi_expl:
+            n_expl = expl.shape[1]
+            if exploration_labels is None:
+                exploration_labels = [f"Exploration {i+1}" for i in range(n_expl)]
+            ax.plot(
+                ts, expl,
+                alpha=0.8,
+                drawstyle="steps-pre",
+                linewidth=2.5, label=exploration_labels
+            )
+            ax.legend(fontsize=14, loc="upper right")
+        else:
+            ax.plot(
+                ts, expl,
+                color="red", alpha=0.8,
+                drawstyle="steps-pre",
+                linewidth=2.5, 
+            )
         ax.set_xlim(t_min - x_eps, t_max + x_eps)
         if num_steps is not None:
             ax.xaxis.set_major_locator(plt.MultipleLocator(100))
         ax.set_xlabel("Time (steps)")
         ax.set_ylabel("Exploration Rate")
-    fig.text(0.5, 1.07, "Intermediate Fitness Over Time", ha='center', fontsize=20)
+    fig.text(0.5, 1.07, "Intermediate Fitness Over Time" if title is None else title, ha='center', fontsize=20)
     fig.text(0.5, 1.02, f"{agg_func.title()} Fitness: {ft:.2f}", ha='center', fontsize=14)
     if savepath is not None:
         print(f"Saving plot to {savepath}")

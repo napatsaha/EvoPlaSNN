@@ -113,6 +113,11 @@ Branch v1.4-rule-rework
 v1.4
 ----
 
+v1.4.12.6 (2026-10-23)
+- Support plotting multiple exploration rates in `plot_intermediate_fitness()`
+    - Plot different exploration rates on different colours, and optional labels
+    - Added optional arguments `exploration_labels` and `title`
+
 v1.4.12.5 (2026-10-22)
 - Hotfix: remove assertion of decay_rate and decay_init_value to be of same size -> difficult to check length when input could be either array or scalar
 
