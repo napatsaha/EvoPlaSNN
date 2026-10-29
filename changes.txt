@@ -113,6 +113,14 @@ Branch v1.4-rule-rework
 v1.4
 ----
 
+v1.4.13.1 (2026-10-29)
+- Simple GA `evo.ga.GeneticAlgorithm`:
+    - Only Tournament selection is supported
+    - Crossover is via swapping parents, to create two offspring. Crossover rate should be kept at 0.5
+    - Can specify mutation method, rate, scale, to be applied to `Genome.mutate()`
+- Added `'simple_ga'` to `common.utils.ALGO_DICT`
+- `BaseSolver` now automatically extracts `ndim` from a sample solution if `ndim=None` and `genome_params` is provided
+
 v1.4.13.0 (2026-10-29)
 - Configured `LayeredRule` to have functional genetic operators, and missing properties from `EvolvableRuleProtocol`:
     - Implemented `.mutate()`, `.crossover()`, `.contains_gene()` and `.copy()`

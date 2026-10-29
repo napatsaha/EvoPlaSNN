@@ -252,7 +252,8 @@ ALGO_DICT = {
     "cma_es": ("evo.cma_es", "CMA_ES"),
     "pycma": ("evo.pycma_wrapper", "PyCMAWrapper"),
     "es": ("evo.es", "EvolutionStrategy"),
-    "simple": ("evo.es", "EvolutionStrategy"),
+    # "simple": ("evo.es", "EvolutionStrategy"),
+    "simple_ga": ("evo.ga", "GeneticAlgorithm"),
     "mu_plus_lambda": ("evo.mu_lambda", "MuPlusLambda"),
     "nslc": ("evo.novelty", "NSLC")
 }

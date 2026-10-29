@@ -11,7 +11,7 @@ from genome.genome import SimpleGenome
 class BaseSolver(Solver):
     solutions: List
 
-    def __init__(self, ndim: int = 2, popsize: int = None, minimise: bool = True, *,
+    def __init__(self, ndim: int = None, popsize: int = None, minimise: bool = True, *,
                  mutation_method: Literal["resample", "perturb"] = "resample", mutation_rate: float = 0.5, mutation_scale: float = 1.0,
                  genome_type: str = None, genome_params: dict = None,):
         self._solutions = []
@@ -34,6 +34,11 @@ class BaseSolver(Solver):
                 self._genome_type = self._genome_params.pop("type")
         self._first_gen = True
         self.fitnesses = np.zeros(self.popsize)
+
+        # Extract ndim from sample solution
+        if self.ndim is None:
+            sample_sol = self._create_individual()
+            self.ndim = sample_sol.size
 
         # Solution and fitness management
         # Best solution in each generation
@@ -61,7 +66,10 @@ class BaseSolver(Solver):
         if self._genome_type is not None:
             indiv = create_learning_rule(self._genome_type, **self._genome_params)
         else:
-            indiv = SimpleGenome(size=self.ndim)
+            if self.ndim is not None:
+                indiv = SimpleGenome(size=self.ndim)
+            else:
+                raise ValueError("Cannot create a SimpleGenome object when self.ndim is not yet specified.")
         return indiv
 
     def _is_better(self, candidate_fts: float, best_fts: float) -> bool:
