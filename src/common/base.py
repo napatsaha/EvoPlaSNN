@@ -206,6 +206,12 @@ class EvolvableRuleProtocol(Genome):
         Returns a copy of self with identical but unlinked genes and parameters.
         """
 
+    def mutate(self, rate, scale, method, **kwargs) -> 'EvolvableRuleProtocol':
+        return super().mutate(rate, scale, method, **kwargs)
+
+    def crossover(self, other, rate) -> 'EvolvableRuleProtocol':
+        return super().crossover(other, rate)
+
 
 # SNN Components
 

@@ -1,4 +1,4 @@
-from typing import List, Dict, Sequence, Tuple
+from typing import Any, List, Dict, Sequence, Tuple
 from copy import deepcopy
 
 import numpy as np
@@ -88,18 +88,18 @@ class DualLearningRule(LearningRule, EvolvableLearningRule):
         pass
 
     def crossover(self, other, rate = 0.5) -> 'DualLearningRule':
-        offspring = super().crossover(other, rate)
+        offspring: 'DualLearningRule' = super().crossover(other, rate)
         offspring._sync_genes()
         return offspring
 
     def mutate(self, rate = 1, scale = 0.1, method = "resample", **kwargs) -> 'DualLearningRule':
-        offspring = super().mutate(rate, scale, method, **kwargs)
+        offspring: 'DualLearningRule' = super().mutate(rate, scale, method, **kwargs)
         offspring._sync_genes()
         return offspring
 
     def __repr__(self):
         return f"DualLearningRule(\n\tinternal_rule={self.internal_rule}, \n\texternal_rule={self.external_rule}, " + \
-            f"gene_order={self.gene_order})"
+            f"gene_order={self.gene_order}\n)"
 
 
 class LayeredRule(LearningRule, EvolvableRuleProtocol):
@@ -129,6 +129,18 @@ class LayeredRule(LearningRule, EvolvableRuleProtocol):
     def from_params(cls, rules: List[dict], layers: List[int] = None, 
                     parameters: ArrayLike = None, genes: List[Parameter] = None, 
                     **kwargs):
+        """
+        Construct a LayeredRule from a list of lrule param dictionaries, instead of learning rule objects
+
+        Args:
+            rules (List[dict]): List of learning rule dictionaries
+            layers (List[int], optional): SynapseLayer number each rule will apply to. If empty, will generate layer id sequentially. Defaults to None.
+            parameters (ArrayLike, optional): Genome array to construct. Defaults to None.
+            genes (List[Parameter], optional): List of genes to construct each constituent rule. Defaults to None.
+
+        Returns:
+            LayeredRule: a LayeredRule object
+        """
         rule_list = []
         i = 0
         for r_params in rules:
@@ -136,12 +148,22 @@ class LayeredRule(LearningRule, EvolvableRuleProtocol):
             if parameters is not None:
                 # Since it is difficult to estimate genome size before creating the rule, to use for slicing 'parameters',
                 #  temp solution is to replace the parameters of each rule after creation
+                if not isinstance(rule, Genome):
+                    # Skip parsing parameters if rule is a genome-less learning rule
+                    continue
                 l = rule.size
                 p = parameters[i:(i+l)]
                 rule.parameters = p
                 i += l
             elif genes is not None:
-                raise NotImplementedError("Setting 'genes' during init is not yet supported in LayeredRule")
+                if not isinstance(rule, EvolvableRuleProtocol):
+                    # Skip parsing parameters if genes is a gene-less learning rule
+                    continue
+                l = len(rule.genes)
+                g = genes[i:(i+l)]
+                rule.genes = g
+                i += l
+                # raise NotImplementedError("Setting 'genes' during init is not yet supported in LayeredRule")
             rule_list.append(rule)
         # rule_list = [create_learning_rule(**r_params) for r_params in rules]
         return cls(rules=rule_list, layers=layers, **kwargs)
@@ -152,11 +174,26 @@ class LayeredRule(LearningRule, EvolvableRuleProtocol):
     def update(self):
         raise TypeError("LayeredRule does not support 'update' method. Please call 'update' of constituent rule individually.")
 
-    def mutate(self, rate, scale, method, **kwargs):
-        raise NotImplementedError()
+    def mutate(self, rate: float, scale: float, method: str, **kwargs):
+        new_rules = []
+        for rule in self.rules:
+            new_rule = rule.mutate(rate, scale, method, **kwargs)
+            new_rules.append(new_rule)
+        return LayeredRule(rules=new_rules, layers=self.layers)
+        # raise NotImplementedError()
 
-    def crossover(self, other, rate):
-        raise NotImplementedError()
+    def crossover(self, other: 'LayeredRule', rate: float):
+        assert len(self.rules) == len(other.rules), "Both LayeredRules must contain the same number of rules. " + f"Got {len(self.rules)} rules in first, and {len(other.rules)} rules in other"
+        assert self.size == other.size, "Both LayeredRules must have the same genome size. " + f"Got size={self.size} for first, and size={other.size} for other"
+        # raise NotImplementedError()
+        new_rules = []
+        for rule1, rule2 in zip(self.rules, other.rules):
+            new_offspring = rule1.crossover(rule2, rate=rate)
+            new_rules.append(new_offspring)
+        return LayeredRule(rules=new_rules, layers=self.layers)
+
+    def copy(self) -> 'LayeredRule':
+        return deepcopy(self)
 
     def get_bounds(self) -> Tuple[List, List]:
         lower, upper = [], []
@@ -165,6 +202,12 @@ class LayeredRule(LearningRule, EvolvableRuleProtocol):
             lower.extend(low)
             upper.extend(upp)
         return lower, upper
+
+    def contains_gene(self, gene_name: str) -> bool:
+        return gene_name in self.gene_order
+
+    def _rename_gene(self, layer_i, gene_name):
+        return f"{gene_name}_layer{layer_i}"
 
     @property
     def rules(self) -> List[EvolvableRuleProtocol]:
@@ -193,7 +236,15 @@ class LayeredRule(LearningRule, EvolvableRuleProtocol):
 
     @property
     def gene_order(self) -> List[str]:
-        return [f"l{i:02}_{g}" for i, r in zip(self.layers, self.rules) for g in r.gene_order]
+        return [self._rename_gene(i, g) for i, r in zip(self.layers, self.rules) for g in r.gene_order]
+
+    @property
+    def values(self) -> Dict[str, ArrayLike]:
+        return {self._rename_gene(i, g): v for i, r in zip(self.layers, self.rules) for g, v in r.values.items()}
+
+    @property
+    def genes_to_encode(self) -> Dict[str, Dict[str, Any]]:
+        return {self._rename_gene(i, g): p for i, r in zip(self.layers, self.rules) for g, p in r.genes_to_encode.items()}
 
     @property
     def size(self) -> int:
@@ -202,5 +253,6 @@ class LayeredRule(LearningRule, EvolvableRuleProtocol):
     def __repr__(self) -> str:
         return "LayeredRule(rules=[\n\t" + \
             ",\n\t".join([repr(r).replace("\n", "\n\t") for r in self.rules]) + "\n\t]," + \
-            f"\n\tlayers={self.layers})"
+            f"\n\tlayers={self.layers}" + \
+            "\n)"
 

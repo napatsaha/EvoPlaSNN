@@ -113,6 +113,14 @@ Branch v1.4-rule-rework
 v1.4
 ----
 
+v1.4.13.0 (2026-10-29)
+- Configured `LayeredRule` to have functional genetic operators, and missing properties from `EvolvableRuleProtocol`:
+    - Implemented `.mutate()`, `.crossover()`, `.contains_gene()` and `.copy()`
+    - Added properties `values`, `genes_to_encode`
+    - Abstracted out how to append layer number to high-level gene names via `_rename_gene()`
+    - Added support for specifying `genes` during `.from_params()` constructor
+- Added `.mutate()` and `.crossover()` methods to `EvolvableRuleProtocol`, based on `Genome` abstract class implementations
+
 v1.4.12.6 (2026-10-23)
 - Support plotting multiple exploration rates in `plot_intermediate_fitness()`
     - Plot different exploration rates on different colours, and optional labels
