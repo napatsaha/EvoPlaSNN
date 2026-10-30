@@ -113,6 +113,15 @@ Branch v1.4-rule-rework
 v1.4
 ----
 
+v1.4.14.0 (2026-10-30)
+- Copied `BaseMaze` into a new `BaseGridMaze` in `rl.env2` with lots of variations:
+    - Walls (aisde from peripheral) does not affect state numbering, and can potentially be added or removed (not yet implemented)
+    - Removed `.pad` (no longer needed, pad will always be 1)
+    - Removed `._empty_idx` since states are not based on walls, there is no point of keeping a list of which cells are non-wall
+    - `._create_maze()` is now performed on base class, since maze is always rectangular
+    - Calculate `_state_pos_dict` early, and `_convert_state_to_pos()` and `_convert_pos_to_state()` operations are based on this dict
+    - Added `._original_shape` to reflect maze shape before padding peripheral walls
+
 v1.4.13.1 (2026-10-29)
 - Simple GA `evo.ga.GeneticAlgorithm`:
     - Only Tournament selection is supported
