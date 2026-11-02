@@ -270,25 +270,30 @@ class BaseGridMaze(gym.Env):
         """
         Initialise valid agent positions, and create state-pos lookup dictionary from empty index
         """
+        self._valid_idx: List[np.ndarray] = []
         if self.randomise_start:
-            if self.random_spawn_method == "area":
-                assert self.spawn_area is not None, "'spawn_area' must be specified if random spawn method is 'area'"
-                self._valid_idx = self._create_valid_spawn_idx_from_spawn_area()
-            elif self.random_spawn_method == "dist":
-                self._valid_idx = self._create_valid_spawn_idx_from_dist()
-            elif self.random_spawn_method == "default":
-                self._valid_idx = self._create_valid_spawn_idx_from_empty_idx()
-            else:
-                raise ValueError(f"Unsupported random spawn method: {self.random_spawn_method}")
+            self._initialise_spawn_idx()
             # Randomly choose starting position from this list
             self.maze[*self._agent_pos] = self.EMPTY
             self._agent_pos = self._choose_random_agent_pos()
             self.maze[*self._agent_pos] = self.AGENT
         else:
             if self._agent_pos is not None:
-                self._starting_pos = self._agent_pos.copy()
+                self._valid_idx.append(self._agent_pos.copy())
             else:
-                self._starting_pos = np.array([0,0])
+                self._valid_idx.append(np.array([0,0]))
+
+    def _initialise_spawn_idx(self):
+        if self.random_spawn_method == "area":
+            assert self.spawn_area is not None, "'spawn_area' must be specified if random spawn method is 'area'"
+        #     self._valid_idx = self._create_valid_spawn_idx_from_spawn_area()
+        # elif self.random_spawn_method == "dist":
+        #     self._valid_idx = self._create_valid_spawn_idx_from_dist()
+        # elif self.random_spawn_method == "default":
+        #     self._valid_idx = self._create_valid_spawn_idx_from_empty_idx()
+        # else:
+        #     raise ValueError(f"Unsupported random spawn method: {self.random_spawn_method}")
+        self._valid_idx = self._create_valid_spawn_idx()
 
     def _choose_random_agent_pos(self) -> np.ndarray:
         """
@@ -299,36 +304,56 @@ class BaseGridMaze(gym.Env):
         rand_idx = np.random.randint(len(self._valid_idx))
         return self._valid_idx[rand_idx]
 
-    def _create_valid_spawn_idx_from_dist(self) -> List[np.ndarray]:
-        """
-        Initialise valid agent spawning position. Child class can override how this behaves. Default is to base on minimum distance with either good or bad positions.
-        """
-        # Pre-determine list of indices which is at least `random_min_dist` away from either good or bad rewards
-        _idx_dist_rec = []
-        for state, pos in self._state_pos_dict.items():
-            # idx2d = np.unravel_index(idx, self.maze.shape)
-            # pos += 1
+    # def _create_valid_spawn_idx_from_dist(self) -> List[np.ndarray]:
+    #     """
+    #     Initialise valid agent spawning position. Child class can override how this behaves. Default is to base on minimum distance with either good or bad positions.
+    #     """
+    #     # Pre-determine list of indices which is at least `random_min_dist` away from either good or bad rewards
+    #     _idx_dist_rec = []
+    #     for state, pos in self._state_pos_dict.items():
+    #         # idx2d = np.unravel_index(idx, self.maze.shape)
+    #         # pos += 1
+    #         good_dist = man_dist(self._good_pos, pos) if self._good_pos is not None else np.inf
+    #         bad_dist = man_dist(self._bad_pos, pos) if self._bad_pos is not None else np.inf
+    #         if good_dist >= self._random_min_dist and bad_dist >= self._random_min_dist:
+    #             _idx_dist_rec.append(pos)
+    #     return _idx_dist_rec
+
+    # def _create_valid_spawn_idx_from_spawn_area(self) -> List[np.ndarray]:
+    #     _idx_rec = []
+    #     for s, (i, j) in self._state_pos_dict.items():
+    #         # x, y = np.unravel_index(idx, self.maze.shape)
+    #         for (x0, y0), (x1, y1) in self.spawn_area:
+    #             if (x0 <= i <= x1) & (y0 <= j <= y1):
+    #                 _idx_rec.append((i,j))
+    #     return _idx_rec
+
+    # def _create_valid_spawn_idx_from_empty_idx(self) -> List[np.ndarray]:
+    #     _idx_rec = []
+    #     for s, (x, y) in self._state_pos_dict.items():
+    #         # x, y = np.unravel_index(s, self.maze.shape)
+    #         _idx_rec.append((x,y))
+    #     return _idx_rec
+
+    def _create_valid_spawn_idx(self) -> List[np.ndarray]:
+        _idx_rec = []
+        for s, pos in self._state_pos_dict.items():
+            if self._check_valid_idx(pos):
+                _idx_rec.append(pos)
+        return _idx_rec
+
+    def _check_valid_idx(self, pos: Tuple[int, int]):
+        i, j = pos
+        if self.random_spawn_method == "dist":
             good_dist = man_dist(self._good_pos, pos) if self._good_pos is not None else np.inf
             bad_dist = man_dist(self._bad_pos, pos) if self._bad_pos is not None else np.inf
-            if good_dist >= self._random_min_dist and bad_dist >= self._random_min_dist:
-                _idx_dist_rec.append(pos)
-        return _idx_dist_rec
-
-    def _create_valid_spawn_idx_from_spawn_area(self) -> List[np.ndarray]:
-        _idx_rec = []
-        for s, (x, y) in self._state_pos_dict.items():
-            # x, y = np.unravel_index(idx, self.maze.shape)
+            return good_dist >= self._random_min_dist and bad_dist >= self._random_min_dist
+        elif self.random_spawn_method == "area":
             for (x0, y0), (x1, y1) in self.spawn_area:
-                if (x0 <= x <= x1) & (y0 <= y <= y1):
-                    _idx_rec.append((x,y))
-        return _idx_rec
-
-    def _create_valid_spawn_idx_from_empty_idx(self) -> List[np.ndarray]:
-        _idx_rec = []
-        for s, (x, y) in self._state_pos_dict.items():
-            # x, y = np.unravel_index(s, self.maze.shape)
-            _idx_rec.append((x,y))
-        return _idx_rec
+                if (x0 <= i <= x1) & (y0 <= j <= y1):
+                    return True
+        elif self.random_spawn_method == "default":
+            return True
 
     ## Internal functions
     def _reset_position(self):
@@ -346,7 +371,7 @@ class BaseGridMaze(gym.Env):
         if self.randomise_start:
             self._agent_pos = self._choose_random_agent_pos()
         else:
-            self._agent_pos = self._starting_pos.copy()
+            self._agent_pos = self._valid_idx[0]
         self.maze[*self._agent_pos] = self.AGENT
         # self._step_count = 0
 
@@ -530,55 +555,99 @@ class BaseGridMaze(gym.Env):
         self._valid_idx = self._create_valid_spawn_idx_from_dist()
         # self._valid_idx = [idx for idx, _, gd, bd in self._idx_dist_rec if gd >= self._random_min_dist and bd >= self._random_min_dist]
 
-    # def _create_reward_function(self):
-    #     if self.reward_function == "A":
-    #         def f(terminated, truncated, reward, **kwargs):
-    #             if terminated:
-    #                 return reward
-    #             elif truncated:
-    #                 return self.reward_trunc
-    #             else:
-    #                 return reward
-    #         self._reward_func = partial(f)
-    #     elif self.reward_function == "B":
-    #         self._reward_func = partial(self.f, m=self.min_steps, M=self.max_steps, r=0.0, R=1.0)
-    #     elif self.reward_function == "C":
-    #         def f(reward, **kwargs):
-    #             return reward
-    #         self._reward_func = partial(f)
-    #     else:
-    #         raise ValueError(f"Invalid reward function: {self.reward_function}. Must be 'A' or 'B'.")
 
-    # def _reward_func(self, displaced_item: int, new_dist: int | None) -> Tuple[float, bool]:
-    #     """
-    #     Return a tuple of (reward, terminated) as a function of the displaced item from the chosen action.
-    #     """
-    #     terminated = False
+class SeasonalObstacleGridMaze(BaseGridMaze):
+    def __init__(self, size=None, width=None, height=None, *, 
+                 max_steps=50, walls: List[Tuple[int, int, int, int]] = None,
+                 randomise_start = False, random_spawn_method = "dist", random_min_dist = 0, spawn_area = None, 
+                 obs_type = "state", include_agent_pos = False, 
+                 reward_step_closer = False, terminate_on_crash = False, 
+                 penalty = -0.1, reward_inter = 0.1, reward_null = 0, reward_bad = -1, reward_good = 1, reward_trunc = -1, **kwargs):
+        """
+        Args:
+            walls (List[Tuple[int, int, int, int]], optional): A list of length-4 tuples each describing a wall via (ith position, jth position, horizontal length, vertical length). Defaults to None.
 
-    #     if displaced_item == self.WALL:
-    #         reward = self.penalty
-    #     elif displaced_item == self.EMPTY:
-    #         if self._reward_step_closer:
-    #             if new_dist < self._closest_dist:
-    #                 self._closest_dist = new_dist
-    #                 reward = self.reward_inter
-    #             else:
-    #                 reward = 0.0
-    #         else:
-    #             reward = self.reward_inter
-    #     elif displaced_item == self.GOOD:
-    #         reward = self.reward_good
-    #         terminated = True
-    #     elif displaced_item == self.BAD:
-    #         reward = self.reward_bad
-    #         terminated = True
-    #     elif displaced_item == self.AGENT:
-    #         # Stationary case
-    #         reward = 0.0
-    #     else:
-    #         raise ValueError(f"Invalid displaced item: {displaced_item}.")
+        """
+        self._wall_list = []
+        if walls is not None:
+            for wall in walls:
+                assert len(wall) == 4, "Each 'wall' spec must have 4 components: i_position, j_position, horizontal_length, vertical_length"
+                self._wall_list.append(wall)
 
-    #     return reward, terminated
+        super().__init__(size, width, height, max_steps=max_steps, 
+                         randomise_start=randomise_start, random_spawn_method=random_spawn_method, random_min_dist=random_min_dist, spawn_area=spawn_area, 
+                         obs_type=obs_type, include_agent_pos=include_agent_pos, reward_step_closer=reward_step_closer, terminate_on_crash=terminate_on_crash, 
+                         penalty=penalty, reward_inter=reward_inter, reward_null=reward_null, reward_bad=reward_bad, reward_good=reward_good, reward_trunc=reward_trunc, **kwargs)
 
+    def _initialise_spawn_idx(self):
+        super()._initialise_spawn_idx()
+        for (i, j, hlength, vlength) in self._wall_list:
+            self._remove_valid_idx_with_wall(i, j, hlength, vlength)
+
+    def _reset_position(self):
+        super()._reset_position()
+        # Apply obstacles after everything else is put into place
+        for (i, j, hlength, vlength) in self._wall_list:
+            # self._remove_valid_idx_with_wall(i, j, hlength, vlength)
+            self._apply_wall_to_maze(i, j, hlength, vlength)
+
+    def _apply_wall_to_maze(self, i, j, hlength, vlength):
+        self.maze[i:(i+vlength), j:(j+hlength)] = self.WALL
+
+    def _remove_wall_from_maze(self, i, j, hlength, vlength):
+        self.maze[i:(i+vlength), j:(j+hlength)] = self.EMPTY
+
+    def _remove_valid_idx_with_wall(self, i, j, hlength, vlength):
+        # Loop in reverse so original list index is not changed
+        for list_i, pos in reversed(list(enumerate(self._valid_idx))): # list(enumrate(l)) already creates a copy of l
+            ix, jx  = pos
+            if (i <= ix < (i+vlength)) and (j <= jx < (j+hlength)):
+                del self._valid_idx[list_i]
     
+    def add_walls(self, pos: Tuple[int, int], hlength: int = 1, vlength: int = 1):
+        """
+        Add a rectangular wall to the maze that prevents agent from going through.
 
+        Args:
+            pos (Tuple[int, int]): Starting position (top-left) of the wall
+            hlength (int, optional): Horizontal length of the wall. Defaults to 1.
+            vlength (int, optional): Vertical length of the wall. Defaults to 1.
+        """
+        i, j = pos
+        # Check whether agent already occupies any part of the wall-to-be-added
+        if (i <= self._agent_pos[0] < (i+vlength)) and (j <= self._agent_pos[1] < (j+hlength)):
+            raise ValueError(f"Agent already occupies cell {self._agent_pos}. Cannot apply wall from i={i}:{i+vlength}, j={j}:{j+hlength}")
+
+        self._remove_valid_idx_with_wall(i, j, hlength, vlength)
+        self._apply_wall_to_maze(i, j, hlength, vlength)
+        self._wall_list.append((i, j, hlength, vlength))
+
+    def remove_walls(self, index: int = None):
+        """
+        Remove a specific wall from the environment's list of walls.  
+        Will replace the walls in maze array with empty cells, and check if random spawn index will need to be added back in with the removal of wall.
+
+        Args:
+            index (int, optional): Index of the wall to be removed from the wall list. If None, will remove all walls. Defaults to None.
+
+        Raises:
+            IndexError: If index is outside of wall list
+        """
+        if index is None:
+            # Remove each wall physically from the maze
+            for (i, j, hlength, vlength) in self._wall_list:
+                self._remove_wall_from_maze(i, j, hlength, vlength)
+            # Reset all walls in list
+            self._wall_list.clear()
+        else:
+            if index >= len(self._wall_list) or index < 0:
+                raise IndexError(f"Index={index} invalid for list `_wall_list` of length {len(self._wall_list)}")
+            wall = self._wall_list.pop(index)
+            # Remove this wall physically from the maze
+            i, j, hlength, vlength = wall
+            self._remove_wall_from_maze(i, j, hlength, vlength)
+            # Add spawn positions back to _valid_idx if occupied by removed wall
+            for ix in range(i, i+vlength):
+                for jx in range(j, j+hlength):
+                    if self._check_valid_idx((ix, jx)):
+                        self._valid_idx.append(np.array((ix, jx)))

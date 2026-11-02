@@ -113,6 +113,15 @@ Branch v1.4-rule-rework
 v1.4
 ----
 
+v1.4.14.1 (2026-11-02)
+- Added `SeasonalObstacleGridMaze` derived from `BaseGridMaze`, with following methods:
+    - `add_walls()` and `remove_walls()
+    - Internal methods for adding/removing WALL cell to maze, and adding/removing valid_idx positions corresponding to walls
+    - Extension to parent's `_reset_position() and `_initialise_spawn_idx()`
+- Refactoring in `env2.BaseGridMaze`:
+    - Refactor out `_create_valid_spawn_idx()` which will call `_check_valid_idx()` which checks each position differently based on `random_spawn_method`
+    - `_initialise_spawn_idx()` from `_prepare_position()` specifically for creating `_valid_dx` to make it easier for child class to extend
+
 v1.4.14.0 (2026-10-30)
 - Copied `BaseMaze` into a new `BaseGridMaze` in `rl.env2` with lots of variations:
     - Walls (aisde from peripheral) does not affect state numbering, and can potentially be added or removed (not yet implemented)
