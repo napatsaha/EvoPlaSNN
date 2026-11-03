@@ -113,6 +113,15 @@ Branch v1.4-rule-rework
 v1.4
 ----
 
+v1.4.14.2 (2026-11-03)
+- Support seasonal changes of switching sets of walls
+- In `SeasonalObstacleGridMaze`:
+    - Added `change_season()` method which take a `season_count` integer and compare to total available season via `%` (mod)
+    - Added `seasonal_walls` arg to init. During init, will calculate `_n_fixed_walls`, `_seasonal_walls` and `_n_seasons`
+    - Added optional argument `ignore_agent=` to `.add_walls()` to ignore the default error when agent is in the way of a wall to be placed
+    - Reset `_n_fixed_walls` to 0 if removing all walls
+- `BaseGridMaze._check_valid_idx()` will always skip a position occupied by either good or bad reward items, if present
+
 v1.4.14.1 (2026-11-02)
 - Added `SeasonalObstacleGridMaze` derived from `BaseGridMaze`, with following methods:
     - `add_walls()` and `remove_walls()

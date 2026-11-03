@@ -192,7 +192,7 @@ class BaseGridMaze(gym.Env):
                                           [0, -1],           [0, 1],
                                           [1, -1], [1, 0], [1, 1]])
 
-        # Create important attributes
+        # Create maze array
         self._create_maze()
         self._pad_maze()
         # Update position and state values
@@ -342,13 +342,24 @@ class BaseGridMaze(gym.Env):
                 _idx_rec.append(pos)
         return _idx_rec
 
-    def _check_valid_idx(self, pos: Tuple[int, int]):
-        i, j = pos
+    def _check_valid_idx(self, pos: Tuple[int, int] | np.ndarray):
+        pos = np.asarray(pos)
+        # Always omit spawning position if it is already taken by good or bad reward items
+        if self._good_pos is not None:
+            if np.all(pos == self._good_pos):
+                return False
+        if self._bad_pos is not None:
+            if np.all(pos == self._bad_pos):
+                return False
+        
+        # Otherwise, if cell is empty^, check position based on other conditions
+        # ^wall is not checked at this stage
         if self.random_spawn_method == "dist":
             good_dist = man_dist(self._good_pos, pos) if self._good_pos is not None else np.inf
             bad_dist = man_dist(self._bad_pos, pos) if self._bad_pos is not None else np.inf
             return good_dist >= self._random_min_dist and bad_dist >= self._random_min_dist
         elif self.random_spawn_method == "area":
+            i, j = pos
             for (x0, y0), (x1, y1) in self.spawn_area:
                 if (x0 <= i <= x1) & (y0 <= j <= y1):
                     return True
@@ -552,13 +563,13 @@ class BaseGridMaze(gym.Env):
     def random_min_dist(self, value: int):
         self._random_min_dist = max(0, int(value))
         # Updates list of valid indices a set distance from either goals
-        self._valid_idx = self._create_valid_spawn_idx_from_dist()
+        self._valid_idx = self._create_valid_spawn_idx()
         # self._valid_idx = [idx for idx, _, gd, bd in self._idx_dist_rec if gd >= self._random_min_dist and bd >= self._random_min_dist]
 
 
 class SeasonalObstacleGridMaze(BaseGridMaze):
     def __init__(self, size=None, width=None, height=None, *, 
-                 max_steps=50, walls: List[Tuple[int, int, int, int]] = None,
+                 max_steps=50, walls: List[Tuple[int, int, int, int]] = None, seasonal_walls: List[List[Tuple[int, int, int, int]]] = None,
                  randomise_start = False, random_spawn_method = "dist", random_min_dist = 0, spawn_area = None, 
                  obs_type = "state", include_agent_pos = False, 
                  reward_step_closer = False, terminate_on_crash = False, 
@@ -573,6 +584,14 @@ class SeasonalObstacleGridMaze(BaseGridMaze):
             for wall in walls:
                 assert len(wall) == 4, "Each 'wall' spec must have 4 components: i_position, j_position, horizontal_length, vertical_length"
                 self._wall_list.append(wall)
+        self._n_fixed_walls = len(self._wall_list)
+
+        # Seasons
+        if seasonal_walls is None:
+            self._seasonal_walls = []
+        else:
+            self._seasonal_walls = list(seasonal_walls)
+        self._n_seasons = len(self._seasonal_walls)
 
         super().__init__(size, width, height, max_steps=max_steps, 
                          randomise_start=randomise_start, random_spawn_method=random_spawn_method, random_min_dist=random_min_dist, spawn_area=spawn_area, 
@@ -604,7 +623,7 @@ class SeasonalObstacleGridMaze(BaseGridMaze):
             if (i <= ix < (i+vlength)) and (j <= jx < (j+hlength)):
                 del self._valid_idx[list_i]
     
-    def add_walls(self, pos: Tuple[int, int], hlength: int = 1, vlength: int = 1):
+    def add_walls(self, pos: Tuple[int, int], hlength: int = 1, vlength: int = 1, ignore_agent: bool = False):
         """
         Add a rectangular wall to the maze that prevents agent from going through.
 
@@ -612,11 +631,16 @@ class SeasonalObstacleGridMaze(BaseGridMaze):
             pos (Tuple[int, int]): Starting position (top-left) of the wall
             hlength (int, optional): Horizontal length of the wall. Defaults to 1.
             vlength (int, optional): Vertical length of the wall. Defaults to 1.
+            ignore_agent (bool, optional): Whether to ignore if agent already occupies one of the cells to be added by the wall.
+                If disabled, will throw an error. If enabled, will replace the agent position with Wall.  
+                Use with care, since agent will be removed from maze if this happens. Recommond to only use this before calling `.reset()`.  
+                Defaults to False.
         """
         i, j = pos
         # Check whether agent already occupies any part of the wall-to-be-added
-        if (i <= self._agent_pos[0] < (i+vlength)) and (j <= self._agent_pos[1] < (j+hlength)):
-            raise ValueError(f"Agent already occupies cell {self._agent_pos}. Cannot apply wall from i={i}:{i+vlength}, j={j}:{j+hlength}")
+        if not ignore_agent:
+            if (i <= self._agent_pos[0] < (i+vlength)) and (j <= self._agent_pos[1] < (j+hlength)):
+                raise ValueError(f"Agent already occupies cell {self._agent_pos}. Cannot apply wall from i={i}:{i+vlength}, j={j}:{j+hlength}")
 
         self._remove_valid_idx_with_wall(i, j, hlength, vlength)
         self._apply_wall_to_maze(i, j, hlength, vlength)
@@ -639,6 +663,8 @@ class SeasonalObstacleGridMaze(BaseGridMaze):
                 self._remove_wall_from_maze(i, j, hlength, vlength)
             # Reset all walls in list
             self._wall_list.clear()
+            # Reset starting wall counting index to prevent remembering non-existing walls
+            self._n_fixed_walls = 0
         else:
             if index >= len(self._wall_list) or index < 0:
                 raise IndexError(f"Index={index} invalid for list `_wall_list` of length {len(self._wall_list)}")
@@ -651,3 +677,24 @@ class SeasonalObstacleGridMaze(BaseGridMaze):
                 for jx in range(j, j+hlength):
                     if self._check_valid_idx((ix, jx)):
                         self._valid_idx.append(np.array((ix, jx)))
+
+    def change_season(self, season_count: int):
+        """
+        Change season by calculating the mod of `season_count` with total `_n_seasons`, to choose the current season.
+        Will remove previous season's walls, then add the new season's set of walls, ignoring agent position.
+        Recommend to call at the end of an episode, and call `.reset()` immediately after this to prevent weird agent behaviour.
+
+        Args:
+            season_count (int): external counter for season
+        """
+        season_idx = season_count % self._n_seasons
+        walls_to_add = self._seasonal_walls[season_idx]
+
+        n_current_walls = len(self._wall_list)
+        for i in reversed(range(self._n_fixed_walls, n_current_walls)):
+            self.remove_walls(i)
+
+        # Add new walls
+        for wall in walls_to_add:
+            self.add_walls(pos=wall[:2], hlength=wall[2], vlength=wall[3], ignore_agent=True)
+
