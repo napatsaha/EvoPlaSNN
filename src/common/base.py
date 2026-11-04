@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 import numpy as np
 from numpy.typing import ArrayLike
 
-from typing import Any, Literal, Protocol, List, Sequence, Tuple, Dict, Union
+from typing import Any, Literal, Protocol, List, Sequence, Tuple, Dict, Union, runtime_checkable
 
 
 # Genome and Learning Rules
@@ -460,6 +460,33 @@ class SimulatorProtocol(Protocol):
 
     network: Any # Will fix later
     environment: Any # Will fix later
+
+
+# Environment components
+
+@runtime_checkable
+class SeasonalEnvProtocol(Protocol):
+    def change_season(self, season_count: int):
+        """
+        Change season of the environment.
+
+        Args:
+            season_count (int): external counter for season
+        """
+        pass
+
+    def reset_season(self):
+        """
+        Reset any internal representations of season (as if just re-init the environment). Should be called at the beginning of simulation
+        """
+        pass
+
+    @property
+    def n_seasons(self) -> int:
+        """
+        Total number of unique available seasons.
+        """
+        pass
 
 
 # Evolutionary Algorithm components

@@ -113,6 +113,21 @@ Branch v1.4-rule-rework
 v1.4
 ----
 
+v1.4.14.3 (2026-11-04)
+- Added `SeasonalEnvProtocol` to `common.base` to use with both `SeasonalObstacleGridMaze` and simulator type checks
+- `SeasonalObstacleGridMaze.change_season()` now takes `season_idx` instead of `season_count`.
+    - Added `_current_season` to keep track of which season an environment is in. If same season, will not perform switch season
+    - Added `n_seasons` property
+- Added `reset_season()` to both seasonal envs, which will reset `_current_season` to None
+- `SNNSimulator` now support seasonal environments:
+    - A flag `seasonal` is set at init, and will only work if env is a SeasonalEnvProtocol
+    - Keep track of seasons via `_season_count` and `seasonal_eps_interval` args
+    - During `reset()` and at start of every `run()` will set `_season_count=0` and call `env.reset_season()`
+    - `season_idx` is how season switch is controlled
+    - Records `season_idx` in RewardCollector.season field
+- Reworked `Trajectory` and `EpsInfo` named tuple, so they have default None, and will only print fields which have values (not None)
+    - Added `season` field to EpsInfo
+
 v1.4.14.2 (2026-11-03)
 - Support seasonal changes of switching sets of walls
 - In `SeasonalObstacleGridMaze`:

@@ -14,7 +14,7 @@ from .modulation import Modulator, Reward_Modulator, TD_Error_Modulator
 from .spikegen import BinaryClassGenerator
 # from .decoding_old import get_decoder_class, get_fitnessor_class, BaseDecoder, BaseFitnessor
 from .rewarder import create_rewarder, create_collector, RewarderProtocol, CollectorProtocol
-from common.base import SpikeCoder
+from common.base import SpikeCoder, SeasonalEnvProtocol
 from rl.collector import RewardCollector, TrajectoryCollector
 import gymnasium as gym
 
@@ -31,6 +31,7 @@ class SNNSimulator:
                 #  update_condition: Literal["on-step", "on-end"] = "on-end",
                  modulation: Literal["reward", "td-error"] = None, modulation_params: dict = {},
                  *, 
+                 seasonal: bool = False, seasonal_eps_interval: int = None, 
                 #  params: dict = {},
                 #  decoder_type: Literal["final", "rate", "latency"] = "final", decoder_params: dict = {},
                 #  fitnessor_type: Literal["accuracy", "reward", "cross-entropy", "mse"] = "accuracy", fitnessor_params: dict = {},
@@ -53,8 +54,17 @@ class SNNSimulator:
         self.network = network
         # self.spike_generator = spike_generator
         self._learning_rule = network.learning_rule
-        self.env = env
         self.spike_coder = spike_coder
+        # Environment and Seasonal changes
+        self.env = env
+        self.seasonal = bool(seasonal)
+        if self.seasonal:
+            assert isinstance(self.env, SeasonalEnvProtocol), "To perform seasonal simulation, the env must be derived from `SeasonalEnvProtocol`. " + f"Got env mro: {type(self.env).mro()}"
+            # self.env: SeasonalEnvProtocol
+            self.n_seasons = self.env.n_seasons
+            self._season_count = 0
+            self.seasonal_eps_interval = max(1, int(seasonal_eps_interval)) if seasonal_eps_interval is not None else None
+
         # Episode and Trajectory collectors
         self.reward_collector = reward_collector
         self._log_traj = bool(collect_trajectory)
@@ -188,6 +198,9 @@ class SNNSimulator:
         # Reset step count
         self.num_steps = 0
         self.num_episode = 0
+        if self.seasonal and isinstance(self.env, SeasonalEnvProtocol):
+            self._season_count = 0
+            self.env.reset_season()
         if self._use_decay:
             self._decay = True
             if self._exploration_source == "network":
@@ -259,7 +272,14 @@ class SNNSimulator:
                 raise ValueError("When only 'num_eps' is specified, Environment must have a 'max_steps' or '_max_episode_steps' attribute. Otherwise, 'num_steps' must be specified.")
             num_steps = num_eps * max_steps_per_eps * self.spike_coder.window_size
         self._setup_run(num_steps)
-        # _new_sample = True
+        
+        # Begin simulation
+        if self.seasonal and isinstance(self.env, SeasonalEnvProtocol):
+            self.env.reset_season()
+            self._season_count = 0
+            season_idx = self._season_count % self.n_seasons
+            self.env.change_season(season_idx=season_idx)
+
         state, info = self.env.reset()
         starting_state = info.get("current_state", None)
         episode_done = False
@@ -348,6 +368,7 @@ class SNNSimulator:
                         self.reward_collector.collect(
                             t=t,
                             episode=self.num_episode,
+                            season=season_idx if self.seasonal else None,
                             reward=reward, 
                             eps_reward=self.trajectory_collector.get_summed_rewards() if self._log_traj else None,
                             episode_length=info.get('step_count', None),
@@ -359,7 +380,12 @@ class SNNSimulator:
                             )
                     if self._log_traj:
                         self.trajectory_collector.reset()
-                    # self.env.reset()
+                    # Check if season needs to be changed, before resetting episode
+                    if self.seasonal:
+                        if (self.num_episode + 1) % self.seasonal_eps_interval == 0:
+                            self._season_count += 1
+                            season_idx = self._season_count % self.n_seasons
+                            self.env.change_season(season_idx=season_idx)
                     state, info = self.env.reset()
                     starting_state = info.get("current_state", None)
                     self.num_episode += 1

@@ -1,10 +1,46 @@
 import numpy as np
 from collections import namedtuple
-from typing import List, Literal, Dict, Callable
+from typing import List, Literal, Dict, Callable, NamedTuple, Any
 
 
-EpsInfo = namedtuple("EpsInfo", ["t", "episode", "reward", "eps_reward", "length", "starting_state", "exploration", "truncated", "terminated", "trajectory"])
+# Trajectory = namedtuple("Trajectory", ["t", "state", "observation", "action", "reward", "done", "info"])
 
+class Trajectory(NamedTuple):
+    t: int = None
+    state: int = None
+    observation: np.ndarray = None
+    action: int = None
+    reward: float = None
+    done: bool = None
+    info: Dict[str, Any] = None
+
+    __slot__ = ()
+
+    def __repr__(self):
+        return "EpsInfo(" + \
+            ", ".join("%s=%s" % (key, val) for key, val in self._asdict().items() if val is not None) + \
+            ")"
+
+# EpsInfo = namedtuple("EpsInfo", ["t", "episode", "reward", "eps_reward", "length", "starting_state", "exploration", "truncated", "terminated", "trajectory"])
+
+class EpsInfo(NamedTuple):
+    t: int = None
+    episode: int = None
+    season: int = None
+    reward: float = None
+    eps_reward: float = None
+    length: int = None
+    starting_state: int = None
+    exploration: np.ndarray | float = None
+    truncated: bool = None
+    terminated: bool = None
+    trajectory: Trajectory = None
+    __slot__ = ()
+
+    def __repr__(self):
+        return "EpsInfo(" + \
+            ", ".join("%s=%s" % (key, val) for key, val in self._asdict().items() if val is not None) + \
+            ")"
 
 class RewardCollector:
     records: List[EpsInfo]
@@ -74,18 +110,17 @@ class RewardCollector:
         if self.fitness_on_eval_only:
             self.reset()
 
-    def collect(self, t: int = None, episode: int = None, reward: float = None, 
-                eps_reward: float = None, episode_length: int = None, 
+    def collect(self, t: int = None, episode: int = None, season: int = None,
+                reward: float = None, eps_reward: float = None, episode_length: int = None, 
                 starting_state: int = None, exploration: float = None, 
-                truncated: bool = False, terminated: bool = False, trajectory: 'Trajectory' = None):
+                truncated: bool = False, terminated: bool = False, trajectory: Trajectory = None):
         """
-        Record final reward and total step count at the end of an episode.
+        Record episode information at the end of an episode.
         """
-        # self.reward_history.append(reward)
-        # self.episode_lengths.append(episode_length)
         self.records.append(EpsInfo(
             t = t,
             episode = episode,
+            season=season,
             reward = reward,
             eps_reward = eps_reward,
             length = episode_length,
@@ -171,7 +206,6 @@ class RewardCollector:
         return agg(fitnesses)
     
 
-Trajectory = namedtuple("Trajectory", ["t", "state", "observation", "action", "reward", "done", "info"])
 
 class TrajectoryCollector:
     records: List[Trajectory]

@@ -5,12 +5,16 @@ Temporary alternate version of `env.BaseMaze`
 """
 
 from types import NoneType
+from typing import List, Literal, Tuple
+from functools import partial
+import warnings
+
 import gymnasium as gym
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import colors
-from typing import List, Literal, Tuple
-from functools import partial
+
+from common.base import SeasonalEnvProtocol
 
 
 def man_dist(x, y):
@@ -567,7 +571,7 @@ class BaseGridMaze(gym.Env):
         # self._valid_idx = [idx for idx, _, gd, bd in self._idx_dist_rec if gd >= self._random_min_dist and bd >= self._random_min_dist]
 
 
-class SeasonalObstacleGridMaze(BaseGridMaze):
+class SeasonalObstacleGridMaze(BaseGridMaze, SeasonalEnvProtocol):
     def __init__(self, size=None, width=None, height=None, *, 
                  max_steps=50, walls: List[Tuple[int, int, int, int]] = None, seasonal_walls: List[List[Tuple[int, int, int, int]]] = None,
                  randomise_start = False, random_spawn_method = "dist", random_min_dist = 0, spawn_area = None, 
@@ -592,6 +596,7 @@ class SeasonalObstacleGridMaze(BaseGridMaze):
         else:
             self._seasonal_walls = list(seasonal_walls)
         self._n_seasons = len(self._seasonal_walls)
+        self._current_season = None
 
         super().__init__(size, width, height, max_steps=max_steps, 
                          randomise_start=randomise_start, random_spawn_method=random_spawn_method, random_min_dist=random_min_dist, spawn_area=spawn_area, 
@@ -678,16 +683,30 @@ class SeasonalObstacleGridMaze(BaseGridMaze):
                     if self._check_valid_idx((ix, jx)):
                         self._valid_idx.append(np.array((ix, jx)))
 
-    def change_season(self, season_count: int):
+    def reset_season(self):
+        self._current_season = None
+
+    def change_season(self, season_idx: int):
         """
-        Change season by calculating the mod of `season_count` with total `_n_seasons`, to choose the current season.
+        Change season by indicating which season to switch to (must be within n_season).  
+        If season to switch to is the same as the current season, will throw a warning, but do nothing.
         Will remove previous season's walls, then add the new season's set of walls, ignoring agent position.
         Recommend to call at the end of an episode, and call `.reset()` immediately after this to prevent weird agent behaviour.
 
         Args:
-            season_count (int): external counter for season
+            season_idx (int): index to determine which season to switch to
         """
-        season_idx = season_count % self._n_seasons
+        # season_idx = season_count % self._n_seasons
+        assert 0 <= season_idx < self.n_seasons, f"`season_idx` must be lower than n_seasons={self.n_seasons}. Got season_idx={season_idx}"
+        if self._current_season is not None:
+            if self._current_season == season_idx:
+                warnings.warn("Attempting to change season when current season is already the same" + f"current_season={self._current_season}, season_idx={season_idx}")
+                return
+            else:
+                self._current_season = season_idx
+        else:
+            self._current_season = season_idx
+
         walls_to_add = self._seasonal_walls[season_idx]
 
         n_current_walls = len(self._wall_list)
@@ -698,3 +717,6 @@ class SeasonalObstacleGridMaze(BaseGridMaze):
         for wall in walls_to_add:
             self.add_walls(pos=wall[:2], hlength=wall[2], vlength=wall[3], ignore_agent=True)
 
+    @property
+    def n_seasons(self) -> int:
+        return self._n_seasons
