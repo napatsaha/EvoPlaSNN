@@ -66,6 +66,7 @@ class RewardCollector:
     }
     def __init__(self, *, fitness_type: Literal["reward", "latency", "success_rate", "eps_reward"] = "reward",
                  fitness_agg_func: Literal["mean", "sum", "min", "max", "median"] = "mean",
+                 fitness_t_cutoff: int = None, fitness_eps_cutoff: int = None,
                 #  max_fitness: float = 1.0, min_fitness: float = -1.0,
                  fitness_on_eval_only: bool = True):
         """
@@ -74,6 +75,8 @@ class RewardCollector:
                 Default: reward
             fitness_agg_func (str, optional): Function to aggregate episode fitnesses. Currently supports:
                 ["mean", "sum", "min", "max", "median"]. Default: mean.
+            fitness_t_cutoff (int, optional): Only calculate fitness after this simulation timestep. Defaults to None.
+            fitness_eps_cutoff (int, optional): Only calculate fitness after this simulation episode. Defaults to None.
             fitness_on_eval_only (bool, optional): Whether to include episodes during phase for fitness calculations. 
                 Note that this is controlled externally (i.e. a simulator needs to call `soft_reset()` of this class after training).
                 Default: True
@@ -94,6 +97,10 @@ class RewardCollector:
         self.max_fitness = self._bounds.get(self.fitness_type)[1]
         self.min_fitness = self._bounds.get(self.fitness_type)[0]
         self.fitness_on_eval_only = fitness_on_eval_only
+
+        # Own cutoff when calculating fitness
+        self.fitness_t_cutoff = fitness_t_cutoff
+        self.fitness_eps_cutoff = fitness_eps_cutoff
 
     def reset(self):
         """
@@ -200,8 +207,14 @@ class RewardCollector:
 
     def get_fitness(self, t_cutoff: int = None, eps_cutoff: int = None) -> float:
         """
-        Calculate fitness for current trial. Depends on `fitness_type`
+        Calculate fitness for current trial, based on `fitness_type`.  
+        If `t_cutoff` or `eps_cutoff` is not specified, `fitness_t_cutoff` or `fitness_eps_cutoff` will be used, respectively (if specified during init).  
+        t_cutoff always have priority over eps_cutoff, if both are given.
         """
+        if t_cutoff is None and self.fitness_t_cutoff is not None:
+            t_cutoff = self.fitness_t_cutoff
+        if eps_cutoff is None and self.fitness_eps_cutoff is not None:
+            eps_cutoff = self.fitness_eps_cutoff
         fitnesses = self.get_intermediate_fitness(t_cutoff=t_cutoff, eps_cutoff=eps_cutoff)
         if len(fitnesses) == 0:
             return self.min_fitness

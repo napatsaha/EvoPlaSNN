@@ -113,6 +113,14 @@ Branch v1.4-rule-rework
 v1.4
 ----
 
+v1.4.14.5 (2026-11-05)
+- Simulator can reset exploration rate with season change if `reset_exploration_on_season_change` is enabled:
+    - Added `_reset_exploration()` method to be called during reset, and when season changes
+    - Added `_t0` for keeping track of last time exploration is reset, for when `decay_method="time"`
+    - Added local flag `season_change` during `run()` for episode where season has just changed
+- Introduced `fitness_t_cutoff` and `fitness_eps_cutoff` to RewardCollector, to take effect during `get_fitness()`
+- RL_Evaluator will rely only on RewardCollector.get_fitness, instead of using simulator.decay_cutoff
+
 v1.4.14.4 (2026-11-05)
 - Add "seasonal-obstacle-maze" to ENV_DICT
 - Add `get_season_timestamps()` to RewardCollector to return timestep when season changes

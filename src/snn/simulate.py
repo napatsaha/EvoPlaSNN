@@ -37,7 +37,8 @@ class SNNSimulator:
                 #  fitnessor_type: Literal["accuracy", "reward", "cross-entropy", "mse"] = "accuracy", fitnessor_params: dict = {},
                 #  num_steps: int = None, num_episodes: int = None,
                 epsilon_greedy: bool = False, epsilon: float = None,
-                 decay: bool = False, exploration_source: Literal["network", "env"] = None,
+                 decay: bool = False, reset_exploration_on_season_change: bool = False,
+                 exploration_source: Literal["network", "env"] = None,
                  decay_method: Literal["time", "constant"] = "time",
                  decay_rate: float | Sequence = None, decay_cutoff: Optional[int] = None, 
                  record_membrane: bool = True, record_spikes: bool = True, record_traces: bool = True, record_pre_traces: bool = False, record_post_traces: bool = False,
@@ -119,10 +120,12 @@ class SNNSimulator:
         self._use_decay = decay
         self._decay = decay
         self.decay_method = decay_method
+        self._t0: int = 0 # for use when decay method is "time"
         self.decay_rate = np.asarray(decay_rate)
         self.decay_cutoff = decay_cutoff
         self._explore = self._should_explore(0)
         self._exploration_source = exploration_source
+        self.reset_exploration_on_season_change = reset_exploration_on_season_change
 
         # Check if Network explore via stochastic spiking
         neuron_expl = self.network.get_exploration_rate(simplify=False)
@@ -203,11 +206,7 @@ class SNNSimulator:
             self.env.reset_season()
         if self._use_decay:
             self._decay = True
-            if self._exploration_source == "network":
-                self.network.set_stochastic()
-                self.network.set_exploration_rate(self.decay_init_value)
-            elif self._exploration_source == "env":
-                self.epsilon = self.decay_init_value
+            self._reset_exploration()
 
         # Reset recorders
         self._reset_recorders()
@@ -277,6 +276,7 @@ class SNNSimulator:
         if self.seasonal and isinstance(self.env, SeasonalEnvProtocol):
             self.env.reset_season()
             self._season_count = 0
+            season_change = False
             season_idx = self._season_count % self.n_seasons
             self.env.change_season(season_idx=season_idx)
 
@@ -382,7 +382,8 @@ class SNNSimulator:
                         self.trajectory_collector.reset()
                     # Check if season needs to be changed, before resetting episode
                     if self.seasonal:
-                        if (self.num_episode + 1) % self.seasonal_eps_interval == 0:
+                        season_change = (self.num_episode + 1) % self.seasonal_eps_interval == 0
+                        if season_change:
                             self._season_count += 1
                             season_idx = self._season_count % self.n_seasons
                             self.env.change_season(season_idx=season_idx)
@@ -399,18 +400,10 @@ class SNNSimulator:
 
             # Update softmax temperature / exploration rate
             if episode_done and self._explore:
-                self._update_exploration_rate(t, self.num_episode)
-                # # Update softmax temp at end of episode
-                # if self._explore:
-                #     if self.decay_method == "time":
-                #         new_rate = self.decay_init_value * np.exp(-t * self.decay_rate / self.decay_cutoff)
-                #     elif self.decay_method == "constant":
-                #         new_rate = self.network.get_exploration_rate(simplify=True) * self.decay_rate
-                #     self.network.set_exploration_rate(new_rate)
-                # else:
-                #     # Set simulator to deterministic
-                #     self.network.set_deterministic()
-                #     self._decay = False
+                if self.seasonal and season_change and self.reset_exploration_on_season_change:
+                    self._reset_exploration(t=t)
+                else:
+                    self._update_exploration_rate(t, self.num_episode)
 
 
             # Record membrane potentials
@@ -634,6 +627,16 @@ class SNNSimulator:
         elif self._exploration_source == "env":
             return self.epsilon
 
+    def _reset_exploration(self, t: int = None):
+        if self._exploration_source == "network":
+            self.network.set_stochastic()
+            self.network.set_exploration_rate(self.decay_init_value)
+        elif self._exploration_source == "env":
+            self.epsilon = self.decay_init_value
+
+        if self.decay_method == "time":
+            self._t0 = t if t is not None else 0
+
     def _update_exploration_rate(self, t: int, episode_count: int):
         """
         Update the exploration rate based on the decay method and cutoff.
@@ -644,7 +647,7 @@ class SNNSimulator:
         if self._should_explore(t):
             if self.decay_method == "time":
                 # Decay based on timestep
-                new_rate = self.decay_init_value * np.exp(-t * self.decay_rate / (self.decay_cutoff or self.num_steps))
+                new_rate = self.decay_init_value * np.exp(-(t-self._t0) * self.decay_rate / (self.decay_cutoff or self.num_steps))
             elif self.decay_method == "constant":
                 # Decay by multiplying with a constant
                 new_rate = self._get_exploration_rate() * self.decay_rate

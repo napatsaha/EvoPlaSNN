@@ -306,7 +306,7 @@ class RL_Evaluator(Evaluator):
                 self.simulator.run(num_eps=self.eval_episodes, update=self.plastic_on_eval)
 
             # Final Fitness
-            fitness = self.reward_collector.get_fitness(t_cutoff=self.simulator.decay_cutoff)
+            fitness = self.reward_collector.get_fitness()
             fitnesses.append(fitness)
 
             if self.logger is not None:
