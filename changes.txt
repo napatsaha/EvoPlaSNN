@@ -113,6 +113,11 @@ Branch v1.4-rule-rework
 v1.4
 ----
 
+v1.4.14.4 (2026-11-05)
+- Add "seasonal-obstacle-maze" to ENV_DICT
+- Add `get_season_timestamps()` to RewardCollector to return timestep when season changes
+- Edited `plot_intermediate_fitness()` to be able to plot seasonal bands is seasonal simulator is enabled
+
 v1.4.14.3 (2026-11-04)
 - Added `SeasonalEnvProtocol` to `common.base` to use with both `SeasonalObstacleGridMaze` and simulator type checks
 - `SeasonalObstacleGridMaze.change_season()` now takes `season_idx` instead of `season_count`.

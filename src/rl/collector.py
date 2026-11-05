@@ -1,6 +1,6 @@
 import numpy as np
 from collections import namedtuple
-from typing import List, Literal, Dict, Callable, NamedTuple, Any
+from typing import List, Literal, Dict, Callable, NamedTuple, Any, Tuple
 
 
 # Trajectory = namedtuple("Trajectory", ["t", "state", "observation", "action", "reward", "done", "info"])
@@ -154,6 +154,9 @@ class RewardCollector:
             return [r.length for r in self.records if r.episode >= eps_cutoff]
         else:
             return [r.length for r in self.records]
+
+    def get_season_timestamps(self) -> List[Tuple[int, int]]:
+        return [(r.t, r.season) for i, r in enumerate(self.records[:]) if (i==0) or (i > 0 and self.records[i-1].season != r.season)]
     
     def get_timestamps(self, t_cutoff: int = None, eps_cutoff: int = None) -> list[int]:
         if t_cutoff is not None:

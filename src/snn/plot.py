@@ -910,6 +910,7 @@ def plot_eligibility_traces(simulator: 'SNNSimulator' = None, values: np.ndarray
 
 def plot_intermediate_fitness(simulator: 'SNNSimulator' = None, values: np.ndarray = None, reward_collector: RewardCollector = None, *, 
                               plot_exploration: bool = False, exploration_labels: List[str] = None,
+                              plot_seasonal_bands: bool = False, season_cmap: str = "Set2",
                               t_cutoff: int = None, eps_cutoff: int = None,
                               num_steps: int = None, timestamps: np.ndarray = None,
                               x_scale: float = 0.01, y_scale: float = 1.0, x_eps: int = 1,
@@ -919,6 +920,7 @@ def plot_intermediate_fitness(simulator: 'SNNSimulator' = None, values: np.ndarr
     if (simulator is not None) or (reward_collector is not None):
         if simulator is not None:
             reward_collector: RewardCollector = simulator.reward_collector
+            plot_seasonal_bands = plot_seasonal_bands and simulator.seasonal # Will ensure seasonal bands are plotted only if simulator.seasonal is enabled
             T = simulator.num_steps
         else:
             T = reward_collector.records[-1].t
@@ -965,6 +967,7 @@ def plot_intermediate_fitness(simulator: 'SNNSimulator' = None, values: np.ndarr
         figsize = (((t_max - t_min) * x_scale, 10 * y_scale * (int(plot_exploration) + 1)))
     fig, axs = plt.subplots(1 + int(plot_exploration), 1, figsize=figsize, dpi=dpi,
                             layout="constrained", squeeze=False)
+    ## Fitness per episode plot
     ax: Axes = axs[0, 0]
     ax.plot(
         ts, fts,
@@ -974,12 +977,29 @@ def plot_intermediate_fitness(simulator: 'SNNSimulator' = None, values: np.ndarr
         marker="o", markersize=5
     )
     ax.plot(ts, runavg, color="blue", linewidth=2, label=f"Running Average ({window_size})", markersize=10, marker="o")
-    ax.legend(loc="lower right", fontsize=12)
+    # Make sure line legend is not removed when plotting season legend
+    line_legend = ax.legend(loc="lower right", fontsize=12)
+    ax.add_artist(line_legend)
     if num_steps is not None:
         ax.xaxis.set_major_locator(plt.MultipleLocator(100))
+    # Plot seasonal bands if necessary
+    if plot_seasonal_bands:
+        # Get timestamps for first occurence of each season change
+        season_ts = reward_collector.get_season_timestamps()
+        if simulator is not None:
+            n_seasons = simulator.n_seasons
+        else:
+            n_seasons = len(set([s for t, s in season_ts]))
+        s_cmap = mpl.colormaps[season_cmap]
+        for (xmin, s0), (xmax, s1) in zip(season_ts, season_ts[1:] + [(ts[-1], None)]): # Add final xmax timestamp for final band
+            ax.axvspan(xmin, xmax, facecolor=s_cmap.colors[s0], alpha=0.5)
+        ax.legend(handles=[mpl.patches.Patch(facecolor=s_cmap.colors[i], label="Season %d" % i) for i in range(n_seasons)], loc="lower left")
+    
     ax.set_xlim(t_min - x_eps, t_max + x_eps)
     ax.set_xlabel("Time (steps)")
     ax.set_ylabel("Episode " + fts_type.title())
+
+    ## Exploration rate plot
     if plot_exploration:
         ax: Axes = axs[1, 0]
         if reward_collector is not None:
