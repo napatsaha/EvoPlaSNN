@@ -113,6 +113,20 @@ Branch v1.4-rule-rework
 v1.4
 ----
 
+v1.4.14.6 (2026-11-06)
+- RewardCollector can collect fitness from only final x eps/t for each season:
+    - Added `fitness_season_t_cutoff` and `fitness_season_eps_cutoff` args to init
+    - EpsInfo has a `collect` field
+    - Whether or not an episode should be included in fitness calculations is determined during `.collect()` via `_last_season`, `_last_season_t` and `_last_season_eps` counters
+    - `get_intermediate_fitness()` and `get_**()` methods only has `collect_only` arg which will only return fitness from episodes whose `collect=True`
+    - `get_fitness()` will only choose episodes based on `collect_only=True`. t/eps_cutoff can still be set externally. Not sure if behaviour has changed
+- Plotting intermediate fitness:
+    - Add argument `plot_collect_fitness` which will plot gray bands between episodes where `collect=True`
+- Improve `plot_fitness_generation`:
+    - Will extract config from `config.yaml` in same directory as results csv:
+    - minimise / maximise operation will depend on config
+    - fitness_type and fitness_agg_func will be extracted from config to display in title and ylabel
+
 v1.4.14.5 (2026-11-05)
 - Simulator can reset exploration rate with season change if `reset_exploration_on_season_change` is enabled:
     - Added `_reset_exploration()` method to be called during reset, and when season changes

@@ -1,7 +1,7 @@
 from pathlib import Path
 import csv, pickle
 from typing import List, Literal, Sequence, Dict
-import os
+import os, yaml
 
 import matplotlib.pyplot as plt
 import matplotlib as mpl
@@ -910,6 +910,7 @@ def plot_eligibility_traces(simulator: 'SNNSimulator' = None, values: np.ndarray
 
 def plot_intermediate_fitness(simulator: 'SNNSimulator' = None, values: np.ndarray = None, reward_collector: RewardCollector = None, *, 
                               plot_exploration: bool = False, exploration_labels: List[str] = None,
+                              plot_collect_fitness: bool = True,
                               plot_seasonal_bands: bool = False, season_cmap: str = "Set2",
                               t_cutoff: int = None, eps_cutoff: int = None,
                               num_steps: int = None, timestamps: np.ndarray = None,
@@ -1019,7 +1020,8 @@ def plot_intermediate_fitness(simulator: 'SNNSimulator' = None, values: np.ndarr
                 drawstyle="steps-pre",
                 linewidth=2.5, label=exploration_labels
             )
-            ax.legend(fontsize=14, loc="upper right")
+            expl_lg = ax.legend(fontsize=14, loc="upper right")
+            ax.add_artist(expl_lg)
         else:
             ax.plot(
                 ts, expl,
@@ -1027,6 +1029,14 @@ def plot_intermediate_fitness(simulator: 'SNNSimulator' = None, values: np.ndarr
                 drawstyle="steps-pre",
                 linewidth=2.5, 
             )
+        # Plot when fitnesses are collected
+        if plot_collect_fitness:
+            tmins = [r1.t for r0, r1 in zip(reward_collector.records[:-1], reward_collector.records[1:]) if r1.collect and not r0.collect]
+            tmaxs = [r1.t for r0, r1 in zip(reward_collector.records[:-1], reward_collector.records[1:]) if not r1.collect and r0.collect]
+            for (xmin, xmax) in zip(tmins, tmaxs + [T]):
+                rec = ax.axvspan(xmin, xmax, facecolor="gray", alpha=0.3)
+                ax.legend(handles=[mpl.patches.Patch(facecolor="gray")], labels=["Collect Fitness"], loc="lower left", fontsize=14)
+
         ax.set_xlim(t_min - x_eps, t_max + x_eps)
         if num_steps is not None:
             ax.xaxis.set_major_locator(plt.MultipleLocator(100))
@@ -1447,9 +1457,15 @@ def plot_learning_rule_2D(rule: base.LearningRule, simulator: 'SNNSimulator' = N
 
 ### Plotting functions for Evolutionary Results ###
 
+_errortype_abbrev = {
+    "se": "Standard Error",
+    "sd": "Standard Deviation",
+    "ci": "Confidence Interval",
+    "pi": "Percentile Interval"
+}
 
 def plot_fitness_generation(file_path: str | Path = None, res: pd.DataFrame = None, *, 
-                            x_var: str = "gen", y_var: str = "avg_fitness",
+                            x_var: str = "gen", y_var: str = "avg_fitness", minimise: bool = False,
                             estimator: str = "mean", errorband: str | tuple = ("pi", 100),
                             hue_var: str = None, run_name: str = None, merge_avg: bool = False,
                             linecolor_best: str = "black", linecolor_est: str = "blue", pointcolor: str = "gray",
@@ -1459,10 +1475,19 @@ def plot_fitness_generation(file_path: str | Path = None, res: pd.DataFrame = No
                             x_eps: int = 2, x_scale: float = 0.3, y_scale: float = 1.3, y_size: float = 10,
                             ymin: float = None, ymax: float = None,
                             savepath: str | Path = None, show: bool = True):
+    fts_name = "Fitness"
     if file_path is not None:
         assert os.path.exists(file_path), f"File {file_path} does not exist."
         res = pd.read_csv(f"{file_path}")
         run_name = run_name if run_name is not None else Path(file_path).parent.stem
+        config_path = file_path.parent / "config.yaml"
+        if config_path.exists():
+            with open(config_path) as f:
+                config = yaml.safe_load(f)
+            minimise = config.get("evo_params", {}).get("solver", {}).get("minimise", minimise)
+            fitness_type = config["collector_params"]["fitness_type"].replace("_", " ").title()
+            fitness_agg_func = config["collector_params"]["fitness_agg_func"].title()
+            fts_name = f"{fitness_agg_func} Episode {fitness_type}"
     if res is not None:
         res = res
         run_name = None if run_name is None else run_name
@@ -1473,12 +1498,15 @@ def plot_fitness_generation(file_path: str | Path = None, res: pd.DataFrame = No
         assert hue_var in res.columns, f"Hue variable to plot ({hue_var}) must be in DataFrame."
 
     # Calulate best all-time fitness
-    best_fts = res.groupby(x_var)[y_var].max().cummax()
+    if not minimise:
+        best_fts = res.groupby(x_var)[y_var].max().cummax()
+    else:
+        best_fts = res.groupby(x_var)[y_var].min().cummin()
     best_fts.rename("best_fitness", inplace=True)
     res = res.join(best_fts, on=x_var, how="left")
 
     num_gens = res[x_var].max() + 1
-    best_fts = res["best_fitness"].max()
+    best_fts_val = res["best_fitness"].max() if not minimise else res["best_fitness"].min()
     ymax = res[y_var].max() if ymax is None else float(ymax)
     ymin = res[y_var].min() if ymin is None else float(ymin)
 
@@ -1505,16 +1533,16 @@ def plot_fitness_generation(file_path: str | Path = None, res: pd.DataFrame = No
     ax.set_ylim(ymin, ymax)
     ax.xaxis.set_major_locator(plt.MultipleLocator(5))
     ax.set_xlabel("Generation", fontsize=12*fontscale)
-    ax.set_ylabel("Fitness", fontsize=12*fontscale)
+    ax.set_ylabel(fts_name, fontsize=12*fontscale)
     if legend:
         ax.legend(loc="upper left", fontsize=12*fontscale)
     else:
         ax.get_legend().remove()
     ax.grid(True, which='both', linestyle='--', linewidth=0.5, alpha=0.5)
 
-    ax.text(num_gens - 1, best_fts, f"{best_fts:.2f}", ha='right', va="bottom", fontsize=16*fontscale, transform=ax.transData, color=linecolor_best)
-    title_main = f"Fitness Over Generations" if title is None else title
-    subtitle = f"({estimator.title()} Fitness +/- {errorband[1]} {errorband[0].upper()})" if subtitle is None else subtitle
+    ax.text(num_gens - 1, best_fts_val, f"{best_fts_val:.2f}", ha='right', va="bottom", fontsize=16*fontscale, transform=ax.transData, color=linecolor_best)
+    title_main = f"{fts_name} Over Generations" if title is None else title
+    subtitle = f"({estimator.title()} $\pm$ {errorband[1]} {_errortype_abbrev[errorband[0]]})" if subtitle is None else subtitle
     comment = f"Run: {run_name}" if comment is None else comment
     fig.text(0.5, 0.95, title_main, ha='center', fontsize=24*fontscale)
     fig.text(0.5, 0.90, subtitle, ha='center', fontsize=16*fontscale)

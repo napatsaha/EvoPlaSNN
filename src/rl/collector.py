@@ -35,6 +35,8 @@ class EpsInfo(NamedTuple):
     truncated: bool = None
     terminated: bool = None
     trajectory: Trajectory = None
+    collect: bool = None
+
     __slot__ = ()
 
     def __repr__(self):
@@ -67,6 +69,7 @@ class RewardCollector:
     def __init__(self, *, fitness_type: Literal["reward", "latency", "success_rate", "eps_reward"] = "reward",
                  fitness_agg_func: Literal["mean", "sum", "min", "max", "median"] = "mean",
                  fitness_t_cutoff: int = None, fitness_eps_cutoff: int = None,
+                 fitness_season_t_cutoff: int = None, fitness_season_eps_cutoff: int = None,
                 #  max_fitness: float = 1.0, min_fitness: float = -1.0,
                  fitness_on_eval_only: bool = True):
         """
@@ -101,6 +104,30 @@ class RewardCollector:
         # Own cutoff when calculating fitness
         self.fitness_t_cutoff = fitness_t_cutoff
         self.fitness_eps_cutoff = fitness_eps_cutoff
+        self.fitness_season_t_cutoff = fitness_season_t_cutoff
+        self.fitness_season_eps_cutoff = fitness_season_eps_cutoff
+
+        # Season counter (for calculating seasonal fitness cutoff)
+        self._last_season = None
+        self._last_season_t = None
+        self._last_season_eps = None
+
+    def _check_collect_fitness(self, t, eps):
+        """
+        Determine (based on cutoff method, t and eps) whether this episode should be included in final fitness calculation
+
+        Args:
+            t (_type_): timestep
+            eps (_type_): episode number
+        """
+        if self.fitness_t_cutoff is not None:
+            return t >= self.fitness_t_cutoff
+        if self.fitness_eps_cutoff is not None:
+            return eps >= self.fitness_eps_cutoff
+        if self.fitness_season_t_cutoff is not None:
+            return (t-self._last_season_t) >= self.fitness_season_t_cutoff
+        if self.fitness_season_eps_cutoff is not None:
+            return (eps-self._last_season_eps) >= self.fitness_season_eps_cutoff
 
     def reset(self):
         """
@@ -109,6 +136,9 @@ class RewardCollector:
         # self.reward_history.clear()
         # self.episode_lengths.clear()
         self.records.clear()
+        self._last_season = None
+        self._last_season_t = None
+        self._last_season_eps = None
 
     def soft_reset(self):
         """
@@ -124,6 +154,12 @@ class RewardCollector:
         """
         Record episode information at the end of an episode.
         """
+        if (self._last_season is None) or (self._last_season != season):
+            self._last_season = season
+            self._last_season_t = t
+            self._last_season_eps = episode
+        
+        collect = self._check_collect_fitness(t, episode)
         self.records.append(EpsInfo(
             t = t,
             episode = episode,
@@ -135,27 +171,34 @@ class RewardCollector:
             exploration = exploration,
             truncated = truncated,
             terminated = terminated,
-            trajectory = trajectory
+            trajectory = trajectory,
+            collect=collect
         ))
 
-    def get_rewards(self, t_cutoff: int = None, eps_cutoff: int = None) -> list[float]:
-        if t_cutoff is not None:
+    def get_rewards(self, collect_only: bool = True, t_cutoff: int = None, eps_cutoff: int = None) -> list[float]:
+        if collect_only:
+            return [r.reward for r in self.records if r.collect]
+        elif t_cutoff is not None:
             return [r.reward for r in self.records if r.t >= t_cutoff]
         elif eps_cutoff is not None:
             return [r.reward for r in self.records if r.episode >= eps_cutoff]
         else:
             return [r.reward for r in self.records]
 
-    def get_eps_rewards(self, t_cutoff: int = None, eps_cutoff: int = None) -> list[float]:
-        if t_cutoff is not None:
+    def get_eps_rewards(self, collect_only: bool = True, t_cutoff: int = None, eps_cutoff: int = None) -> list[float]:
+        if collect_only:
+            return [r.eps_reward for r in self.records if r.collect]
+        elif t_cutoff is not None:
             return [r.eps_reward for r in self.records if r.t >= t_cutoff]
         elif eps_cutoff is not None:
             return [r.eps_reward for r in self.records if r.episode >= eps_cutoff]
         else:
             return [r.eps_reward for r in self.records]
     
-    def get_episode_lengths(self, t_cutoff: int = None, eps_cutoff: int = None) -> list[int]:
-        if t_cutoff is not None:
+    def get_episode_lengths(self, collect_only: bool = True, t_cutoff: int = None, eps_cutoff: int = None) -> list[int]:
+        if collect_only:
+            return [r.length for r in self.records if r.collect]
+        elif t_cutoff is not None:
             return [r.length for r in self.records if r.t >= t_cutoff]
         elif eps_cutoff is not None:
             return [r.length for r in self.records if r.episode >= eps_cutoff]
@@ -181,26 +224,28 @@ class RewardCollector:
         else:
             return [r.exploration for r in self.records]
     
-    def get_success(self, t_cutoff: int = None, eps_cutoff: int = None) -> list[float]:
-        if t_cutoff is not None:
+    def get_success(self, collect_only: bool = True, t_cutoff: int = None, eps_cutoff: int = None) -> list[float]:
+        if collect_only:
+            return [1 if r.terminated and r.reward == self.max_fitness else 0 for r in self.records if r.collect]
+        elif t_cutoff is not None:
             return [1 if r.terminated and r.reward == self.max_fitness else 0 for r in self.records if r.t >= t_cutoff]
         elif eps_cutoff is not None:
             return [1 if r.terminated and r.reward == self.max_fitness else 0 for r in self.records if r.episode >= eps_cutoff]
         else:
             return [1 if r.terminated and r.reward == self.max_fitness else 0 for r in self.records]
 
-    def get_intermediate_fitness(self, t_cutoff: int = None, eps_cutoff: int = None) -> List[float]:
+    def get_intermediate_fitness(self, collect_only: bool = True, t_cutoff: int = None, eps_cutoff: int = None) -> List[float]:
         """
         Return list of episode fitnesses before aggregation.
         """
         if self.fitness_type == "reward":
-            fitnesses = self.get_rewards(t_cutoff=t_cutoff, eps_cutoff=eps_cutoff)
+            fitnesses = self.get_rewards(collect_only=collect_only, t_cutoff=t_cutoff, eps_cutoff=eps_cutoff)
         elif self.fitness_type == "eps_reward":
-            fitnesses = self.get_eps_rewards(t_cutoff=t_cutoff, eps_cutoff=eps_cutoff)
+            fitnesses = self.get_eps_rewards(collect_only=collect_only, t_cutoff=t_cutoff, eps_cutoff=eps_cutoff)
         elif self.fitness_type == "success_rate":
-            fitnesses = self.get_success(t_cutoff=t_cutoff, eps_cutoff=eps_cutoff)
+            fitnesses = self.get_success(collect_only=collect_only, t_cutoff=t_cutoff, eps_cutoff=eps_cutoff)
         elif self.fitness_type == "latency":
-            fitnesses = self.get_episode_lengths(t_cutoff=t_cutoff, eps_cutoff=eps_cutoff)
+            fitnesses = self.get_episode_lengths(collect_only=collect_only, t_cutoff=t_cutoff, eps_cutoff=eps_cutoff)
         else:
             fitnesses = []
         return fitnesses
@@ -211,11 +256,11 @@ class RewardCollector:
         If `t_cutoff` or `eps_cutoff` is not specified, `fitness_t_cutoff` or `fitness_eps_cutoff` will be used, respectively (if specified during init).  
         t_cutoff always have priority over eps_cutoff, if both are given.
         """
-        if t_cutoff is None and self.fitness_t_cutoff is not None:
-            t_cutoff = self.fitness_t_cutoff
-        if eps_cutoff is None and self.fitness_eps_cutoff is not None:
-            eps_cutoff = self.fitness_eps_cutoff
-        fitnesses = self.get_intermediate_fitness(t_cutoff=t_cutoff, eps_cutoff=eps_cutoff)
+        # if t_cutoff is None and self.fitness_t_cutoff is not None:
+        #     t_cutoff = self.fitness_t_cutoff
+        # if eps_cutoff is None and self.fitness_eps_cutoff is not None:
+        #     eps_cutoff = self.fitness_eps_cutoff
+        fitnesses = self.get_intermediate_fitness(collect_only=True, t_cutoff=t_cutoff, eps_cutoff=eps_cutoff)
         if len(fitnesses) == 0:
             return self.min_fitness
         agg = self._agg_func_dict.get(self.fitness_agg_func)
