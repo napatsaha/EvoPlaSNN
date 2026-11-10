@@ -36,9 +36,10 @@ class BaseSolver(Solver):
         self.fitnesses = np.zeros(self.popsize)
 
         # Extract ndim from sample solution
+        self.sample_sol = self._create_individual()
+
         if self.ndim is None:
-            sample_sol = self._create_individual()
-            self.ndim = sample_sol.size
+            self.ndim = self.sample_sol.size
 
         # Solution and fitness management
         # Best solution in each generation
@@ -148,6 +149,23 @@ class BaseSolver(Solver):
             self.save_best(self.log_path, n=n_best)
 
     def save_best(self, save_dir: str | Path, n: int = 1, precision: int = None):
+        top_solutions = self._select_best_n(n)
+        for i in range(n):
+            sol = top_solutions[i]
+            i = str(i + 1).zfill(2)  # Ensure two-digit index
+            file_name = f"best_rule_{i}.txt"
+            self.write_solution(sol, save_dir, file_name, precision)
+
+    def _select_best_n(self, n) -> List[Genome]:
+        """
+        Select top n individuals, based on their fitness and whether `minimise` is true or not.
+
+        Args:
+            n (int): number of best individuals to select
+
+        Returns:
+            List[Genome]: List of best individuals
+        """
         top_indices = np.argsort(self.fitnesses if self.minimise else -self.fitnesses) # Will arrange from lowest to highest fitness
         top_indices = top_indices[:n]
         # if self.minimise:
@@ -156,13 +174,9 @@ class BaseSolver(Solver):
         # else:
         #     # Last n fitness in descending order
         #     top_indices = top_indices[-n:][::-1]
-        print(top_indices)
+        # print(top_indices)
         top_solutions = self.take_solutions(top_indices, return_array=False)
-        for i in range(n):
-            sol = top_solutions[i]
-            i = str(i + 1).zfill(2)  # Ensure two-digit index
-            file_name = f"best_rule_{i}.txt"
-            self.write_solution(sol, save_dir, file_name, precision)
+        return top_solutions
 
     def write_solution(self, sol: np.ndarray | Genome, save_dir: str | Path, file_name: str, precision: int = None):
         if isinstance(sol, np.ndarray):

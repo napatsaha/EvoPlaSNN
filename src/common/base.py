@@ -31,6 +31,12 @@ class Genome(ABC):
         Crossover between two Genomes
         """
 
+    @abstractmethod
+    def get_bounds(self) -> Tuple[List, List]:
+        """
+        Return lower and upper boundaries of each gene position.
+        """
+
     @property
     @abstractmethod
     def parameters(self) -> np.ndarray:

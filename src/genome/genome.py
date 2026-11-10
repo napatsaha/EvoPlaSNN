@@ -58,6 +58,14 @@ class SimpleGenome(Genome):
         new_params = np.where(flags, self.parameters, other.parameters)
         return self.__class__(parameters=new_params, dist=self.dist)
 
+    def get_bounds(self) -> Tuple[List, List]:
+        if self.dist == "uniform":
+            return [np.full(self.size, fill_value=0.0), 
+                    np.full(self.size, fill_value=1.0)]
+        else:
+            return [np.full(self.size, fill_value=-np.inf), 
+                    np.full(self.size, fill_value=np.inf)]
+
     @property
     def parameters(self) -> np.ndarray:
         """

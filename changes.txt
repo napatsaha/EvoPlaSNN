@@ -113,6 +113,20 @@ Branch v1.4-rule-rework
 v1.4
 ----
 
+v1.4.15.0 (2026-11-10)
+- Lots of changes to `ga.GeneticAlgorithm`:
+    - The entire `_generate_next_generation()` is now performed under one loop, instead of passing along intermediate populations to select, crossover and mutate
+    - Elites can now be specified
+    - Selection happens for each pair of parents, and will ensure the two parent are not duplicates
+    - Add the option to use the algorithm's own implementations of crossover and mutate, without relying on the Genome's object methods
+        - Pros: simpler to understand, able to use true crossover (swapping genes to produce two offsprings), future methods additions would be simpler
+        - Cons: Not able to use custom class sampling, dtype check and other conversions
+    - If using own genetic operators, will pull lower/upper bounds from sample solution, to use in mutation as appropriate
+        - Allow setting default low and high, for when a gene is unbounded and the mutation method is resample
+- Add `get_bounds()` to base `Genome` object, as well as `SimpleGenome`
+- `BaseSolver` now saves sample solution as `.sample_sol`
+- Refactor `BaseSolver` selection of best n solutions into `_select_best_n()` method
+
 v1.4.14.6 (2026-11-06)
 - RewardCollector can collect fitness from only final x eps/t for each season:
     - Added `fitness_season_t_cutoff` and `fitness_season_eps_cutoff` args to init
