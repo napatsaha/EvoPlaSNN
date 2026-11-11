@@ -247,6 +247,9 @@ class RealParam(BaseParameter):
                 raise ValueError(f"All Values must be between [{self.low}, {self.high}]. At index(s) {idx[0]}, got value(s) {vals}")
         return value
 
+    def get_dtype(self):
+        return float
+
     def __repr__(self):
         kwargs = ', '.join(f"{k}={v}" for k, v in self.to_dict().items() if v is not None)
         return f"RealParam({self.value}, {kwargs})"
@@ -376,6 +379,9 @@ class DiscreteParam(BaseParameter):
             vals = value[idx]
             raise ValueError(f"All Values must be integers between [{self.low}, {self.high}). At index(s) {idx[0]}, got value(s) {vals}")
         return value.astype(np.int_)
+
+    def get_dtype(self):
+        return int
 
     # def sample(self):
     #     self._value = self._generate(self.low, self.high)

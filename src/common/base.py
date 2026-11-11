@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 import numpy as np
 from numpy.typing import ArrayLike
 
-from typing import Any, Literal, Protocol, List, Sequence, Tuple, Dict, Union, runtime_checkable
+from typing import Any, Literal, Protocol, List, Sequence, Tuple, Dict, Type, Union, runtime_checkable
 
 
 # Genome and Learning Rules
@@ -11,10 +11,11 @@ class Genome(ABC):
     """
     Base class to allow for genetic-related operations in evolutionary Solver.
     """
-    # def __init__(self, **kwargs):
-    #     super().__init__()
-        # self._parameters = parameters
-    # genes: List['Parameter']
+    def __init__(self, parameters: np.ndarray = None, **kwargs):
+        """
+        Args:
+            parameters (np.ndarray, optional): Set genome values to Genome. If None, will sample randomly. Defaults to None.
+        """
 
     @abstractmethod
     def mutate(self, rate: float, scale: float, method: str, **kwargs) -> 'Genome':
@@ -35,6 +36,12 @@ class Genome(ABC):
     def get_bounds(self) -> Tuple[List, List]:
         """
         Return lower and upper boundaries of each gene position.
+        """
+
+    @abstractmethod
+    def get_gene_dtypes(self) -> List[Type]:
+        """
+        Return the dtype of each gene position as a list.
         """
 
     @property
@@ -120,6 +127,11 @@ class Parameter(ABC):
         Return a list of upper bounds of the same length as gene's length. For gene position with no bound, will return 'None'.
         """
 
+    def get_dtype(self) -> Type:
+        """
+        Return dtype of gene Parameter.
+        """
+        
 
 class LearningRule(ABC):
     """

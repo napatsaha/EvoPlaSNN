@@ -17,13 +17,13 @@ class SimpleGenome(Genome):
     def __init__(self, parameters: ArrayLike = None, size: int = None, dist: Literal["normal", "uniform"] = "uniform", **kwargs):
         super().__init__()
         self.dist = dist
+        self._parameters: np.ndarray = parameters
         if parameters is None:
             if size is not None:
                 self._parameters = self._make_random_parameters(size)
             else:
                 raise ValueError("Either 'parameters' or 'size' must be supplied.")
-        else:
-            self._parameters = parameters
+        self._dtype = self._parameters.dtype
 
     def _make_random_parameters(self, size: int) -> ArrayLike:
         if self.dist == "uniform":
@@ -49,6 +49,7 @@ class SimpleGenome(Genome):
         elif method == "perturb":
             delta = np.random.normal(0, scale=scale, size=self.size)
             params = params + delta
+        params = params.astype(self._dtype)
         return self.__class__(params)
 
     def crossover(self, other: Genome, rate: float) -> Genome:
@@ -56,6 +57,7 @@ class SimpleGenome(Genome):
         rate = np.clip(rate, 0, 1)
         flags = np.random.binomial(1, p=rate, size=self.size)
         new_params = np.where(flags, self.parameters, other.parameters)
+        new_params = new_params.astype(self._dtype)
         return self.__class__(parameters=new_params, dist=self.dist)
 
     def get_bounds(self) -> Tuple[List, List]:
@@ -65,6 +67,9 @@ class SimpleGenome(Genome):
         else:
             return [np.full(self.size, fill_value=-np.inf), 
                     np.full(self.size, fill_value=np.inf)]
+
+    def get_gene_dtypes(self):
+        return [self._dtype for _ in range(self.size)]
 
     @property
     def parameters(self) -> np.ndarray:
@@ -144,6 +149,9 @@ class CompositeGenome(Genome):
         lower = [x for xs in [g.get_lower_bounds() for g in self.genes] for x in xs]
         upper = [x for xs in [g.get_upper_bounds() for g in self.genes] for x in xs]
         return lower, upper
+
+    def get_gene_dtypes(self):
+        return [g.get_dtype() for g in self.genes for _ in range(g.length)]
 
     @property
     def parameters(self) -> np.ndarray:
@@ -429,6 +437,9 @@ class EvolvableLearningRule(EvolvableRuleProtocol):
 
     def get_bounds(self) -> Tuple[List, List]:
         return self.genome.get_bounds()
+
+    def get_gene_dtypes(self):
+        return self.genome.get_gene_dtypes()
 
     @property
     def size(self):

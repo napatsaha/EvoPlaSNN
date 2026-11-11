@@ -113,6 +113,17 @@ Branch v1.4-rule-rework
 v1.4
 ----
 
+v1.4.15.1 (2026-11-11)
+- Gene dtype and integer gene mutation:
+    - Perform mutation at each gene position step-by-step in `GeneticAlgorithm`
+        - If rand() > mutation rate, skip
+        - If dtype is int, and perturb, sample from {-1,0,+1} 
+        → Might consider incorporating mutation_scale in future
+        - If dtype is int and resample, choose from random integers within bounds
+    - Extract and save gene_dtypes during init
+- Add `get_gene_dtype()` to base `Genome` and all its children
+- Add `get_dtype()` to each `Parameter` so it can be used with `CompositeGenome`
+
 v1.4.15.0 (2026-11-10)
 - Lots of changes to `ga.GeneticAlgorithm`:
     - The entire `_generate_next_generation()` is now performed under one loop, instead of passing along intermediate populations to select, crossover and mutate

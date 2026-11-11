@@ -62,11 +62,14 @@ class GeneticAlgorithm(BaseSolver):
         assert 0 <= n_elites < self.popsize, f"`n_elites` must be a positive integer less than popsize={self.popsize}. " + f"Got `n_elites={n_elites}`"
         self.n_elites = int(n_elites)
         if not self.use_genome_operator:
+            # Get gene dtypes
+            self._gene_dtypes = self.sample_sol.get_gene_dtypes()
+            # Get clipping and sampling boundaries
             self.lower_bounds, self.upper_bounds = self.sample_sol.get_bounds()
-            # For use only in sampling in mutation_method="resample"
+            # Sampling bounds -- For use only in sampling in mutation_method="resample"
             self._sampling_low = np.where(np.array(self.lower_bounds) == None, default_lower_bound, self.lower_bounds).astype(float)
             self._sampling_high = np.where(np.array(self.upper_bounds) == None, default_upper_bound, self.upper_bounds).astype(float)
-            # Replace None with -inf/+inf for use in clipping
+            # Clipping bounds -- Replace None with -inf/+inf for use in clipping
             self.lower_bounds = np.where(np.array(self.lower_bounds) == None, -np.inf, self.lower_bounds).astype(float)
             self.upper_bounds = np.where(np.array(self.upper_bounds) == None, np.inf, self.upper_bounds).astype(float)
 
@@ -114,16 +117,18 @@ class GeneticAlgorithm(BaseSolver):
                 # Crossover to produce two offsprings
                 o1, o2 = self._crossover_array(p1a, p2a)
                 if n_left > 1:
+                    # Only mutate and reconstruct both offsprings if there's space enough for two
                     # Mutate each offspring
                     o1 = self._mutate_array(o1)
                     o2 = self._mutate_array(o2)
                     # Reconstruct Genome from parameters array
-                    o1 = create_learning_rule(self._genome_type, parameters=o1, **self._genome_params)
-                    o2 = create_learning_rule(self._genome_type, parameters=o2, **self._genome_params)
+                    o1 = self._create_individual(genome=o1)
+                    o2 = self._create_individual(genome=o2)
                     pop.extend([o1, o2])
                 else:
+                    # Otherwise add only the first offspring
                     o1 = self._mutate_array(o1)
-                    o1 = create_learning_rule(self._genome_type, parameters=o1, **self._genome_params)
+                    o1 = self._create_individual(genome=o1)
                     pop.append(o1)
 
             n_left -= 2
@@ -196,19 +201,50 @@ class GeneticAlgorithm(BaseSolver):
         return o1, o2
 
     def _mutate_array(self, ind: np.ndarray) -> np.ndarray:
+        """Perform mutation when genome is a 1D array (Mutate each position step-by-step)"""
+        off_genome = ind.copy()
+
+        for i, dtype in zip(range(off_genome.size), self._gene_dtypes):
+            # Decide whether to mutate this gene or not
+            if np.random.rand() > self.mutation_rate:
+                continue
+            # Mutation
+            if self.mutation_method == "resample":
+                if dtype is int:
+                    new_p = np.random.randint(self._sampling_low[i], self._sampling_high[i], size=1)
+                elif dtype is float:
+                    new_p = np.random.uniform(self._sampling_low[i], self._sampling_high[i], size=1)
+                else:
+                    raise TypeError(f"dtype={dtype} not recognised for gene position {i}")
+
+            elif self.mutation_method == "perturb":
+                old_p = off_genome[i]
+                if dtype is int:
+                    # TODO: Incorporate mutation_scale into integer noise
+                    noise = np.random.randint(-1, 1 + 1, size=1)
+                elif dtype is float:
+                    noise = np.random.normal(loc=0, scale=self.mutation_scale, size=1)
+                else:
+                    raise TypeError(f"dtype={dtype} not recognised for gene position {i}")
+                new_p = old_p + noise
+                new_p = np.clip(new_p, self.lower_bounds[i], self.upper_bounds[i])
+            else:
+                raise NotImplementedError(f"Mutation method {self.mutation_method} not supported.")
+            off_genome[i] = new_p
+        return off_genome
         # raise NotImplementedError("Custom array-based mutation will be implemented in the future")
-        if self.mutation_method == "resample":
-            flags = np.random.binomial(1, p=self.mutation_rate, size=ind.size).astype(bool)
-            new_p = np.random.uniform(low=self._sampling_low, high=self._sampling_high, size=ind.size)
-            o = np.where(flags, new_p, ind)
-        elif self.mutation_method == "perturb":
-            flags = np.random.binomial(1, p=self.mutation_rate, size=ind.size).astype(bool)
-            noise = np.random.normal(loc=0, scale=self.mutation_scale, size=ind.size)
-            o = np.where(flags, ind + noise, ind)
-            o = np.clip(o, self.lower_bounds, self.upper_bounds)
-        else:
-            raise NotImplementedError(f"Mutation method {self.mutation_method} not supported.")
-        return o
+        # if self.mutation_method == "resample":
+        #     flags = np.random.binomial(1, p=self.mutation_rate, size=ind.size).astype(bool)
+        #     new_p = np.random.uniform(low=self._sampling_low, high=self._sampling_high, size=ind.size)
+        #     o = np.where(flags, new_p, ind)
+        # elif self.mutation_method == "perturb":
+        #     flags = np.random.binomial(1, p=self.mutation_rate, size=ind.size).astype(bool)
+        #     noise = np.random.normal(loc=0, scale=self.mutation_scale, size=ind.size)
+        #     o = np.where(flags, ind + noise, ind)
+        #     o = np.clip(o, self.lower_bounds, self.upper_bounds)
+        # else:
+        #     raise NotImplementedError(f"Mutation method {self.mutation_method} not supported.")
+        # return o
 
     # def _crossover_pop(self, inter_pop: List[Genome]) -> List[Genome]:
     #     pop = []
