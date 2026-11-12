@@ -113,6 +113,16 @@ Branch v1.4-rule-rework
 v1.4
 ----
 
+v1.4.15.3 (2026-11-11)
+- Update `CGP_Graph`:
+    - Make it a subclass of `Genome`
+    - Has methods for `get_bounds()` and `get_gene_dtype()`
+    - Allow specifying `parameters=` during init
+    - Renamed properties and its doc to be more easily understandable and more comprehensive
+    - Changed mutation of output genes to use number of input+internal nodes, instead of number of output (incorrect)
+- Added alternate names to TYPE_DICT: "cgp_graph", "cgp_rule"
+- Update `plot_intermediate_fitness` to not use `collect` fields when pulling intermediate fitnesses to plot
+
 v1.4.15.2 (2026-11-11)
 - Update `MuPlusLambda` to be like the new `GeneticAlgorithm`
     - Add `use_genome_operator` boolean arg similar to `GeneticAlgorithm`

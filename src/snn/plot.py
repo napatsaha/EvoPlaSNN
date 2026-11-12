@@ -925,7 +925,7 @@ def plot_intermediate_fitness(simulator: 'SNNSimulator' = None, values: np.ndarr
             T = simulator.num_steps
         else:
             T = reward_collector.records[-1].t
-        fts = reward_collector.get_intermediate_fitness(t_cutoff=t_cutoff, eps_cutoff=eps_cutoff)
+        fts = reward_collector.get_intermediate_fitness(t_cutoff=t_cutoff, eps_cutoff=eps_cutoff, collect_only=False)
         ft = reward_collector.get_fitness(t_cutoff=t_cutoff, eps_cutoff=eps_cutoff)
         # eps_len = simulator.reward_collector.get_episode_lengths()
         # eps_timestamp = np.cumsum(eps_len) * simulator.spike_coder.input_delay

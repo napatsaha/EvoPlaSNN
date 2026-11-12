@@ -2,7 +2,7 @@
 Cartesian Genetic Programming: graph program, and learning rule
 """
 import copy
-from typing import List, Tuple, Literal, Callable
+from typing import List, Sequence, Tuple, Literal, Callable
 from enum import IntEnum
 
 import numpy as np
@@ -22,13 +22,13 @@ FUNCTION_LIST = [
 ]
 
 
-class CGP_Graph:
+class CGP_Graph(Genome):
     GENE_TYPE = IntEnum('GeneType', ["Connection", "Function", "Output"])
 
     def __init__(self, 
                  n_inputs: int, n_outputs: int, n_rows: int, n_cols: int, *,
-                 genome: list = None, function_list: List[Callable] = None,
-                 arity: int = 2, levels_back: int = None, allow_input_anywhere: bool = False,
+                 genome: list = None, parameters: np.ndarray = None,
+                 function_list: List[Callable] = None, arity: int = 2, levels_back: int = None, allow_input_anywhere: bool = False,
                  mutation_rate: int | float = 0.1, mu_c: float = None, mu_f: float = None, mu_o: float = None,
                  mutation_method: Literal["point", "prob"] = "point",
                  seed: int = None):
@@ -89,11 +89,12 @@ class CGP_Graph:
         self._genome_output = np.zeros((self._no), dtype=np.int16)
 
         # Init genome
+        if parameters is not None and genome is None:
+            genome = np.asarray(parameters, dtype=int)
         if genome is not None:
             self._fill_genome(genome)
             self._check_valid_genome()
         else:
-            # TODO
             self._create_random_genome(seed=seed)
 
         # Find active nodes
@@ -156,14 +157,48 @@ class CGP_Graph:
         else:
             return np.squeeze(self._node_outputs[self._m:, :])
 
-    def mutate(self, mutation_rate: float) -> "CGP_Graph":
+    def get_bounds(self) -> Tuple[List, List]:
+        """
+        Return [lower, upper) boundaries for each gene in the genome.  
+        Lower bounds are inclusive, while upper bounds are exclusive.  
+        All values between bounds are assumed to be integers.
+
+        Returns:
+            Tuple[List, List]: Tuple of (lower, upper) boundary lists
+        """
+        lower, upper = [], []
+
+        for gene in range(self._lg):
+            gene_type = self._determine_gene_type(gene)
+            if gene_type == self.GENE_TYPE.Output:
+                low = 0
+                high = self.n_input_internal_nodes
+            elif gene_type == self.GENE_TYPE.Function:
+                low = 0
+                high = self.n_func
+            elif gene_type == self.GENE_TYPE.Connection:
+                i, j, k = self.flat_to_coord_3d(gene)
+                high, low = self._get_column_bounds(j)
+            lower.append(low)
+            upper.append(high)
+        return lower, upper
+
+    def get_gene_dtypes(self):
+        return [int for _ in range(self.size)]
+
+    def mutate(self, rate: float, scale: float = None, method: str = "resample", **kwargs) -> "CGP_Graph":
         """
         Mutate current graph and produce a new copy of an offspring.
         """
+        if method != "resample":
+            raise ValueError("Methods other than 'resample' not supported with CGP_Graph")
         offspring = copy.deepcopy(self)
-        offspring._mutate(mutation_rate)
+        offspring._mutate(rate)
         offspring._find_active_nodes()
         return offspring
+
+    def crossover(self, other: 'CGP_Graph', rate: int):
+        raise TypeError("Crossover is not supported with Cartesian Genetic Programming graph objects.")
 
     def _mutate(self, rate: float) -> np.ndarray[int]:
         # TODO: Add probabilistic mutation
@@ -179,7 +214,7 @@ class CGP_Graph:
             # Output genes
             if gene_type == self.GENE_TYPE.Output:
                 idx = gene - (self._nn * self._al)
-                self._genome_output[idx] = np.random.randint(self._no)
+                self._genome_output[idx] = np.random.randint(self.n_input_internal_nodes)
             # Function genes
             elif gene_type == self.GENE_TYPE.Function:
                 idx = self.flat_to_coord_3d(gene)
@@ -214,6 +249,7 @@ class CGP_Graph:
         
 
     def _get_column_bounds(self, j) -> tuple:
+        """Return (upper, lower) bounds of a connection gene positioned in column j"""
         upper_bound = self._ni + j*self._nr
         lower_bound = 0 if j < self._l else self._ni + (j - self._l)*self._nr
         return upper_bound, lower_bound
@@ -358,27 +394,47 @@ class CGP_Graph:
 
     @property
     def n_inputs(self):
+        """Number of input nodes"""
         return self._ni
     @property
     def n_nodes(self):
+        """Number of internal nodes"""
         return self._nn
     @property
     def n_outputs(self):
+        """Number of output nodes"""
         return self._no
     @property
+    def n_input_internal_nodes(self):
+        """Number of inputs and internal nodes"""
+        return self._m
+    @property
+    def n_total_nodes(self):
+        """Number of all nodes (input + internal + output)"""
+        return self._mo
+    @property
     def n_rows(self):
+        """Number of rows in internal nodes"""
         return self._nr
     @property
     def n_cols(self):
+        """Number of columns in internal nodes"""
         return self._nc
     @property
     def n_func(self):
+        """Number of available functions"""
         return self._nf
     @property
     def arity(self):
+        """Maximum inputs into function"""
         return self._a
     @property
+    def allele_length(self):
+        """Length of allele, or tuple representation in each node"""
+        return self._al
+    @property
     def levels_back(self):
+        """How many columns are inputs to internal nodes allowed to connect back."""
         return self._l
     
     @property
@@ -389,7 +445,7 @@ class CGP_Graph:
     @property
     def genome(self):
         return np.r_[self._genome_internal.swapaxes(0, 1).flatten(order="C"), self._genome_output]
-    
+
     @genome.setter
     def genome(self, value):
         self._genome_internal.fill(0)
@@ -397,6 +453,16 @@ class CGP_Graph:
         self._fill_genome(value)
         self._check_valid_genome()
 
+    @property
+    def parameters(self):
+        """Alias for genome"""
+        return self.genome
+
+    @parameters.setter
+    def parameters(self, value: Sequence | np.ndarray):
+        assert len(value) == self.size, "Length of new genome must be equal to current genome size " + self.size + f". Got size={len(value)}"
+        self.genome = value
+    
     @property
     def active_nodes(self):
         return self._active_nodes
