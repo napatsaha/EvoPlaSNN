@@ -18,11 +18,11 @@ class BaseSolver(Solver):
         self.ndim = ndim
         self.popsize = popsize if popsize is not None else int(4 + np.floor(3 + np.log(self.ndim)))
         self.minimise = minimise
-        # Gene Operator info
-        assert mutation_method in ["resample", "perturb"]
-        self.mutation_method = mutation_method
-        self.mutation_rate = min(1.0, max(0.0, mutation_rate))
-        self.mutation_scale = max(0.0, mutation_scale)
+        # # Gene Operator info
+        # assert mutation_method in ["resample", "perturb"]
+        # self.mutation_method = mutation_method
+        # self.mutation_rate = min(1.0, max(0.0, mutation_rate))
+        # self.mutation_scale = max(0.0, mutation_scale)
 
         # Genome Info
         self._genome_params = genome_params if genome_params is not None else {}
@@ -62,13 +62,13 @@ class BaseSolver(Solver):
             indiv = self._create_individual()
             self.solutions.append(indiv)
 
-    def _create_individual(self) -> Genome | LearningRule:
+    def _create_individual(self, genome: np.ndarray = None) -> Genome | LearningRule:
         # Generalise solution creation to any type of genome
         if self._genome_type is not None:
-            indiv = create_learning_rule(self._genome_type, **self._genome_params)
+            indiv = create_learning_rule(self._genome_type, parameters=genome, **self._genome_params)
         else:
             if self.ndim is not None:
-                indiv = SimpleGenome(size=self.ndim)
+                indiv = SimpleGenome(size=self.ndim, parameters=genome)
             else:
                 raise ValueError("Cannot create a SimpleGenome object when self.ndim is not yet specified.")
         return indiv

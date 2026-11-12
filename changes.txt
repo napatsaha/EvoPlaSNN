@@ -113,6 +113,15 @@ Branch v1.4-rule-rework
 v1.4
 ----
 
+v1.4.15.2 (2026-11-11)
+- Update `MuPlusLambda` to be like the new `GeneticAlgorithm`
+    - Add `use_genome_operator` boolean arg similar to `GeneticAlgorithm`
+    - Add `_mutate_array()` method, identical to `GeneticAlgorithm`
+    - Use base class `_create_individual()` instead of calling `create_learning_rule` directly
+- Moved `mutation_*` arguments from `BaseSolver` to `MuPlusLambda` itself (makes more sense)
+- Add abiility to specify `genome=` (aka parameters=) within `BaseSolver._create_individual()`
+- Add `get_gene_dtype()` method to `LayeredRule`
+
 v1.4.15.1 (2026-11-11)
 - Gene dtype and integer gene mutation:
     - Perform mutation at each gene position step-by-step in `GeneticAlgorithm`

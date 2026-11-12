@@ -203,6 +203,9 @@ class LayeredRule(LearningRule, EvolvableRuleProtocol):
             upper.extend(upp)
         return lower, upper
 
+    def get_gene_dtypes(self):
+        return [dtype for rule in self.rules for dtype in rule.get_gene_dtypes()]
+
     def contains_gene(self, gene_name: str) -> bool:
         return gene_name in self.gene_order
 
