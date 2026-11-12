@@ -113,6 +113,12 @@ Branch v1.4-rule-rework
 v1.4
 ----
 
+v1.4.15.4 (2026-11-12)
+- Introduce `CategoricalParam` in `genome.parameter` module as a child of `DiscreteParam` with string values for each integer
+- Added type "category" to `PARAM_DICT`
+- Added 'trigger_condition' gene type to `EvolvableLearningRule`
+- Added `_get_value(name, simplify=)` to `EvolvableLearningRule` to allow returning scalar value from gene
+
 v1.4.15.3 (2026-11-11)
 - Update `CGP_Graph`:
     - Make it a subclass of `Genome`

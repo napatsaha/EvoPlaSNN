@@ -12,7 +12,8 @@ from common.base import Parameter
 PARAM_DICT = {
     "real": "RealParam",
     "log": "LogRealParam",
-    "discrete": "DiscreteParam"
+    "discrete": "DiscreteParam",
+    "category": "CategoricalParam",
 }
 
 @dataclass
@@ -390,3 +391,29 @@ class DiscreteParam(BaseParameter):
     def __repr__(self):
         return f"DiscreteParam({self.value}, low={self.low}, high={self.high}, n={self.n})"
     
+
+class CategoricalParam(DiscreteParam):
+    """
+    A type of Discrete Parameter where each value represents a unique string category.
+    """
+
+    def __init__(self, categories: List[str], 
+                 value=None, length=1, name = None, 
+                 ):
+        n = len(categories)
+        assert all(isinstance(c, str) for c in categories), "Each category must be a string value. " + f"Got categories: {categories}"
+        self._categories = np.array(categories)
+        n_unique = len(np.unique(self._categories))
+        assert n_unique == n, f"Each categories must be unique. Got {n} total categories, but only {n_unique} categories. Categories are: {self._categories}"
+        super().__init__(value, length, name, n=n)
+
+    def get_value(self):
+        # return [*map(self._categories.__getitem__, self.value)]
+        return self.categories[self.value]
+
+    @property
+    def categories(self) -> np.ndarray:
+        return self._categories
+
+    def __repr__(self):
+        return f"CategoricalParam(value={self.value}, true_value={self.get_value()}, categories={self.categories})"

@@ -192,6 +192,7 @@ class EvolvableLearningRule(EvolvableRuleProtocol):
     _specs: Dict[str, Dict[str, Any]]
     default_gene_specs = {
         "learning_rate": dict(kind="log", length=1, base=10, low=-3, high=1, dist="uniform"),
+        "trigger_condition": dict(kind="category", categories=("on-timestep", "on-step", "on-reward", "on-end"), length=1),
         "tau_syn": dict(kind="log", length=1, base=2, low=-3, high=0, dist="uniform"),
         "tau_pre": dict(kind="log", length=1, base=2, low=-5, high=0, dist="uniform"),
         "tau_post": dict(kind="log", length=1, base=2, low=-5, high=0, dist="uniform"),
@@ -202,7 +203,7 @@ class EvolvableLearningRule(EvolvableRuleProtocol):
         "w_max": dict(kind="real", length=1, low=0, high=10, dist="uniform"),
         "w_range": dict(kind="real", length=1, low=0.0, high=10, dist="uniform"),
     }
-    default_gene_order = ("learning_rate", "tau_syn", "tau_pre", "tau_post", "e_min", "e_range", "w_min", "w_range")
+    default_gene_order = ("learning_rate", "trigger_condition", "tau_syn", "tau_pre", "tau_post", "e_min", "e_range", "w_min", "w_range")
 
     def __init__(self, *, parameters: ArrayLike = None, genes: List[Parameter] = None, 
                  genes_to_encode: List[Dict] = None, gene_order: Sequence[str] = None,
@@ -383,8 +384,17 @@ class EvolvableLearningRule(EvolvableRuleProtocol):
         """
         Perform class-specific operations based on gene values
         """
-        if self.encode_learning_rate:
-            self.learning_rate = self.values.get("learning_rate")
+        if self.contains_gene("learning_rate"):
+            self.learning_rate = self._get_value("learning_rate", simplify=True)
+        if self.contains_gene("trigger_condition"):
+            self.trigger_condition = self._get_value("trigger_condition", simplify=True)
+
+    def _get_value(self, name: str, simplify: bool = False) -> Any:
+        """Shorthand way to extract values from value dictionary while allowing simplifying array to scalar"""
+        val = self.values.get(name)
+        if simplify and len(val) == 1 and isinstance(val, np.ndarray):
+            return val.item()
+        return val
 
     def update_values(self):
         """
