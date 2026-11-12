@@ -520,8 +520,8 @@ def plot_weight_over_time(simulator: 'SNNSimulator' = None, values: List[np.ndar
         post_id = [*range(w_mat.shape[1])]
 
     nrow, ncol = w_mat.shape[:2]
-    wmax = max(np.max(w_mat), 1)
-    wmin = min(np.min(w_mat), 0)
+    wmax = np.max(w_mat)
+    wmin = np.min(w_mat)
 
     figsize=(x_scale*ncol, y_scale*nrow) if figsize is None else figsize
     fig, axs = plt.subplots(nrow, ncol, figsize=figsize, dpi=dpi,
