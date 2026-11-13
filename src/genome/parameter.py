@@ -40,7 +40,9 @@ class BaseParameter(Parameter):
     value: np.typing.ArrayLike
     name: str
 
-    def __init__(self, value, length: int = 1, name: str = None, low: int | float = None, high: int | float = None,
+    def __init__(self, value, length: int = 1, name: str = None, 
+                 low: int | float | np.ndarray | Sequence = None, 
+                 high: int | float | np.ndarray | Sequence = None,
                  dtype: np.typing.DTypeLike = np.float32):
         super().__init__()
         # Boundary creation is needed for value validation
@@ -48,8 +50,12 @@ class BaseParameter(Parameter):
         self.high = high #if high is not None else np.inf
         self._bounded = (self.low is not None) or (self.high is not None)
         if (self.low is not None) and (self.high is not None): 
-            if self.low > self.high:
-                raise ValueError(f"'low' must be strictly less than 'high'. Got low={self.low}, high={self.high}")
+            if isinstance(self.low, np.ndarray | Sequence) or isinstance(self.high, np.ndarray | Sequence):
+                if any(self.low > self.high):
+                    raise ValueError(f"'low' must be strictly less than 'high'. Got low={self.low}, high={self.high}")
+            else:
+                if self.low > self.high:
+                    raise ValueError(f"'low' must be strictly less than 'high'. Got low={self.low}, high={self.high}")
             
         if value is None:
             length = max(1, length)
@@ -71,6 +77,11 @@ class BaseParameter(Parameter):
         self._value = value
         self._length = length
         self._name = name if name is not None else ""
+
+        if isinstance(self.low, np.ndarray | Sequence):
+            assert len(self.low) == self.length
+        if isinstance(self.high, np.ndarray | Sequence):
+            assert len(self.high) == self.length
 
     def _generate(self, size) -> ArrayLike:
         raise NotImplementedError()
@@ -152,9 +163,13 @@ class BaseParameter(Parameter):
         return f"Param({self.value})"
 
     def get_lower_bounds(self) -> List[int | float]:
+        if isinstance(self.low, np.ndarray | Sequence):
+            return list(self.low)
         return [self.low for _ in range(self.length)]
 
     def get_upper_bounds(self) -> List[int | float]:
+        if isinstance(self.high, np.ndarray | Sequence):
+            return list(self.high)
         return [self.high for _ in range(self.length)]
     
     @property
@@ -324,16 +339,16 @@ class DiscreteParam(BaseParameter):
 
         if n is not None:
             # Reconstruct low/high from n
-            self.n = int(n)
+            self.n = n
             assert n > 0, "'n' must be at least 1"
             if (low is None) and (high is None):
                 low = 0
                 high = low + self.n
             elif (high is not None) and (low is None):
-                high = int(high)
+                high = high
                 low = high - self.n
             elif (low is not None) and (high is None):
-                low = int(low)
+                low = low
                 high = low + self.n
             else:
                 # assert high > low, "high must be greater than low" # -> This will be handled by BaseParameter
@@ -343,12 +358,12 @@ class DiscreteParam(BaseParameter):
         else:
             # Reconstruct n from low/high
             if (high is not None) and (low is not None):
-                assert high > low, "high must be greater than low"
-                low = int(low)
-                high = int(high)
+                # assert all(high > low), "high must be greater than low"
+                low = low
+                high = high
                 self.n = high - low
             elif (low is None) and (high is not None):
-                high = int(high)
+                high = high
                 low = 0
                 self.n = high - low
             else:

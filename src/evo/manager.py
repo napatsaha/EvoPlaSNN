@@ -3,6 +3,7 @@ import logging
 import time
 from typing import List
 import yaml
+import copy
 from tqdm import tqdm
 
 import numpy as np
@@ -24,7 +25,7 @@ class EvoManager:
                  results_path: str = None,
                  multiple_evaluators: bool = False,
                  max_generations: int = None, max_stagnation: int = None,
-                 use_target_fitness: bool = None, target_fitness: float = None, tolerance: float = 1e-6, 
+                 use_target_fitness: bool = False, target_fitness: float = None, tolerance: float = 1e-6, 
                  record_classes: bool = False, save_best: int = 1, save_precision: int = 6,
                  log_trial_fts: bool = True, log_trial_info: bool = True, 
                  log_genome: bool = True, log_indiv: bool = True,
@@ -78,7 +79,7 @@ class EvoManager:
         #     config["evo_params"]["solver"]["ndim"] = evaluator.get_parameter_size()
         # TODO: Calculate this without Evaluator
         config["evo_params"]["solver"]["minimise"] = evaluator.is_minimise()
-        solver = create_solver(config["evo_params"]["solver"], genome_params=config.get("lrule_params").copy())
+        solver = create_solver(config["evo_params"]["solver"], genome_params=copy.deepcopy(config.get("lrule_params")))
         if "popsize" not in config["evo_params"]["solver"]:
             config["evo_params"]["solver"]["popsize"] = solver.popsize
         if "ndim" not in config["evo_params"]["solver"]:
@@ -112,8 +113,9 @@ class EvoManager:
 
         # Termination control
         self.max_generations = max(max_generations, 1) # Ensure non-zero and non-negative
-        self.target_fitness = target_fitness
-        self._check_target_fitness = use_target_fitness if use_target_fitness is not None else (target_fitness is not None)
+        self._worst_fitness = evaluator.get_worst_fitness()
+        self.target_fitness = evaluator.get_target_fitness()  
+        self._check_target_fitness = bool(use_target_fitness) 
         self.tolerance = tolerance
         self._check_stagnation = True if max_stagnation is not None else False
         self.max_stagnation = max_stagnation
@@ -202,7 +204,10 @@ class EvoManager:
                         if self.measure_behaviour:
                             behaviours.append(behv)
                     else:
-                        fts_list, avg_fts, std_fts, behv = self.evaluator.evaluate(solution, num_trials=self.num_trials, gen_count=gen_count, inv_count=i)
+                        try:
+                            fts_list, avg_fts, std_fts, behv = self.evaluator.evaluate(solution, num_trials=self.num_trials, gen_count=gen_count, inv_count=i)
+                        except:
+                            avg_fts = self._worst_fitness
                         fitness_list[i] = avg_fts
                         if self.measure_behaviour:
                             behaviours.append(behv)

@@ -2,15 +2,15 @@
 Cartesian Genetic Programming: graph program, and learning rule
 """
 import copy
-from typing import List, Sequence, Tuple, Literal, Callable
+from typing import Any, Dict, List, Sequence, Tuple, Literal, Callable
 from enum import IntEnum
 
 import numpy as np
 from numpy.typing import ArrayLike
 
 from lrule.base import BaseLearningRule
-from common.base import Genome
-from genome.genome import SimpleGenome
+from common.base import Genome, Parameter
+from genome.genome import EvolvableLearningRule, SimpleGenome
 
 
 
@@ -500,14 +500,17 @@ class CGP_Graph(Genome):
         return f"CGP_Graph({self._tuplify_genome()}, n_inputs={self.n_inputs}, n_rows={self.n_rows}, n_cols={self.n_cols}, n_outputs={self.n_outputs})"
 
 
-class CGP_Rule(BaseLearningRule, Genome):
+class CGP_Rule(BaseLearningRule, EvolvableLearningRule):
     """
     Learning Rule version of CGP.
     Contains a CGP graph calibrated to synaptic update
     """
     graph: CGP_Graph
+    default_gene_order = ("graph")
 
-    def __init__(self, parameters = None, *, 
+    def __init__(self, *, 
+                 parameters: ArrayLike = None, genes: List[Parameter] = None, 
+                 genes_to_encode: List[Dict] | Dict[str, Dict] = None, gene_order: Sequence[str] = None, 
                  n_rows: int = 1, n_cols: int = 1, 
                  function_list: List[Callable] = None,
                  arity: int = 2, levels_back: int = None, allow_input_anywhere: bool = False,
@@ -515,17 +518,22 @@ class CGP_Rule(BaseLearningRule, Genome):
                  mutation_method: Literal["point", "prob"] = "point",
                  seed: int = None,
                  learning_rate: float = 1.0, learning_rate_thr: float = 0.1, threshold_agg_func: Literal["max", "min", "mean", "sum"] = "mean",
-                 delta_weight: bool = True, delta_threshold: bool = False,
-                 use_trace_pre: bool = False, use_trace_post: bool = False, use_weights: bool = True, use_reward: bool = False, 
-                 use_eligibility: bool = False, use_eligibility_pre: bool = False, use_eligibility_post: bool = False, use_eligibility_stdp: bool = False,
+                trigger_condition: Literal["on-timestep", "on-step", "on-reward", "on-end"] = None,
+                delta_weight: bool = False, delta_threshold: bool = False, delta_eligibility: bool = False,
+                use_trace_pre: bool = False, use_trace_post: bool = False, use_spike_pre: bool = False, use_spike_post: bool = False,
+                use_weights: bool = False, use_reward: bool = False, 
+                use_eligibility: bool = False, use_eligibility_pre: bool = False, use_eligibility_post: bool = False, 
+                use_eligibility_stdp: bool = False, use_eligibility_custom: bool = False,
                  **kwargs):
-        super().__init__(
-            learning_rate=learning_rate, learning_rate_thr=learning_rate_thr,
-            threshold_agg_func=threshold_agg_func, delta_weight=delta_weight, delta_threshold=delta_threshold,
-            use_trace_pre=use_trace_pre, use_trace_post=use_trace_post,
+        BaseLearningRule.__init__(self,
+            learning_rate=learning_rate, 
+            learning_rate_thr=learning_rate_thr,threshold_agg_func=threshold_agg_func, 
+            trigger_condition=trigger_condition, 
+            delta_weight=delta_weight, delta_threshold=delta_threshold, delta_eligibility=delta_eligibility,
+            use_trace_pre=use_trace_pre, use_trace_post=use_trace_post, use_spike_pre=use_spike_pre, use_spike_post=use_spike_post,
             use_weights=use_weights, use_reward=use_reward,
             use_eligibility=use_eligibility, use_eligibility_pre=use_eligibility_pre, use_eligibility_post=use_eligibility_post,
-            use_eligibility_stdp=use_eligibility_stdp
+            use_eligibility_stdp=use_eligibility_stdp, use_eligibility_custom=use_eligibility_custom,
         )
 
         self.graph = CGP_Graph(
@@ -538,7 +546,17 @@ class CGP_Rule(BaseLearningRule, Genome):
             **kwargs
         )
 
-        self.genome = SimpleGenome(parameters=self.parameters)
+        # self.genome = SimpleGenome(parameters=self.parameters)
+
+        EvolvableLearningRule.__init__(self, parameters=parameters, genes=genes, genes_to_encode=genes_to_encode, gene_order=gene_order)
+
+    def _build_gene_specs(self) -> Dict[str, Dict[str, Any]]:
+        specs = super()._build_gene_specs()
+        low, high = self.graph.get_bounds()
+        specs.update({
+            "graph": dict(kind="discrete", length=self.graph.size, low=np.array(low), high=np.array(high)),
+        })
+        return specs
 
     def forward(self, inp):
         outp = self.graph.forward(inp)

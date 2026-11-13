@@ -71,6 +71,7 @@ class RewardCollector:
                  fitness_t_cutoff: int = None, fitness_eps_cutoff: int = None,
                  fitness_season_t_cutoff: int = None, fitness_season_eps_cutoff: int = None,
                 #  max_fitness: float = 1.0, min_fitness: float = -1.0,
+                best_fitness: float = None, worst_fitness: float = None,
                  fitness_on_eval_only: bool = True):
         """
         Args:
@@ -97,8 +98,9 @@ class RewardCollector:
                                  Only accepts {self._agg_func_dict.keys()} or a Callable.")
         self.fitness_agg_func = fitness_agg_func
         # TODO: Get min-max fitness from environment
-        self.max_fitness = self._bounds.get(self.fitness_type)[1]
-        self.min_fitness = self._bounds.get(self.fitness_type)[0]
+        self._max_reward = 1.0
+        self.best_fitness = self._bounds.get(self.fitness_type)[1] if best_fitness is None else best_fitness
+        self.worst_fitness = self._bounds.get(self.fitness_type)[0] if worst_fitness is None else worst_fitness
         self.fitness_on_eval_only = fitness_on_eval_only
 
         # Own cutoff when calculating fitness
@@ -226,13 +228,13 @@ class RewardCollector:
     
     def get_success(self, collect_only: bool = True, t_cutoff: int = None, eps_cutoff: int = None) -> list[float]:
         if collect_only:
-            return [1 if r.terminated and r.reward == self.max_fitness else 0 for r in self.records if r.collect]
+            return [1 if r.terminated and r.reward == self._max_reward else 0 for r in self.records if r.collect]
         elif t_cutoff is not None:
-            return [1 if r.terminated and r.reward == self.max_fitness else 0 for r in self.records if r.t >= t_cutoff]
+            return [1 if r.terminated and r.reward == self._max_reward else 0 for r in self.records if r.t >= t_cutoff]
         elif eps_cutoff is not None:
-            return [1 if r.terminated and r.reward == self.max_fitness else 0 for r in self.records if r.episode >= eps_cutoff]
+            return [1 if r.terminated and r.reward == self._max_reward else 0 for r in self.records if r.episode >= eps_cutoff]
         else:
-            return [1 if r.terminated and r.reward == self.max_fitness else 0 for r in self.records]
+            return [1 if r.terminated and r.reward == self._max_reward else 0 for r in self.records]
 
     def get_intermediate_fitness(self, collect_only: bool = True, t_cutoff: int = None, eps_cutoff: int = None) -> List[float]:
         """
@@ -262,7 +264,7 @@ class RewardCollector:
         #     eps_cutoff = self.fitness_eps_cutoff
         fitnesses = self.get_intermediate_fitness(collect_only=True, t_cutoff=t_cutoff, eps_cutoff=eps_cutoff)
         if len(fitnesses) == 0:
-            return self.min_fitness
+            return self.worst_fitness
         agg = self._agg_func_dict.get(self.fitness_agg_func)
         return agg(fitnesses)
     

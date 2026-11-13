@@ -115,8 +115,8 @@ class RL_Evaluator(Evaluator):
         ## Episode info collector for calculating fitness 
         self.reward_collector = RewardCollector(**params["collector_params"])
         # Update min and max fitness from environment
-        self.reward_collector.min_fitness = self.env.get_min_reward()
-        self.reward_collector.max_fitness = self.env.get_max_reward()
+        # self.reward_collector.min_fitness = self.env.get_min_reward()
+        # self.reward_collector.max_fitness = self.env.get_max_reward()
 
         # Backward compatilibity -> CHeck if config has update condition from simulator_params
         simulator_params = params.get("simulator_params", {})
@@ -195,7 +195,10 @@ class RL_Evaluator(Evaluator):
         Returns the target fitness for the evaluation.
         This is used to determine when the optimisation should stop.
         """
-        return self.reward_collector.max_fitness
+        return self.reward_collector.best_fitness
+
+    def get_worst_fitness(self) -> float:
+        return self.reward_collector.worst_fitness
 
     def setup_logger(self, results_path: Path = None, 
                      logfile_name: str = None, fits_trial_file: str = None, 

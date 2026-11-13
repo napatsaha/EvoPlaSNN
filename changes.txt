@@ -113,6 +113,17 @@ Branch v1.4-rule-rework
 v1.4
 ----
 
+v1.4.16.0 (2026-11-13)
+- Update CGP_Rule to be EvolvableLearningRule
+- Allow low and high in BaseParameter to be array the same length as gene
+    - Different checks and get_*_bounds() for when low/high is an array
+- DiscreteParam doesn't coerce low,high into int
+- When creating solver in EvoManager, a deepcopy is performed on lrule_params, in order to prevent deep components from being rewritten into config,
+    especially during EvolvableLearningRule.__init__, e.g. `genes_to_encode`
+- RewardCollector accepts `best_fitness` and `worst_fitness` args
+- Add `get_worst_fitness()` method to RL_Evaluator
+- During evaluator.evaluate() call in manager.run(), if there is an error, the avg fitness returned will be the worst fitness instead
+
 v1.4.15.4.1 (2026-11-12)
 - Hotfix: fix plot weights over time
 
