@@ -98,8 +98,10 @@ class DualLearningRule(LearningRule, EvolvableLearningRule):
         return offspring
 
     def __repr__(self):
-        return f"DualLearningRule(\n\tinternal_rule={self.internal_rule}, \n\texternal_rule={self.external_rule}, " + \
-            f"gene_order={self.gene_order}\n)"
+        return f"DualLearningRule(" + \
+                f"\n\tinternal_rule={repr(self.internal_rule).replace("\n", "\n\t\t")}, " + \
+                f"\n\texternal_rule={repr(self.external_rule).replace("\n", "\n\t\t")}, " + \
+                f"\n\tgene_order={self.gene_order}\n)"
 
 
 class LayeredRule(LearningRule, EvolvableRuleProtocol):

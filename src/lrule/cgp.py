@@ -13,6 +13,12 @@ from common.base import Genome, Parameter
 from genome.genome import EvolvableLearningRule, SimpleGenome
 
 
+def safe_divide(x, y):
+    if y == 0:
+        return np.nan
+    else:
+        return x / y
+
 
 FUNCTION_LIST = [
     np.add,
@@ -20,6 +26,13 @@ FUNCTION_LIST = [
     np.multiply,
     np.divide
 ]
+
+FUNC_DICT = {
+    "add": np.add,
+    "subtract": np.subtract,
+    "multiply": np.multiply,
+    "divide": safe_divide
+}
 
 
 class CGP_Graph(Genome):
@@ -52,6 +65,7 @@ class CGP_Graph(Genome):
 
         # functions
         self.function_list = []
+        self._func_list_names = []
         if function_list is None:
             self.function_list = FUNCTION_LIST
         else:
@@ -59,13 +73,15 @@ class CGP_Graph(Genome):
             for f in function_list:
                 if isinstance(f, Callable):
                     self.function_list.append(f)
+                    self._func_list_names.append(f.__name__)
                 elif isinstance(f, str):
                     # Try getting function from numpy
                     try:
-                        f = getattr(np, f)
+                        func = FUNC_DICT.get(f)
                     except:
                         raise Exception(f"Could not find function \'{f}\' from numpy")
-                    self.function_list.append(f)
+                    self.function_list.append(func)
+                    self._func_list_names.append(f)
 
         # self.function_list = FUNCTION_LIST if function_list is None else function_list
         self._nf = len(self.function_list)
@@ -497,7 +513,8 @@ class CGP_Graph(Genome):
 
 
     def __repr__(self):
-        return f"CGP_Graph({self._tuplify_genome()}, n_inputs={self.n_inputs}, n_rows={self.n_rows}, n_cols={self.n_cols}, n_outputs={self.n_outputs})"
+        return f"CGP_Graph({self._tuplify_genome()}, \nn_inputs={self.n_inputs}, n_rows={self.n_rows}, n_cols={self.n_cols}, n_outputs={self.n_outputs}, " + \
+            f"\nfunction_list={self._func_list_names})"
 
 
 class CGP_Rule(BaseLearningRule, EvolvableLearningRule):
@@ -538,7 +555,7 @@ class CGP_Rule(BaseLearningRule, EvolvableLearningRule):
 
         self.graph = CGP_Graph(
             n_inputs=self.input_size, n_outputs=self.output_size, n_rows=n_rows, n_cols=n_cols,
-            genome=parameters,
+            # genome=parameters,
             function_list=function_list, arity=arity, 
             levels_back=levels_back, allow_input_anywhere=allow_input_anywhere,
             mutation_method=mutation_method, mutation_rate=mutation_rate, mu_c=mu_c, mu_f=mu_f, mu_o=mu_o,
@@ -557,6 +574,12 @@ class CGP_Rule(BaseLearningRule, EvolvableLearningRule):
             "graph": dict(kind="discrete", length=self.graph.size, low=np.array(low), high=np.array(high)),
         })
         return specs
+
+    def _apply_gene_values(self):
+        super()._apply_gene_values()
+        if self.contains_gene("graph"):
+            graph_genome = self.values.get("graph")
+            self.graph.genome = graph_genome
 
     def forward(self, inp):
         outp = self.graph.forward(inp)
@@ -589,23 +612,21 @@ class CGP_Rule(BaseLearningRule, EvolvableLearningRule):
         )
         return d
 
-    @property
-    def size(self):
-        return self.graph.size
+    # @property
+    # def size(self):
+    #     return self.graph.size
     
-    @property
-    def parameters(self):
-        return self.graph.genome
+    # @property
+    # def parameters(self):
+    #     return self.graph.genome
     
-    @parameters.setter
-    def parameters(self, value):
-        self.graph.genome = value
+    # @parameters.setter
+    # def parameters(self, value):
+    #     self.graph.genome = value
 
     # Alias
     # genome = parameters
 
     def __repr__(self):
-        return f"CGP_Rule(parameters={self.graph._tuplify_genome()}, size={self.size}, input_order={self.input_order}, outputs={self.output_order}, learning_rate={self.learning_rate})"
+        return f"CGP_Rule(\ngraph={repr(self.graph)}, \ninput_order={self.input_order}, outputs={self.output_order}, \nlearning_rate={self.learning_rate:.3g}, trigger_condition={self.trigger_condition}\n)"
     
-    def __str__(self):
-        return str(self.graph)

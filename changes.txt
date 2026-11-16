@@ -1,113 +1,14 @@
 ----
-Branch v1.4-rule-rework
+v1.5
 ----
 
-0.13 (2026-09-16)
-- Merged with main branch v1.4 + Minor fixes: add yaml to common.utils
-
-0.12 (2026-09-15)
-- Backward compatibility fixes:
-    - A multiplicative rule will be automatically created and assigned to SynapseLayer external rule during RL_Evaluator.__init__,
-        when the config contains 'update_weights_on_etrace' in 'snn_params'
-    - External & Internal rules will no longer be cleared when setting a new `learning_rule` in SynapseLayer
-    - `CompositeGenome` and `EvolvableLearningRule` can now allow "no-gene" construction (for learning rule purposes only)
-        (at least in the usage tested -- no genes, gene_order, genes_to_encode, values, parameters were created; may need to further test more rigorously)
-
-0.11 (2026-09-15)
-- Added settable limits to synapse weights and eligibility trace
-- Added new settable properties to `SynapseLayer`: `e_min`, `e_max`, `e_range`, `w_min`, `w_max`, `w_range`
-- Switched out `weight_clip_min` -> `w_min` and `weight_clip_max` to `w_max`. (Previous args still work)
-- Added the corresponding gene to `EvolvableLearningRule`
-
-0.10 (2026-09-15)
-- Added automatic bounds detection from genome to be applied to Solver
-- Added option in `pycma.PyCMAWrapper` to extract `bounds` from `sample_sol` during init, if available; Otherwise extract from kwargs, or else None
-- Moved `low` and `high` attributes in all Param to BaseParameter
-    - Added `get_lower_boudns()` and `get_upper_bounds()` to BaseParameter (and `Parameter`) which returns a list of gene's length
-- Added `get_bounds` to CompositeGenome and EvolvableLearningRule, which returns a tuple of flattened list for (lower, upper) bounds
-
-0.9.1 (2026-09-11)
-- Added plot option `rule_component` in `plot_learning_rule`
-    - DualLearningRule should not plottable without specifying rule_component
-- `genes_to_encode` arg are deep-copied when passed into `EvolvableLearningRule` to prevent changing outside dict via popping
-
-0.9 (2026-09-11)
-- Backward compatibility with single-rule system:
-    - SynapseLayer will automatically assign a rule to:
-        1. internal rule if its trigger_condition is "on-timestep"
-        2. external rule for every other trigger_condition
-        3. No assignment if trigger_condition is None
-- Changed default `trigger_condition` without explicit argument, 
-    when rule's delta_eligibility to "on-timestep" and 
-    otherwise to None (to prevent unintentional behaviours)
-- SynapseLayer resets its internal_rule and external_rule when learning_rule property is set
-- SynapseLayer `apply_**_rule` check if that rule is available first before calling check_trigger
-
-0.8 (2026-09-11)
-- Added `lrule.arithmetic.py` module
-- Added `MultiplyLearningRule` to `arithmetic`:
-    - Simply produces product of all inputs, regardless of what is being used
-- Added 'multiply' to `common.utils.TYPE_DICT` for creation
-
-0.7.1 (2026-09-11)
-- Minor fixes:
-    - Removed Simulator `trigger_condition = 'on-timestep'` check
-    - Fixed `signal=` and `reward=` kwarg mixup error in Simulator during `network.apply_internal_rule()`
-    - Added `eligibility_custom` to `BaseLearningRule`
-    - Default args for `BaseLearningRule` is all False for `use_**` and `delta_**`
-    - `BaseLearningRule` will throw error if either no input or output variables are specified
-    - Added `dual` to learning rule `TYPE_DICT` in `common.utils`
-
-0.7 (2026-09-10)
-- Duplicate handling for gene names in external and internal rule
-    - During init of `DualLearningRule`, the gene_order, genes_to_encode, and specs are adapted and renamed to reflect any 
-    duplicates by appending either '_ext' or '_int' suffixes
-    - Only after renaming can the base class EvolvableLearningRule be initialised
-- Still not entirely sure if it will still cause problem, but I've tested manually and checked the results -- it looks like what 
-    I expected. (see `jupyter/test-lrule/260910_dual-rule-2.ipynb` part3 for testing)
-
-0.6 (2026-09-10)
-- Fixed `values` not changing when `genes` or `parameters` are changed via setters in `EvolvableLearningRule`
-    - Refactored out `update_values()` method from previously `_extract_values_from_genes()` and 
-        `_apply_gene_values()`. It is to be called when internal values need to be updated
-
-0.5 (2026-09-10)
-- Added method `apply_genes_to_synapse()` to `EvolvableLearningRule` which takes in synapse
-    - Will be called when SynapseLayer.learning_rule is being set, if the rule is an evolvable one
-- Updated `common.base.SynapseLayerProtocol` to include various taus, e-traces etc
-- Added `check_trigger` condition to normal `SynapseLayer.apply_learning_rule()`
-
-0.4 (2026-09-10)
-- First part in integrating DualLearningRule with wider system
-- Added `check_trigger()` method to `common.base.LearningRule`
-- Simulator collects a dictionary of on_* flags which is passed down eventually to the LearningRule
-- Simulator calls network.apply_external_rule and network.apply_internal_rule at during episode step and time step, respectively
-- SNN and SynapseLayer has methods `apply_external_rule` and `apply_internal_rule`
-- SynapseLayer extracts internal and external rule during learning_rule setter if rule is a DualLearningRule
-    - Removed reliance on _out_weight, _out_*. Instead rely on whether each output of rule (dw, dth, delig) is present
-    - During apply_*_rule, calls LearningRule.check_trigger to determine if update should be made
-    - Requires importing from `lrule.dual` and `genome.genome` for now (in future will create a common Protocol)
-- Currently has no ability to apply value changes from gene to synapses (e.g. tau from genome) -> Next Update
-
-0.3 (2026-09-08)
-- Added `._sync_genes()` to `DualLearningRule` after instantiating `EvolvableLearningRule` parent class:
-    - It ensures that genes created from parent class are carried over to external/internal rules
-- Added `_gene_origin_flag` to track which gene belong to "external", "internal" or "shared"
-- Ensured the gene syncing is carried over when copying, mutating and crossovering genes
-- Ensured constructing by passing in either `parameters=` or `genes=` maintains gene syncing
-
-0.2 (2026-09-07)
-- `lrule/dual.py`: `DualLearningRule` which is a composite of external and internal learning rule
-    - Still a work in progress
-- Removed kwargs to be passed to ANN in ANN_Rule (kwargs only apply to BaseLearningRule)
-- SmallPolynomialRule now has explicit arguments for use_* format inputs, instead of hard-coding
-    in order to allow not clashing with params from config
-- Added empty private attributes for external and internal rules in SynapseLayer
-
-0.1 (2026-09-07)
-- Moved 'update_condition' from `Simulator` to 'trigger_condition' in `LearningRule`
-    - Ensured config reading in `RL_Evaluator` have backward compatibility
-    - Simply changed which learning_rule trigger_condition is referred to during `Simulator.run` for now
+v1.5.0.0 (2026-11-16)
+- Fixed issue with CGP_Rule not syncing CGP graph and genes:
+    - Updated `_apply_gene_values()` to `CGP_Rule`
+- Minor cosmetic changes to how `DualLearningRule`, `CGP_Graph` and `CGP_Rule` display `repr`. Removed CGP_Rule's `str` calls
+- Ensured `CGP_Rule` property getter/setter for parameters and genes do not conflict with `EvolvableLearningRule`
+- Added `_func_list_names` attribute to CGP_Graph as a list of strings
+- Added `safe_divide()` when function is `'divide'` to prevent ZeroDivisionError (default return value set to `np.nan`)
 
 ----
 v1.4
@@ -514,6 +415,119 @@ v1.4.3.0 (2026-09-17)
     - By default, set to True, if set to spiking stochastically during init.
 - SNN methods `set_exploration_rate`, `set_deterministic`, `set_stochastic` now affects all neuron layers instead of only last layer. 
     Whether or not each layer will be changed depends on its `decayable` attribute.
+
+----
+Branch v1.4-rule-rework
+----
+
+0.13 (2026-09-16)
+- Merged with main branch v1.4 + Minor fixes: add yaml to common.utils
+
+0.12 (2026-09-15)
+- Backward compatibility fixes:
+    - A multiplicative rule will be automatically created and assigned to SynapseLayer external rule during RL_Evaluator.__init__,
+        when the config contains 'update_weights_on_etrace' in 'snn_params'
+    - External & Internal rules will no longer be cleared when setting a new `learning_rule` in SynapseLayer
+    - `CompositeGenome` and `EvolvableLearningRule` can now allow "no-gene" construction (for learning rule purposes only)
+        (at least in the usage tested -- no genes, gene_order, genes_to_encode, values, parameters were created; may need to further test more rigorously)
+
+0.11 (2026-09-15)
+- Added settable limits to synapse weights and eligibility trace
+- Added new settable properties to `SynapseLayer`: `e_min`, `e_max`, `e_range`, `w_min`, `w_max`, `w_range`
+- Switched out `weight_clip_min` -> `w_min` and `weight_clip_max` to `w_max`. (Previous args still work)
+- Added the corresponding gene to `EvolvableLearningRule`
+
+0.10 (2026-09-15)
+- Added automatic bounds detection from genome to be applied to Solver
+- Added option in `pycma.PyCMAWrapper` to extract `bounds` from `sample_sol` during init, if available; Otherwise extract from kwargs, or else None
+- Moved `low` and `high` attributes in all Param to BaseParameter
+    - Added `get_lower_boudns()` and `get_upper_bounds()` to BaseParameter (and `Parameter`) which returns a list of gene's length
+- Added `get_bounds` to CompositeGenome and EvolvableLearningRule, which returns a tuple of flattened list for (lower, upper) bounds
+
+0.9.1 (2026-09-11)
+- Added plot option `rule_component` in `plot_learning_rule`
+    - DualLearningRule should not plottable without specifying rule_component
+- `genes_to_encode` arg are deep-copied when passed into `EvolvableLearningRule` to prevent changing outside dict via popping
+
+0.9 (2026-09-11)
+- Backward compatibility with single-rule system:
+    - SynapseLayer will automatically assign a rule to:
+        1. internal rule if its trigger_condition is "on-timestep"
+        2. external rule for every other trigger_condition
+        3. No assignment if trigger_condition is None
+- Changed default `trigger_condition` without explicit argument, 
+    when rule's delta_eligibility to "on-timestep" and 
+    otherwise to None (to prevent unintentional behaviours)
+- SynapseLayer resets its internal_rule and external_rule when learning_rule property is set
+- SynapseLayer `apply_**_rule` check if that rule is available first before calling check_trigger
+
+0.8 (2026-09-11)
+- Added `lrule.arithmetic.py` module
+- Added `MultiplyLearningRule` to `arithmetic`:
+    - Simply produces product of all inputs, regardless of what is being used
+- Added 'multiply' to `common.utils.TYPE_DICT` for creation
+
+0.7.1 (2026-09-11)
+- Minor fixes:
+    - Removed Simulator `trigger_condition = 'on-timestep'` check
+    - Fixed `signal=` and `reward=` kwarg mixup error in Simulator during `network.apply_internal_rule()`
+    - Added `eligibility_custom` to `BaseLearningRule`
+    - Default args for `BaseLearningRule` is all False for `use_**` and `delta_**`
+    - `BaseLearningRule` will throw error if either no input or output variables are specified
+    - Added `dual` to learning rule `TYPE_DICT` in `common.utils`
+
+0.7 (2026-09-10)
+- Duplicate handling for gene names in external and internal rule
+    - During init of `DualLearningRule`, the gene_order, genes_to_encode, and specs are adapted and renamed to reflect any 
+    duplicates by appending either '_ext' or '_int' suffixes
+    - Only after renaming can the base class EvolvableLearningRule be initialised
+- Still not entirely sure if it will still cause problem, but I've tested manually and checked the results -- it looks like what 
+    I expected. (see `jupyter/test-lrule/260910_dual-rule-2.ipynb` part3 for testing)
+
+0.6 (2026-09-10)
+- Fixed `values` not changing when `genes` or `parameters` are changed via setters in `EvolvableLearningRule`
+    - Refactored out `update_values()` method from previously `_extract_values_from_genes()` and 
+        `_apply_gene_values()`. It is to be called when internal values need to be updated
+
+0.5 (2026-09-10)
+- Added method `apply_genes_to_synapse()` to `EvolvableLearningRule` which takes in synapse
+    - Will be called when SynapseLayer.learning_rule is being set, if the rule is an evolvable one
+- Updated `common.base.SynapseLayerProtocol` to include various taus, e-traces etc
+- Added `check_trigger` condition to normal `SynapseLayer.apply_learning_rule()`
+
+0.4 (2026-09-10)
+- First part in integrating DualLearningRule with wider system
+- Added `check_trigger()` method to `common.base.LearningRule`
+- Simulator collects a dictionary of on_* flags which is passed down eventually to the LearningRule
+- Simulator calls network.apply_external_rule and network.apply_internal_rule at during episode step and time step, respectively
+- SNN and SynapseLayer has methods `apply_external_rule` and `apply_internal_rule`
+- SynapseLayer extracts internal and external rule during learning_rule setter if rule is a DualLearningRule
+    - Removed reliance on _out_weight, _out_*. Instead rely on whether each output of rule (dw, dth, delig) is present
+    - During apply_*_rule, calls LearningRule.check_trigger to determine if update should be made
+    - Requires importing from `lrule.dual` and `genome.genome` for now (in future will create a common Protocol)
+- Currently has no ability to apply value changes from gene to synapses (e.g. tau from genome) -> Next Update
+
+0.3 (2026-09-08)
+- Added `._sync_genes()` to `DualLearningRule` after instantiating `EvolvableLearningRule` parent class:
+    - It ensures that genes created from parent class are carried over to external/internal rules
+- Added `_gene_origin_flag` to track which gene belong to "external", "internal" or "shared"
+- Ensured the gene syncing is carried over when copying, mutating and crossovering genes
+- Ensured constructing by passing in either `parameters=` or `genes=` maintains gene syncing
+
+0.2 (2026-09-07)
+- `lrule/dual.py`: `DualLearningRule` which is a composite of external and internal learning rule
+    - Still a work in progress
+- Removed kwargs to be passed to ANN in ANN_Rule (kwargs only apply to BaseLearningRule)
+- SmallPolynomialRule now has explicit arguments for use_* format inputs, instead of hard-coding
+    in order to allow not clashing with params from config
+- Added empty private attributes for external and internal rules in SynapseLayer
+
+0.1 (2026-09-07)
+- Moved 'update_condition' from `Simulator` to 'trigger_condition' in `LearningRule`
+    - Ensured config reading in `RL_Evaluator` have backward compatibility
+    - Simply changed which learning_rule trigger_condition is referred to during `Simulator.run` for now
+
+----
 
 v1.4.2.2 (2026-09-11)
 - Minor changes:
