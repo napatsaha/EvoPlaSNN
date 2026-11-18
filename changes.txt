@@ -2,6 +2,11 @@
 v1.5
 ----
 
+v1.5.1.2 (2026-11-18)
+- Initial prototype of `plot_stdp` in `snn.plot`
+    - Still early and still needs working on improving
+- Relies on `_query_rule_from_delta_t()` and `_plot_pre_post()`
+
 v1.5.1.1 (2026-11-17)
 - Added QTableModulator to `snn/modulation.py`
 - Refactored abstrac class `Modulator` to `common.base`:

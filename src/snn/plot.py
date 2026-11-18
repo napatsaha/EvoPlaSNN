@@ -1455,6 +1455,44 @@ def plot_learning_rule_2D(rule: base.LearningRule, simulator: 'SNNSimulator' = N
         plt.show()
     plt.close(fig)
 
+## Plotting pre-post STDP plots
+def _query_rule_from_delta_t(rule: base.LearningRule, delta_t, tau_pre, tau_post, lrate, dt):
+
+    spike_pre = (delta_t <= 0).astype(int)
+    
+    spike_post = (delta_t >= 0).astype(int)
+    
+    trace_pre = np.where(delta_t >= 0, 1.0 * np.exp(-delta_t*dt / tau_pre), 0.0)
+    
+    trace_post = np.where(delta_t <= 0, 1.0 * np.exp(delta_t*dt / tau_post), 0.0)
+    
+    inp = np.c_[trace_pre, trace_post, spike_pre, spike_post]
+    
+    outp = lrate * rule.forward(inp)
+
+    return outp
+
+def _plot_pre_post(delta_t, outp):
+    plt.plot(delta_t, outp.reshape(-1))
+    plt.axhline(0.0, c="black")
+    plt.axvline(0.0, c="black")
+    plt.show()
+
+def plot_stdp(rule, **kwargs):
+
+    tau_pre = rule.values.get("tau_pre").item()
+    tau_post = rule.values.get("tau_post").item()
+    lrate = rule.values.get("learning_rate_int").item()
+    dt = 0.001
+
+    assert rule.internal_rule.input_order == ['trace_pre', 'trace_post', 'spike_pre', 'spike_post']
+
+    delta_t = np.arange(-10, 10)
+    delta_w = _query_rule_from_delta_t(rule.internal_rule, delta_t, tau_pre, tau_post, lrate, dt)
+
+    _plot_pre_post(delta_t, delta_w, **kwargs)
+
+
 ### Plotting functions for Evolutionary Results ###
 
 _errortype_abbrev = {
