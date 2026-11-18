@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+import abc
 import numpy as np
 from numpy.typing import ArrayLike
 
@@ -662,4 +663,13 @@ class SpikeCoder(ABC):
     @property
     def window_size(self) -> int:
         raise NotImplementedError()
+
+
+class Modulator(abc.ABC):
+    @abc.abstractmethod
+    def signal(self, locals: dict) -> float:
+        pass
+
+    def reset(self):
+        pass
 

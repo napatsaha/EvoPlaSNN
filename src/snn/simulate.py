@@ -9,12 +9,12 @@ from .base import SpikeGenerator
 
 from .utils import LayerRecorder, MatrixRecorder
 from .snn import SNN
-from .modulation import Modulator, Reward_Modulator, TD_Error_Modulator
+from .modulation import MODULATOR_DICT
 # from lrule import LearningRule
 from .spikegen import BinaryClassGenerator
 # from .decoding_old import get_decoder_class, get_fitnessor_class, BaseDecoder, BaseFitnessor
 from .rewarder import create_rewarder, create_collector, RewarderProtocol, CollectorProtocol
-from common.base import SpikeCoder, SeasonalEnvProtocol
+from common.base import Modulator, SpikeCoder, SeasonalEnvProtocol
 from rl.collector import RewardCollector, TrajectoryCollector
 import gymnasium as gym
 
@@ -108,13 +108,15 @@ class SNNSimulator:
         # self.update_condition = update_condition
 
         # Neuro-modulation
-        self._modulation = modulation if modulation is not None else False
-        if self._modulation == "reward":
-            self.modulator = Reward_Modulator(**modulation_params)
-        elif self._modulation == "td-error":
-            self.modulator = TD_Error_Modulator(**modulation_params)
-        else:
-            self.modulator = None
+        self._modulation = modulation is not None
+        if self._modulation:
+            self.modulator: Modulator = MODULATOR_DICT.get(modulation)(**modulation_params)
+        # if self._modulation == "reward":
+        #     self.modulator = Reward_Modulator(**modulation_params)
+        # elif self._modulation == "td-error":
+        #     self.modulator = TD_Error_Modulator(**modulation_params)
+        # else:
+        #     self.modulator = None
 
         # Deal with decaying exploration over course of simulation
         self._use_decay = decay
@@ -231,6 +233,10 @@ class SNNSimulator:
 
         # Reset network
         self.network.reset()
+
+        # Reset modulators
+        if self._modulation:
+            self.modulator.reset()
 
         # Reset decay/exploration
         self._explore = self._should_explore(0)

@@ -2,6 +2,13 @@
 v1.5
 ----
 
+v1.5.1.1 (2026-11-17)
+- Added QTableModulator to `snn/modulation.py`
+- Refactored abstrac class `Modulator` to `common.base`:
+    - Added `reset()` method
+- Added `MODULATOR_DICT` to modulation
+- SNNSimulator now construct modulator from dict and params, + call modulator.reset() during simulator.reset()
+
 v1.5.1.0 (2026-11-18)
 - Displaying CGP_Graph as mathematical expression:
     - Add `FUNC_SYMBOLS` module dict
