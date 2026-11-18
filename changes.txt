@@ -2,6 +2,15 @@
 v1.5
 ----
 
+v1.5.1.0 (2026-11-18)
+- Displaying CGP_Graph as mathematical expression:
+    - Add `FUNC_SYMBOLS` module dict
+    - Add `input_names` and `output_names` init args
+    - Add methods `_get_expr()`, `_create_expression()`, `recalculate_expression()`
+    - Call `recalculate_expression()` whenever mutate happens, or genome is rewritten
+- Sync input_order to input_names and output_order to output_names in CGP_Rule
+- Removes mutation args in CGP_Graph (mutation params are specified externally by Parameter, or Solver)
+
 v1.5.0.0 (2026-11-16)
 - Fixed issue with CGP_Rule not syncing CGP graph and genes:
     - Updated `_apply_gene_values()` to `CGP_Rule`

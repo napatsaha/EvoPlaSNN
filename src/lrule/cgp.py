@@ -34,6 +34,13 @@ FUNC_DICT = {
     "divide": safe_divide
 }
 
+FUNC_SYMBOLS = {
+    "add": "+",
+    "subtract": "-",
+    "multiply": "*",
+    "divide": "/"
+}
+
 
 class CGP_Graph(Genome):
     GENE_TYPE = IntEnum('GeneType', ["Connection", "Function", "Output"])
@@ -42,8 +49,9 @@ class CGP_Graph(Genome):
                  n_inputs: int, n_outputs: int, n_rows: int, n_cols: int, *,
                  genome: list = None, parameters: np.ndarray = None,
                  function_list: List[Callable] = None, arity: int = 2, levels_back: int = None, allow_input_anywhere: bool = False,
-                 mutation_rate: int | float = 0.1, mu_c: float = None, mu_f: float = None, mu_o: float = None,
-                 mutation_method: Literal["point", "prob"] = "point",
+                 input_names: List[str] = None, output_names: List[str] = None,
+                #  mutation_rate: int | float = 0.1, mu_c: float = None, mu_f: float = None, mu_o: float = None,
+                #  mutation_method: Literal["point", "prob"] = "point",
                  seed: int = None):
         self._ni = n_inputs
         self._no = n_outputs
@@ -87,19 +95,19 @@ class CGP_Graph(Genome):
         self._nf = len(self.function_list)
 
         # Mutation
-        self.mutation_method = mutation_method
-        if mutation_method == "point":
-            if isinstance(mutation_rate, float) and (0 <= mutation_rate < 1.0):
-                self._mu_min = int(mutation_rate * self._lg)
-                self._mu_rate = mutation_rate
-            elif isinstance(mutation_rate, int) and (1 <= mutation_rate <= self._lg):
-                self._mu_min = int(mutation_rate)
-                self._mu_rate = mutation_rate / self._lg
-            else:
-                raise ValueError(f"Invalid mutation rate. Must be either fraction [0, 1) or an integer between [0, {self._lg}]")
-        # TODO: Add probabilistic mutation
-        elif mutation_method == "prob":
-            raise NotImplementedError("Probabilistic mutation not yet implemented")
+        # self.mutation_method = mutation_method
+        # if mutation_method == "point":
+        #     if isinstance(mutation_rate, float) and (0 <= mutation_rate < 1.0):
+        #         self._mu_min = int(mutation_rate * self._lg)
+        #         self._mu_rate = mutation_rate
+        #     elif isinstance(mutation_rate, int) and (1 <= mutation_rate <= self._lg):
+        #         self._mu_min = int(mutation_rate)
+        #         self._mu_rate = mutation_rate / self._lg
+        #     else:
+        #         raise ValueError(f"Invalid mutation rate. Must be either fraction [0, 1) or an integer between [0, {self._lg}]")
+        # # TODO: Add probabilistic mutation
+        # elif mutation_method == "prob":
+        #     raise NotImplementedError("Probabilistic mutation not yet implemented")
         # Internal arrays
         self._genome_internal = np.zeros((self._nr, self._nc, self._al), dtype=np.int16)
         self._genome_output = np.zeros((self._no), dtype=np.int16)
@@ -120,6 +128,34 @@ class CGP_Graph(Genome):
         # Activation arrays
         # Starts with empty dimension in axis=1 to allow broadcasting to fit input size if needed
         self._node_outputs = np.zeros((self._mo, 1), dtype=np.float64)
+
+        # Input/Output names used for expressions
+        self.input_names: List[str] = None
+        self.output_names: List[str] = None
+        if input_names is None:
+            if self.n_inputs <= 10:
+                self.input_names = ["x_%01d" % i for i in range(self.n_inputs)]
+            elif self.n_inputs <= 100:
+                self.input_names = ["x_%02d" % i for i in range(self.n_inputs)]
+            else:
+                self.input_names = ["x_%d" % i for i in range(self.n_inputs)]
+        else:
+            assert len(input_names) == self.n_inputs
+            self.input_names = [str(name) for name in input_names]
+        # Process Output names
+        if output_names is None:
+            if self.n_outputs <= 10:
+                self.output_names = ["x_%01d" % i for i in range(self.n_outputs)]
+            elif self.n_outputs <= 100:
+                self.output_names = ["x_%02d" % i for i in range(self.n_outputs)]
+            else:
+                self.output_names = ["x_%d" % i for i in range(self.n_outputs)]
+        else:
+            assert len(output_names) == self.n_outputs
+            self.output_names = [str(name) for name in output_names]
+
+        # Make and store expression
+        self._expr = self._create_expression()
 
     def reset(self, ns_in: int = None):
         self._node_outputs.fill(np.nan)
@@ -211,6 +247,7 @@ class CGP_Graph(Genome):
         offspring = copy.deepcopy(self)
         offspring._mutate(rate)
         offspring._find_active_nodes()
+        offspring.recalculate_expression()
         return offspring
 
     def crossover(self, other: 'CGP_Graph', rate: int):
@@ -468,6 +505,9 @@ class CGP_Graph(Genome):
         self._genome_output.fill(0)
         self._fill_genome(value)
         self._check_valid_genome()
+        # Update pre-calculated fields
+        self._find_active_nodes()
+        self.recalculate_expression()
 
     @property
     def parameters(self):
@@ -482,6 +522,30 @@ class CGP_Graph(Genome):
     @property
     def active_nodes(self):
         return self._active_nodes
+
+    def _get_expr(self, idx):
+        if 0 <= idx < self.n_inputs:
+            return self.input_names[idx]
+        elif self.n_inputs <= idx < self.n_input_internal_nodes:
+            i, j = self.flat_to_coord(idx - self.n_inputs)
+            c1, c2, f = self._genome_internal[i, j, :]
+            func = FUNC_SYMBOLS.get(self._func_list_names[f])
+            x1 = self._get_expr(c1)
+            x2 = self._get_expr(c2)
+            return f"({x1} {func} {x2})"
+        else:
+            raise ValueError(f"Invalid node index: {idx}")
+
+    def _create_expression(self) -> str:
+        s = ""
+        for o, outp in enumerate(self._genome_output):
+            expr = self._get_expr(outp)
+            outp_name = self.output_names[o]
+            s += f"{outp_name} = {expr}\n"
+        return s
+
+    def recalculate_expression(self):
+        self._expr = self._create_expression()
 
     def _tuplify_genome(self) -> str:
         internals = self._genome_internal.swapaxes(0, 1).reshape(-1, self._al).tolist()
@@ -501,7 +565,8 @@ class CGP_Graph(Genome):
         else:
             raise IndexError(f"Invalid index {index}")
 
-    def __str__(self):
+    def display_active_nodes(self):
+        """Print out which nodes are active, and their connection and output genes."""
         s = "CGP Graph (active nodes only)" + "\n"
         s += "Input Nodes: " + str([*range(self._ni)]) + "\n"
         for node in self.active_nodes:
@@ -509,8 +574,10 @@ class CGP_Graph(Genome):
         for oi, o in enumerate(self._genome_output):
             s+= f"Output {oi}: Node " + str(o) + "\n"
         s = s.rstrip("\n")
-        return s
+        print(s)
 
+    def __str__(self):
+        return self._expr
 
     def __repr__(self):
         return f"CGP_Graph({self._tuplify_genome()}, \nn_inputs={self.n_inputs}, n_rows={self.n_rows}, n_cols={self.n_cols}, n_outputs={self.n_outputs}, " + \
@@ -558,8 +625,9 @@ class CGP_Rule(BaseLearningRule, EvolvableLearningRule):
             # genome=parameters,
             function_list=function_list, arity=arity, 
             levels_back=levels_back, allow_input_anywhere=allow_input_anywhere,
-            mutation_method=mutation_method, mutation_rate=mutation_rate, mu_c=mu_c, mu_f=mu_f, mu_o=mu_o,
+            # mutation_method=mutation_method, mutation_rate=mutation_rate, mu_c=mu_c, mu_f=mu_f, mu_o=mu_o,
             seed=seed,
+            input_names=self.input_order, output_names=self.output_order,
             **kwargs
         )
 
@@ -586,7 +654,7 @@ class CGP_Rule(BaseLearningRule, EvolvableLearningRule):
         return outp.reshape(-1, self.output_size)
 
     def mutate(self, rate: float, scale: float, method: str,) -> 'CGP_Rule':
-        new_graph = self.graph.mutate(mutation_rate=rate)
+        new_graph = self.graph.mutate(mutation_rate=rate, scale=scale, method=method)
         new_rule = copy.copy(self)
         new_rule.graph = new_graph
         return new_rule
@@ -606,8 +674,8 @@ class CGP_Rule(BaseLearningRule, EvolvableLearningRule):
                 arity = self.graph.arity, 
                 levels_back = self.graph.levels_back, 
                 allow_input_anywhere = self.graph._allow_inputs,
-                mutation_rate = self.graph._mu_rate, 
-                mutation_method = self.graph.mutation_method,
+                # mutation_rate = self.graph._mu_rate, 
+                # mutation_method = self.graph.mutation_method,
             )
         )
         return d
