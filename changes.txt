@@ -2,6 +2,15 @@
 v1.5
 ----
 
+v1.5.2.0 (2026-11-19)
+- First version of foraging environment `rl/env3.BaseOpenMaze`:
+    - Agent has position and direction
+    - Sensor is based on facing direction
+    - Simplified env by removing unnecessary stuff e.g. random_spawn_method, obs_type, any state reference/calculations
+    - Update `env.render()` to display agent direction arrow, as well as remove state number display
+    - Reward function is still based on which item was eaten only
+- Action and observation depends on `rotate()` module function which converts half-pi units of rotation to a coordinate transformation
+
 v1.5.1.2 (2026-11-18)
 - Initial prototype of `plot_stdp` in `snn.plot`
     - Still early and still needs working on improving
