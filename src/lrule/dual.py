@@ -41,6 +41,7 @@ class DualLearningRule(LearningRule, EvolvableLearningRule):
             gene_order = ["external_rule", "internal_rule"]
         new_gene_order = []
         self._gene_origin_flag = []
+        self._shared_genes = []
         for gene in gene_order:
             if gene == "external_rule":
                 new_gene_order.extend(new_ext_gene_order)
@@ -50,6 +51,7 @@ class DualLearningRule(LearningRule, EvolvableLearningRule):
                 self._gene_origin_flag.extend(["internal" for _ in range(len(new_int_gene_order))])
             else:
                 new_gene_order.append(gene)
+                self._shared_genes.append(gene)
                 self._gene_origin_flag.append("shared")
 
         # Update gene_to_encode dict
@@ -96,6 +98,14 @@ class DualLearningRule(LearningRule, EvolvableLearningRule):
         offspring: 'DualLearningRule' = super().mutate(rate, scale, method, **kwargs)
         offspring._sync_genes()
         return offspring
+
+    def _print_shared_gene_values(self) -> str:
+        return "{" + ", ".join([f"{k}: {v}" for k,v in self.values.items() if k in self._shared_genes]) + "}"
+
+    def __str__(self):
+        return "{\n" + "internal_rule genes: " + str(self.internal_rule) + ",\n" + \
+            "external_rule genes: " + str(self.external_rule) + ",\n" + \
+            "other genes: " + self._print_shared_gene_values() + "\n}"
 
     def __repr__(self):
         return f"DualLearningRule(" + \

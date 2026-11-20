@@ -542,7 +542,7 @@ class CGP_Graph(Genome):
             expr = self._get_expr(outp)
             outp_name = self.output_names[o]
             s += f"{outp_name} = {expr}\n"
-        return s
+        return s.strip()
 
     def recalculate_expression(self):
         self._expr = self._create_expression()
@@ -697,4 +697,7 @@ class CGP_Rule(BaseLearningRule, EvolvableLearningRule):
 
     def __repr__(self):
         return f"CGP_Rule(\ngraph={repr(self.graph)}, \ninput_order={self.input_order}, outputs={self.output_order}, \nlearning_rate={self.learning_rate:.3g}, trigger_condition={self.trigger_condition}\n)"
+
+    def __str__(self):
+        return "{" + ", ".join([f"{k}: {v}" if k != "graph" else f"{k}: \'{str(self.graph)}\'" for k,v in self.values.items()]) + "}"
     

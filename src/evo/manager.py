@@ -28,7 +28,7 @@ class EvoManager:
                  use_target_fitness: bool = False, target_fitness: float = None, tolerance: float = 1e-6, 
                  record_classes: bool = False, save_best: int = 1, save_precision: int = 6,
                  log_trial_fts: bool = True, log_trial_info: bool = True, 
-                 log_genome: bool = True, log_indiv: bool = True,
+                 log_genome: bool = True, log_indiv: bool = True, log_phenotype: bool = False,
                 #  update_inputs: bool = True,  # Whether to update input classes for each generation
                  **kwargs):
         self.multiple_evaluators = multiple_evaluators
@@ -110,6 +110,7 @@ class EvoManager:
         self.log_trial_info = log_trial_info
         self.log_genome = log_genome
         self.log_indiv = log_indiv
+        self.log_phenotype = log_phenotype
 
         # Termination control
         self.max_generations = max(max_generations, 1) # Ensure non-zero and non-negative
@@ -135,13 +136,7 @@ class EvoManager:
             self.logger.handlers.clear()
         self.logger.addHandler(handler)
 
-    def run(self, logging_freq: int = 1):
-        """
-        Runs the evolutionary optimisation loop.
-        """
-        t0 = time.time()
-        # Setup logging for each component
-        self._setup_logger()
+        # Setup evaluator loggers
         if self.multiple_evaluators:
             for i, evaluator in enumerate(self.evaluators, start=1):
                 evaluator.setup_logger(
@@ -158,9 +153,20 @@ class EvoManager:
                     logfile_name = "log_trials.log" if self.log_trial_info else None,
                     fits_trial_file = "fitness_per_trial.csv" if self.log_trial_fts else None, 
                     fits_indiv_file = "fitness_per_indiv.csv" if self.log_indiv else None, 
-                    genome_file = "genome.csv" if self.log_genome else None
+                    genome_file = "genome.csv" if self.log_genome else None,
+                    phenotype_file = "log_phenotype.csv" if self.log_phenotype else None
             )
+
+        # Setup solver logger
         self.solver.setup_logger(self.results_path)
+
+    def run(self, logging_freq: int = 1):
+        """
+        Runs the evolutionary optimisation loop.
+        """
+        t0 = time.time()
+        # Setup logging for each component
+        self._setup_logger()
 
         if self.max_generations is None:
             self.max_generations = 1000  # Default maximum generations

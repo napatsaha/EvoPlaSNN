@@ -203,6 +203,7 @@ class RL_Evaluator(Evaluator):
     def setup_logger(self, results_path: Path = None, 
                      logfile_name: str = None, fits_trial_file: str = None, 
                      fits_indiv_file: str = None, genome_file: str = None,
+                     phenotype_file: str = None,
                      logger_name: str = "SNN_Evaluator"):
         self.results_path = results_path
         # self._log_info = max(0, self._log_info)
@@ -241,8 +242,13 @@ class RL_Evaluator(Evaluator):
             # self._genome_file = "genome.csv"
             self._genome_file = genome_file
             if self._genome_file is not None:
+                ndim = self.get_parameter_size()
                 with open(self.results_path / self._genome_file, "w") as f:
-                    f.write("gen,indiv,genome\n")
+                    f.write("gen,indiv," + ",".join(["gene_%02d" % i for i in range(ndim)]) + "\n")
+            self._phenotype_file = phenotype_file
+            if self._phenotype_file is not None:
+                with open(self.results_path / self._phenotype_file, "w") as f:
+                    f.write("gen,indiv,phenotype\n")
 
 
     def evaluate(self, genome: np.ndarray | LearningRule | Genome = None, num_trials=1, 
@@ -284,6 +290,7 @@ class RL_Evaluator(Evaluator):
         if self.logger is not None:
             self.logger.info(f"Generation {gen_count}, Individual {inv_count}") 
         self.write_genome(gen_count, inv_count, genome)
+        self.write_phenotype(gen_count, inv_count, rule)
 
         # Measure behaviour characteristics of the learning rule (currently assumed to be separate from fitness evaluation)
         if self.measure_behaviour:
@@ -403,6 +410,16 @@ class RL_Evaluator(Evaluator):
             with open(self.results_path / self._genome_file, "a") as f:
                 genome_str = ','.join([f"{param:.{precision}f}" for param in genome])
                 f.write(f"{gen},{indiv},{genome_str}\n")
+
+    def write_phenotype(self, gen: int, indiv: int, rule):
+        """
+        Records generation number, individual number, and phenotype for each rule.
+        """
+        if self.results_path is not None and self._phenotype_file is not None:
+            with open(self.results_path / self._phenotype_file, "a") as f:
+                pheno = str(rule).replace("\n", " ")
+                f.write(f"{gen},{indiv},\"{pheno}\"\n")
+
 
     def close(self):
         pass

@@ -2,6 +2,14 @@
 v1.5
 ----
 
+v1.5.2.1 (2026-11-20)
+- Added logging rule phenotype in 'log_phenotype.csv' in RL_Evaluator and EvoManager:
+    - More informative `__str__` method in EvolvableLearningRule and DualLearningRule
+    - CGP_Rule prints graph expression for its 'graph' gene in `__str__`
+- In DualLearningRule, add `_print_shared_gene_values()` and `_shared_genes` to help with printing genes
+- When Simulator call `network.get_exploration_rate()`, simplify tag is now enabled (to prevent different array shapes being saved)
+- In EvoManager, refactor all logger setup calls to `_setup_logger()`
+
 v1.5.2.0 (2026-11-19)
 - First version of foraging environment `rl/env3.BaseOpenMaze`:
     - Agent has position and direction

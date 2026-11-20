@@ -521,3 +521,9 @@ class EvolvableLearningRule(EvolvableRuleProtocol):
         Check whether this rule is encoding a certain gene in its genome
         """
         return gene_name in self._gene_order
+
+    def __repr__(self):
+        return f"EvolvableLearningRule(parameters={self.parameters}, gene_order={self.gene_order})"
+
+    def __str__(self):
+        return "{" + ", ".join([f"{k}: {v}" for k,v in self.values.items()]) + "}"

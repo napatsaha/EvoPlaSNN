@@ -130,7 +130,7 @@ class SNNSimulator:
         self.reset_exploration_on_season_change = reset_exploration_on_season_change
 
         # Check if Network explore via stochastic spiking
-        neuron_expl = self.network.get_exploration_rate(simplify=False)
+        neuron_expl = self.network.get_exploration_rate(simplify=True)
         if (neuron_expl is not None) or (neuron_expl > 0.0):
             if self._exploration_source is None:
                 self._exploration_source = "network"
@@ -629,7 +629,7 @@ class SNNSimulator:
 
     def _get_exploration_rate(self) -> float:
         if self._exploration_source == "network":
-            return self.network.get_exploration_rate(simplify=False)
+            return self.network.get_exploration_rate(simplify=True)
         elif self._exploration_source == "env":
             return self.epsilon
 
