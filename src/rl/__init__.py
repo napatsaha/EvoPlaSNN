@@ -1,8 +1,6 @@
 from .env import BaseMaze
 from .maze import TMaze
 from . import maze, env2
-from .spike_coding import StateCoder
-from .collector import RewardCollector
 
 
 ENV_DICT: dict[str, BaseMaze] = {

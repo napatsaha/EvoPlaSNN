@@ -3,7 +3,7 @@ import abc
 import numpy as np
 from numpy.typing import ArrayLike
 
-from typing import Any, Literal, Protocol, List, Sequence, Tuple, Dict, Type, Union, runtime_checkable
+from typing import Any, Literal, Protocol, List, Sequence, Tuple, Dict, Type, Union, runtime_checkable, NamedTuple
 
 
 # Genome and Learning Rules
@@ -464,12 +464,16 @@ class SynapseLayerProtocol(Protocol):
         """
 
 
+# TODO: Add methods and attributes of SNN
 class SNNProtocol(Protocol):
     """
     Spiking Neural Network Protocol
     """
 
 
+# Simulation components
+
+# TODO: Add methods and attributes of SNNSimulator
 class SimulatorProtocol(Protocol):
     """
     SNN Simulator Protocol
@@ -480,6 +484,64 @@ class SimulatorProtocol(Protocol):
     network: Any # Will fix later
     environment: Any # Will fix later
 
+
+class FitnessCollector(Protocol):
+    """Previously called RewardCollect, now has its own protocol setup"""
+    records: List[NamedTuple]
+    episodic: bool
+    fitness_type: str
+    fitness_agg_func: str
+
+    @abstractmethod
+    def collect(self, **kwargs):
+        """
+        Record information
+        """
+    @abstractmethod
+    def reset(self):
+        """
+        Reset the collector's history.
+        """
+    @abstractmethod
+    def soft_reset(self):
+        """
+        Reset after a training phase. Behaviour depends on `fitness_on_eval_only`
+        """
+    @abstractmethod
+    def get_timestamps(self, t_cutoff: int = None, eps_cutoff: int = None) -> list[int]:
+        """
+        Return timestamp of each entry in the record
+        """ 
+    @abstractmethod
+    def get_explorations(self, t_cutoff: int = None, eps_cutoff: int = None) -> list[float]:
+        """
+        Return exploration values of each entry in the record
+        """
+    @abstractmethod
+    def get_intermediate_fitness(self, collect_only: bool = True, t_cutoff: int = None, eps_cutoff: int = None) -> List[float]:
+        """
+        Return fitness value separately for each entry in the record
+
+        Args:
+            collect_only (bool, optional): Whether to only return entries where `collect` tags is True. Defaults to True.
+            t_cutoff (int, optional): Whether to only return entries where `t > t_cutoff`. Defaults to None.
+            eps_cutoff (int, optional): Whether to only return entries where `eps > eps_cutoff`. Defaults to None.
+
+        Returns:
+            List[float]: _description_
+        """
+    @abstractmethod
+    def get_fitness(self, t_cutoff: int = None, eps_cutoff: int = None) -> float:
+        """
+        Aggregate intermediate fitness into a single fitness value
+
+        Args:
+            t_cutoff (int, optional): Whether to only return entries where `t > t_cutoff`. Defaults to None.
+            eps_cutoff (int, optional): Whether to only return entries where `eps > eps_cutoff`. Defaults to None.
+
+        Returns:
+            float: fitness value
+        """
 
 # Environment components
 

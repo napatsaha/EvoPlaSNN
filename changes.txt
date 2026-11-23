@@ -2,6 +2,13 @@
 v1.5
 ----
 
+v1.5.3.0 (2026-11-23)
+- Fitness Collector refactoring
+- Added ABC protocol `FitnessCollector` to `common.base`
+    - It must have the `episodic` field
+- `rl.collector.RewardCollector` becomes `EpisodeCollector` due to its nature to record at the end of episode
+- Renamed all occurrences of `reward_collector` in Simulator, RL_Evaluator, and `snn.plot.plot_intermediate_fitness()` to `fitness_collector`
+
 v1.5.2.2 (2026-11-23)
 - Reward function in `BaseOpenMaze` foraging task
 - Add `_get_reward()` and `_base_reward_function` and argument to override said function: `reward_func_params=`

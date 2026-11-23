@@ -14,8 +14,8 @@ from .modulation import MODULATOR_DICT
 from .spikegen import BinaryClassGenerator
 # from .decoding_old import get_decoder_class, get_fitnessor_class, BaseDecoder, BaseFitnessor
 from .rewarder import create_rewarder, create_collector, RewarderProtocol, CollectorProtocol
-from common.base import Modulator, SpikeCoder, SeasonalEnvProtocol
-from rl.collector import RewardCollector, TrajectoryCollector
+from common.base import Modulator, SpikeCoder, SeasonalEnvProtocol, FitnessCollector
+from rl.collector import TrajectoryCollector
 import gymnasium as gym
 
 
@@ -25,7 +25,7 @@ class SNNSimulator:
     rewarder: RewarderProtocol | None
     collector: CollectorProtocol | None
     def __init__(self, network: SNN, #spike_generator: SpikeGenerator = None, 
-                 env: gym.Env = None, spike_coder: SpikeCoder = None, reward_collector: RewardCollector = None,
+                 env: gym.Env = None, spike_coder: SpikeCoder = None, fitness_collector: FitnessCollector = None,
                 #  trajectory_collector: TrajectoryCollector = None,
                  collect_trajectory: bool = False, trajectory_params: dict = None,
                 #  update_condition: Literal["on-step", "on-end"] = "on-end",
@@ -67,7 +67,7 @@ class SNNSimulator:
             self.seasonal_eps_interval = max(1, int(seasonal_eps_interval)) if seasonal_eps_interval is not None else None
 
         # Episode and Trajectory collectors
-        self.reward_collector = reward_collector
+        self.fitness_collector = fitness_collector
         self._log_traj = bool(collect_trajectory)
         if self._log_traj and trajectory_params is None:
             trajectory_params = {}
@@ -226,8 +226,8 @@ class SNNSimulator:
         # self.spike_generator.reset()
         self.env.reset()
         self.spike_coder.reset()
-        if self.reward_collector is not None:
-            self.reward_collector.reset()
+        if self.fitness_collector is not None:
+            self.fitness_collector.reset()
         if self._log_traj:
             self.trajectory_collector.reset()
 
@@ -253,8 +253,8 @@ class SNNSimulator:
         self.env.reset()
         # Reset episode collectors and trajectory collector
         if erase_collectors:
-            if self.reward_collector is not None:
-                self.reward_collector.soft_reset()
+            if self.fitness_collector is not None:
+                self.fitness_collector.soft_reset()
             if self._log_traj:
                 self.trajectory_collector.reset()
         # Reset other recorders
@@ -370,8 +370,8 @@ class SNNSimulator:
 
                 # Perform episode reset or proceed to next env step
                 if episode_done:
-                    if self.reward_collector is not None:
-                        self.reward_collector.collect(
+                    if self.fitness_collector is not None and self.fitness_collector.episodic:
+                        self.fitness_collector.collect(
                             t=t,
                             episode=self.num_episode,
                             season=season_idx if self.seasonal else None,
@@ -491,12 +491,12 @@ class SNNSimulator:
         #     return self.collector.calculate_fitness()
         # else:
             # return None
-        if self.reward_collector is None:
+        if self.fitness_collector is None:
             Warning("Reward collector is not set. Fitness cannot be calculated.")
             return None
         if use_decay_cutoff and self.decay_cutoff is not None:
             t_cutoff = self.decay_cutoff
-        return self.reward_collector.get_fitness(t_cutoff=t_cutoff, eps_cutoff=eps_cutoff)
+        return self.fitness_collector.get_fitness(t_cutoff=t_cutoff, eps_cutoff=eps_cutoff)
 
     def get_intermediate_fitness(self, use_decay_cutoff: bool = False, t_cutoff: int = None, eps_cutoff: int = None) -> List[float] | None:
         # if self._post_process_type == 0:
@@ -511,20 +511,20 @@ class SNNSimulator:
         #     return self.collector.get_intermediate_fitness(use_portion=use_portion)
         # else:
             # return None
-        if self.reward_collector is None:
+        if self.fitness_collector is None:
             Warning("Reward collector is not set. Intermediate fitness cannot be calculated.")
             return None
         if use_decay_cutoff and self.decay_cutoff is not None:
             t_cutoff = self.decay_cutoff
-        return self.reward_collector.get_intermediate_fitness(t_cutoff=t_cutoff, eps_cutoff=eps_cutoff)
+        return self.fitness_collector.get_intermediate_fitness(t_cutoff=t_cutoff, eps_cutoff=eps_cutoff)
 
     def get_episode_timestamps(self, use_decay_cutoff: bool = False, t_cutoff: int = None, eps_cutoff: int = None) -> np.ndarray[int] | None:
-        if self.reward_collector is None:
+        if self.fitness_collector is None:
             Warning("Reward collector is not set. Episode timestamps cannot be calculated.")
             return None
         if use_decay_cutoff and self.decay_cutoff is not None:
             t_cutoff = self.decay_cutoff
-        eps_timestamp = self.reward_collector.get_timestamps(t_cutoff=t_cutoff, eps_cutoff=eps_cutoff)
+        eps_timestamp = self.fitness_collector.get_timestamps(t_cutoff=t_cutoff, eps_cutoff=eps_cutoff)
         return eps_timestamp
 
     def get_target_fitness(self) -> float | None:
@@ -549,7 +549,7 @@ class SNNSimulator:
         # elif self._post_process_type == 1:
         #     return self.collector.minimise if self.collector is not None else None
         # else:
-        return self.reward_collector.minimise if self.reward_collector is not None else None
+        return self.fitness_collector.minimise if self.fitness_collector is not None else None
 
     def get_spike_times(self, start=0, end=None) -> List[List[np.ndarray]] | None:
         if self.spike_recorder is None:

@@ -1,6 +1,7 @@
 import numpy as np
 from collections import namedtuple
 from typing import List, Literal, Dict, Callable, NamedTuple, Any, Tuple
+from common.base import FitnessCollector
 
 
 # Trajectory = namedtuple("Trajectory", ["t", "state", "observation", "action", "reward", "done", "info"])
@@ -44,7 +45,7 @@ class EpsInfo(NamedTuple):
             ", ".join("%s=%s" % (key, val) for key, val in self._asdict().items() if val is not None) + \
             ")"
 
-class RewardCollector:
+class EpisodeCollector(FitnessCollector):
     records: List[EpsInfo]
     # _valid_fitness_types: List[str] = ["reward", "latency"]
     _optimise_direction_dict: dict = {
@@ -85,6 +86,7 @@ class RewardCollector:
                 Note that this is controlled externally (i.e. a simulator needs to call `soft_reset()` of this class after training).
                 Default: True
         """
+        self.episodic = True
         # self.reward_history = []
         # self.episode_lengths = []
         self.records = []

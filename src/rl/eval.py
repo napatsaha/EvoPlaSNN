@@ -19,7 +19,8 @@ from rl.spike_coding import StateCoder
 # import snn.spikegen
 # from lrule import LearningRule
 from lrule.arithmetic import MultiplyLearningRule
-from rl import ENV_DICT, RewardCollector, BaseMaze
+from rl import ENV_DICT, BaseMaze
+from rl.collector import EpisodeCollector
 from common.base import SpikeCoder
 
 class RL_Evaluator(Evaluator):
@@ -113,7 +114,7 @@ class RL_Evaluator(Evaluator):
             self.snn.learning_rule = ext_rule
 
         ## Episode info collector for calculating fitness 
-        self.reward_collector = RewardCollector(**params["collector_params"])
+        self.fitness_collector = EpisodeCollector(**params["collector_params"])
         # Update min and max fitness from environment
         # self.reward_collector.min_fitness = self.env.get_min_reward()
         # self.reward_collector.max_fitness = self.env.get_max_reward()
@@ -126,7 +127,7 @@ class RL_Evaluator(Evaluator):
             _trigger_condition = simulator_params.pop("update_condition", None)
 
         ## Simulator: Putting everything together
-        self.simulator = SNNSimulator(self.snn, self.env, self.spike_coder, self.reward_collector,
+        self.simulator = SNNSimulator(self.snn, self.env, self.spike_coder, self.fitness_collector,
                                       record_weights=record_info, 
                                       record_traces=record_info,
                                       record_pre_traces=record_info,
@@ -188,17 +189,17 @@ class RL_Evaluator(Evaluator):
         Returns whether the optimisation is minimisation or maximisation.
         Depends on Fitnessor type.
         """
-        return self.reward_collector.minimise
+        return self.fitness_collector.minimise
 
     def get_target_fitness(self) -> float:
         """
         Returns the target fitness for the evaluation.
         This is used to determine when the optimisation should stop.
         """
-        return self.reward_collector.best_fitness
+        return self.fitness_collector.best_fitness
 
     def get_worst_fitness(self) -> float:
-        return self.reward_collector.worst_fitness
+        return self.fitness_collector.worst_fitness
 
     def setup_logger(self, results_path: Path = None, 
                      logfile_name: str = None, fits_trial_file: str = None, 
@@ -316,7 +317,7 @@ class RL_Evaluator(Evaluator):
                 self.simulator.run(num_eps=self.eval_episodes, update=self.plastic_on_eval)
 
             # Final Fitness
-            fitness = self.reward_collector.get_fitness()
+            fitness = self.fitness_collector.get_fitness()
             fitnesses.append(fitness)
 
             if self.logger is not None:

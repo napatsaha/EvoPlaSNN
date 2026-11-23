@@ -15,7 +15,6 @@ import pandas as pd
 import seaborn as sns
 
 # from .simulate import SNNSimulator
-from rl.collector import RewardCollector
 from snn.utils import get_spike_times
 from common import base
 from common.utils import get_boundaries_for_lrule_inputs, LRULE_INPUT_BOUNDS
@@ -908,7 +907,7 @@ def plot_eligibility_traces(simulator: 'SNNSimulator' = None, values: np.ndarray
     plt.close(fig)
 
 
-def plot_intermediate_fitness(simulator: 'SNNSimulator' = None, values: np.ndarray = None, reward_collector: RewardCollector = None, *, 
+def plot_intermediate_fitness(simulator: 'SNNSimulator' = None, values: np.ndarray = None, fitness_collector: base.FitnessCollector = None, *, 
                               plot_exploration: bool = False, exploration_labels: List[str] = None,
                               plot_collect_fitness: bool = True,
                               plot_seasonal_bands: bool = False, season_cmap: str = "Set2",
@@ -918,20 +917,20 @@ def plot_intermediate_fitness(simulator: 'SNNSimulator' = None, values: np.ndarr
                               t_min: int = None, t_max: int = None, t_range: int = None, window_size: int = 10, 
                               figsize: tuple = None, dpi: int = 100, title: str = None,
                               savepath: str | Path = None, show: bool = True):
-    if (simulator is not None) or (reward_collector is not None):
+    if (simulator is not None) or (fitness_collector is not None):
         if simulator is not None:
-            reward_collector: RewardCollector = simulator.reward_collector
+            fitness_collector: base.FitnessCollector = simulator.fitness_collector
             plot_seasonal_bands = plot_seasonal_bands and simulator.seasonal # Will ensure seasonal bands are plotted only if simulator.seasonal is enabled
             T = simulator.num_steps
         else:
-            T = reward_collector.records[-1].t
-        fts = reward_collector.get_intermediate_fitness(t_cutoff=t_cutoff, eps_cutoff=eps_cutoff, collect_only=False)
-        ft = reward_collector.get_fitness(t_cutoff=t_cutoff, eps_cutoff=eps_cutoff)
+            T = fitness_collector.records[-1].t
+        fts = fitness_collector.get_intermediate_fitness(t_cutoff=t_cutoff, eps_cutoff=eps_cutoff, collect_only=False)
+        ft = fitness_collector.get_fitness(t_cutoff=t_cutoff, eps_cutoff=eps_cutoff)
         # eps_len = simulator.reward_collector.get_episode_lengths()
         # eps_timestamp = np.cumsum(eps_len) * simulator.spike_coder.input_delay
-        eps_timestamp = reward_collector.get_timestamps(t_cutoff=t_cutoff, eps_cutoff=eps_cutoff)
-        agg_func = reward_collector.fitness_agg_func
-        fts_type = reward_collector.fitness_type
+        eps_timestamp = fitness_collector.get_timestamps(t_cutoff=t_cutoff, eps_cutoff=eps_cutoff)
+        agg_func = fitness_collector.fitness_agg_func
+        fts_type = fitness_collector.fitness_type
     
     elif values is not None:
         # Assume values is a list of fitnesses
@@ -986,7 +985,7 @@ def plot_intermediate_fitness(simulator: 'SNNSimulator' = None, values: np.ndarr
     # Plot seasonal bands if necessary
     if plot_seasonal_bands:
         # Get timestamps for first occurence of each season change
-        season_ts = reward_collector.get_season_timestamps()
+        season_ts = fitness_collector.get_season_timestamps()
         if simulator is not None:
             n_seasons = simulator.n_seasons
         else:
@@ -1003,11 +1002,11 @@ def plot_intermediate_fitness(simulator: 'SNNSimulator' = None, values: np.ndarr
     ## Exploration rate plot
     if plot_exploration:
         ax: Axes = axs[1, 0]
-        if reward_collector is not None:
-            expl = reward_collector.get_explorations(t_cutoff=t_cutoff, eps_cutoff=eps_cutoff)
+        if fitness_collector is not None:
+            expl = fitness_collector.get_explorations(t_cutoff=t_cutoff, eps_cutoff=eps_cutoff)
             expl = np.array(expl)
             multi_expl = expl.ndim > 1 and expl.shape[1] > 1
-            ts = reward_collector.get_timestamps(t_cutoff=t_cutoff, eps_cutoff=eps_cutoff)
+            ts = fitness_collector.get_timestamps(t_cutoff=t_cutoff, eps_cutoff=eps_cutoff)
         else:
             raise ValueError("Can only plot exploration with a valid 'reward_collector'")
         if multi_expl:
@@ -1031,8 +1030,8 @@ def plot_intermediate_fitness(simulator: 'SNNSimulator' = None, values: np.ndarr
             )
         # Plot when fitnesses are collected
         if plot_collect_fitness:
-            tmins = [r1.t for r0, r1 in zip(reward_collector.records[:-1], reward_collector.records[1:]) if r1.collect and not r0.collect]
-            tmaxs = [r1.t for r0, r1 in zip(reward_collector.records[:-1], reward_collector.records[1:]) if not r1.collect and r0.collect]
+            tmins = [r1.t for r0, r1 in zip(fitness_collector.records[:-1], fitness_collector.records[1:]) if r1.collect and not r0.collect]
+            tmaxs = [r1.t for r0, r1 in zip(fitness_collector.records[:-1], fitness_collector.records[1:]) if not r1.collect and r0.collect]
             for (xmin, xmax) in zip(tmins, tmaxs + [T]):
                 rec = ax.axvspan(xmin, xmax, facecolor="gray", alpha=0.3)
                 ax.legend(handles=[mpl.patches.Patch(facecolor="gray")], labels=["Collect Fitness"], loc="lower left", fontsize=14)
