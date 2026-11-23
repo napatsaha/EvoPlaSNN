@@ -2,6 +2,14 @@
 v1.5
 ----
 
+v1.5.2.2 (2026-11-23)
+- Reward function in `BaseOpenMaze` foraging task
+- Add `_get_reward()` and `_base_reward_function` and argument to override said function: `reward_func_params=`
+- Added `_blue_count`, `_green_count`
+- `_take_action()` no longer returns reward, and no longer takes or return info
+- Reordered operation sequence in `step()`: get obs from previous step, get reward, take action, get new observation, create info dict
+- Added `blue_count`, and `green_count` to info dict
+
 v1.5.2.1 (2026-11-20)
 - Added logging rule phenotype in 'log_phenotype.csv' in RL_Evaluator and EvoManager:
     - More informative `__str__` method in EvolvableLearningRule and DualLearningRule

@@ -8,7 +8,7 @@ Key differences are:
 """
 
 from types import NoneType
-from typing import List, Literal, Tuple
+from typing import List, Literal, Tuple, Dict
 from functools import partial
 import warnings
 from enum import IntEnum
@@ -93,6 +93,18 @@ class BaseOpenMaze(gym.Env):
     action_space: gym.spaces.Discrete
     observation_space: gym.spaces.MultiDiscrete
 
+    _base_reward_function = dict(
+        desired_eat = 1.0,
+        desired_avoid = -1.0,
+        undesired_eat = -1.0,
+        undesired_avoid = 0.0,
+        wall_eat = -1.0,
+        wall_avoid = 1.0,
+        wall_hug = -1.0,
+        empty_straight = 1.0,
+        empty_turn = -1.0,
+    )
+
     def __init__(self, size=None, width=None, height=None, *, 
                  max_steps=50, 
                 #  randomise_start: bool = False, random_spawn_method: Literal["random", "area"] = "random",
@@ -103,6 +115,7 @@ class BaseOpenMaze(gym.Env):
                 #  terminate_on_crash: bool = False,
                  penalty: float = -0.1, reward_inter: float = 0.1, reward_null: float | NoneType = 0.0,
                  reward_bad: float = -1.0, reward_good: float = 1.0, reward_trunc: float = 0.0,
+                 reward_func_params: Dict[str, float | int] = None,
                  **kwargs):
         """
         Initializes the environment with the given parameters.
@@ -148,6 +161,9 @@ class BaseOpenMaze(gym.Env):
 
         # Reward parameters
         # Final episode reward
+        self.reward_function = self._base_reward_function
+        if reward_func_params is not None:
+            self.reward_function.update(reward_func_params)
         self.reward_bad = reward_bad
         self.reward_good = reward_good
         self.reward_trunc = reward_trunc
@@ -182,6 +198,8 @@ class BaseOpenMaze(gym.Env):
         
         # Counters
         self._step_count = 0
+        self._blue_count = 0
+        self._green_count = 0
 
         # Plotting attributes
         self.cmap = colors.ListedColormap(OBJ_COLOR)
@@ -250,7 +268,51 @@ class BaseOpenMaze(gym.Env):
             obs.append(item_type)
         return obs
 
-    def _take_action(self, action: int, info: dict) -> Tuple[float, dict]:
+    def _get_reward(self, obs, action) -> float | int:
+        """Calculate reward from current observation and supposed action"""
+        item_displaced = obs[action]
+
+        if ObjType.GREEN in obs:
+            if item_displaced == ObjType.GREEN:
+                reward = self.reward_function["desired_eat"]
+            else:
+                reward = self.reward_function["desired_avoid"]
+        elif ObjType.BLUE in obs:
+            if item_displaced == ObjType.BLUE:
+                reward = self.reward_function["undesired_eat"]
+            else:
+                reward = self.reward_function["undesired_avoid"]
+        elif ObjType.WALL in obs:
+            if obs[Rotation.STRAIGHT+1] == ObjType.WALL:
+                if (action-1) == Rotation.STRAIGHT:
+                    reward = self.reward_function["wall_eat"]
+                else:
+                    reward = self.reward_function["wall_avoid"]
+            elif obs[Rotation.LEFT+1] == ObjType.WALL:
+                if (action-1) == Rotation.RIGHT:
+                    reward = self.reward_function["wall_avoid"]
+                elif (action-1) == Rotation.STRAIGHT:
+                    reward = self.reward_function["wall_hug"]
+                else:
+                    reward = self.reward_function["wall_eat"]
+            elif obs[Rotation.RIGHT+1] == ObjType.WALL:
+                if (action-1) == Rotation.LEFT:
+                    reward = self.reward_function["wall_avoid"]
+                elif (action-1) == Rotation.STRAIGHT:
+                    reward = self.reward_function["wall_hug"]
+                else:
+                    reward = self.reward_function["wall_eat"]
+        elif ObjType.EMPTY in obs:
+            if (action-1) == Rotation.STRAIGHT:
+                reward = self.reward_function["empty_straight"]
+            else:
+                reward = self.reward_function["empty_turn"]
+        else:
+            reward = 0.0
+
+        return reward
+
+    def _take_action(self, action: int) -> Tuple[float, dict]:
         """
         Internals of a step function:
         - Apply chosen action to current agent position to see what item would be displaced
@@ -260,7 +322,7 @@ class BaseOpenMaze(gym.Env):
 
         The info dictionary are there to store intermediate information
         """
-        reward = 0.0
+        # reward = 0.0
 
         # TODO: Validate action is within ACTION_MAP
 
@@ -272,7 +334,7 @@ class BaseOpenMaze(gym.Env):
         if displaced_item == ObjType.WALL:
             # Bumping into wall
             self._agent_direction = (self._agent_direction + ACTION_MAP[action]) % 4
-            reward = self.penalty
+            # reward = self.penalty
         # elif displaced_item == ObjType.AGENT:
         #     # Stationary case
         #     reward = self.reward_null
@@ -291,18 +353,17 @@ class BaseOpenMaze(gym.Env):
 
             # Calculate reward and terminate for non-empty cells
             if displaced_item == ObjType.GREEN:
-                reward = self.reward_good
+                # reward = self.reward_good
                 # Respawn food object
                 self.maze[*pos] = ObjType.GREEN
 
             elif displaced_item == ObjType.BLUE:
-                reward = self.reward_bad
+                # reward = self.reward_bad
                 # Respawn food object
                 self.maze[*pos] = ObjType.BLUE
-            else:
-                reward = self.reward_null
 
-        return reward, info
+
+        return displaced_item
     
     ## Helper functions
 
@@ -327,27 +388,41 @@ class BaseOpenMaze(gym.Env):
     def reset(self, *, seed = None, options = None):
         super().reset(seed=seed, options=options)
         self._step_count = 0
+        self._blue_count = 0
+        self._green_count = 0
         self._reset_position()
         obs = self._get_observation()
         info = {
             'step_count': self._step_count,
             'agent_position': self.get_agent_position(),
+            'green_count': self._green_count,
+            'blue_count': self._blue_count,
         }
         return obs, info
 
     def step(self, action: int) -> Tuple[int, float | None, bool, bool, dict]:
         self._step_count += 1
+        # Calculate reward before taking action and getting obs
+        obs = self._get_observation()
+        # reward function based on obs and action
+        reward = self._get_reward(obs, action)
+        # Move the agent
+        item_displaced = self._take_action(action)
+        if item_displaced == ObjType.BLUE:
+            self._blue_count += 1
+        if item_displaced == ObjType.GREEN:
+            self._green_count += 1
+
+        obs = self._get_observation()
+        # This environment will never be terminated, only truncated
+        terminated = False
+        truncated = self._step_count >= self.max_steps
         info = {
             'step_count': self._step_count, 
             'agent_position': self.get_agent_position(),
+            'green_count': self._green_count,
+            'blue_count': self._blue_count,
         }
-        truncated = self._step_count >= self.max_steps
-        reward, info = self._take_action(action, info)
-        # TODO: Add reward function based on obs and action
-        terminated = bool(info.get('terminated', False))
-        if truncated and not terminated:
-            reward = self.reward_trunc
-        obs = self._get_observation()
         return obs, reward, terminated, truncated, info
 
     ## Other functions
