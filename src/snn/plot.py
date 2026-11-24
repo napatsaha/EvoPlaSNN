@@ -492,6 +492,7 @@ def plot_weight_over_time(simulator: 'SNNSimulator' = None, values: List[np.ndar
                           figsize=None, dpi: int = 100,
                           title: str = None, x_min=None, x_max=None, t_max=None, t_min=None,
                           x_scale: float = 1, y_scale: float = 1,
+                          w_eps: float = 0.1,
                           sample_freq: int = 1,
                           synapse_layer: int = 0, 
                           savepath=None, show=True, line_kw={}):
@@ -519,8 +520,8 @@ def plot_weight_over_time(simulator: 'SNNSimulator' = None, values: List[np.ndar
         post_id = [*range(w_mat.shape[1])]
 
     nrow, ncol = w_mat.shape[:2]
-    wmax = np.max(w_mat)
-    wmin = np.min(w_mat)
+    wmax = np.max(w_mat) + w_eps
+    wmin = np.min(w_mat) - w_eps
 
     figsize=(x_scale*ncol, y_scale*nrow) if figsize is None else figsize
     fig, axs = plt.subplots(nrow, ncol, figsize=figsize, dpi=dpi,
@@ -909,7 +910,7 @@ def plot_eligibility_traces(simulator: 'SNNSimulator' = None, values: np.ndarray
 
 def plot_intermediate_fitness(simulator: 'SNNSimulator' = None, values: np.ndarray = None, fitness_collector: base.FitnessCollector = None, *, 
                               plot_exploration: bool = False, exploration_labels: List[str] = None,
-                              plot_collect_fitness: bool = True,
+                              plot_collect_fitness: bool = True, plot_food_counts: bool = False,
                               plot_seasonal_bands: bool = False, season_cmap: str = "Set2",
                               t_cutoff: int = None, eps_cutoff: int = None,
                               num_steps: int = None, timestamps: np.ndarray = None,
@@ -956,6 +957,14 @@ def plot_intermediate_fitness(simulator: 'SNNSimulator' = None, values: np.ndarr
     window_size = min(window_size, len(fts))
     runavg = np.convolve(fts, np.ones(window_size) / window_size, mode='same')
 
+    # Extract food counts if applicable
+    if plot_food_counts:
+        rec = fitness_collector.records[0]
+        assert ("blue_count" in rec._fields) and ("green_count" in rec._fields), \
+            "To plot food counts, records in FitnessCollector must have the fields: 'green_count' and 'blue_count'"
+        blues = fitness_collector.get_blue_count()
+        greens = fitness_collector.get_green_count()
+
     if t_range is None:
         t_range = T
     if t_max is None:
@@ -963,12 +972,14 @@ def plot_intermediate_fitness(simulator: 'SNNSimulator' = None, values: np.ndarr
     if t_min is None:
         t_min = max(0, t_max - t_range)
 
+    n_rows = int(plot_exploration) + int(plot_food_counts) + 1
     if figsize is None:
-        figsize = (((t_max - t_min) * x_scale, 10 * y_scale * (int(plot_exploration) + 1)))
-    fig, axs = plt.subplots(1 + int(plot_exploration), 1, figsize=figsize, dpi=dpi,
-                            layout="constrained", squeeze=False)
+        figsize = (((t_max - t_min) * x_scale, 10 * y_scale * (n_rows)))
+    fig, axs = plt.subplots(n_rows, 1, figsize=figsize, dpi=dpi,
+                            layout="constrained", squeeze=False, sharex=True)
+    ax_i = 0
     ## Fitness per episode plot
-    ax: Axes = axs[0, 0]
+    ax: Axes = axs[ax_i, 0]
     ax.plot(
         ts, fts,
         color="gray", alpha=0.8,
@@ -997,11 +1008,12 @@ def plot_intermediate_fitness(simulator: 'SNNSimulator' = None, values: np.ndarr
     
     ax.set_xlim(t_min - x_eps, t_max + x_eps)
     ax.set_xlabel("Time (steps)")
-    ax.set_ylabel("Episode " + fts_type.title())
+    ax.set_ylabel(fts_type.title())
+    ax_i += 1
 
     ## Exploration rate plot
     if plot_exploration:
-        ax: Axes = axs[1, 0]
+        ax: Axes = axs[ax_i, 0]
         if fitness_collector is not None:
             expl = fitness_collector.get_explorations(t_cutoff=t_cutoff, eps_cutoff=eps_cutoff)
             expl = np.array(expl)
@@ -1041,8 +1053,22 @@ def plot_intermediate_fitness(simulator: 'SNNSimulator' = None, values: np.ndarr
             ax.xaxis.set_major_locator(plt.MultipleLocator(100))
         ax.set_xlabel("Time (steps)")
         ax.set_ylabel("Exploration Rate")
+        ax_i += 1
+
+    # Plot Cumulative Food Counts
+    if plot_food_counts:
+        ax: Axes = axs[ax_i, 0]
+        ax.plot(ts, blues, color="blue", label="Blue object")
+        ax.plot(ts, greens, color="green", label="Green object")
+        ax.set_xlim(t_min - x_eps, t_max + x_eps)
+
+        ax.legend(title="Object Type")
+        ax.set_ylabel("Cumulative Object Gathered")
+        ax.set_xlabel("Time (steps)")
+
     fig.text(0.5, 1.07, "Intermediate Fitness Over Time" if title is None else title, ha='center', fontsize=20)
-    fig.text(0.5, 1.02, f"{agg_func.title()} Fitness: {ft:.2f}", ha='center', fontsize=14)
+    fig.text(0.5, 1.04, f"Fitness Type: {fts_type.title()}", ha='center', fontsize=14)
+    fig.text(0.5, 1.01, f"{agg_func.title()} Fitness: {ft:.2f}", ha='center', fontsize=14)
     if savepath is not None:
         print(f"Saving plot to {savepath}")
         plt.savefig(savepath, dpi=dpi)
@@ -1070,7 +1096,7 @@ def plot_learning_rule(rule: 'base.LearningRule', simulator: 'SNNSimulator' = No
     elif input_size == 4:
         plot_learning_rule_4D(rule, simulator, **kwargs)
     else:
-        raise ValueError(f"Plotting learning rule is not yet supported for input_size={input_size}")
+        raise ValueError(f"Plotting learning rule is not yet supported for {input_size}-dimension inputs")
 
 
 def plot_learning_rule_4D(rule: 'base.LearningRule', simulator: 'SNNSimulator' = None, *, 
@@ -1509,7 +1535,7 @@ def plot_fitness_generation(file_path: str | Path = None, res: pd.DataFrame = No
                             sns_style: str = "whitegrid", sns_palette: str = "muted", figsize: tuple = None, dpi: int = 100,
                             legend: bool = True, fontscale: float = 1.0,
                             title: str = None, subtitle: str = None, comment: str = None,
-                            x_eps: int = 2, x_scale: float = 0.3, y_scale: float = 1.3, y_size: float = 10,
+                            x_eps: int = 2, x_scale: float = 0.3, y_scale: float = 1.3, y_size: float = 10, y_eps: float = 5,
                             ymin: float = None, ymax: float = None,
                             savepath: str | Path = None, show: bool = True):
     fts_name = "Fitness"
@@ -1567,7 +1593,7 @@ def plot_fitness_generation(file_path: str | Path = None, res: pd.DataFrame = No
                     palette=sns_palette, linewidth=2)
     
     ax.set_xlim(0-x_eps, num_gens+x_eps)
-    ax.set_ylim(ymin, ymax)
+    ax.set_ylim(ymin-y_eps, ymax+y_eps)
     ax.xaxis.set_major_locator(plt.MultipleLocator(5))
     ax.set_xlabel("Generation", fontsize=12*fontscale)
     ax.set_ylabel(fts_name, fontsize=12*fontscale)

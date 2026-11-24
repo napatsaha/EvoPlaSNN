@@ -2,6 +2,16 @@
 v1.5
 ----
 
+v1.5.3.2 (2026-11)
+- `env3.BaseOpenMaze` can accept max_steps=None (in which case it will be infinity)
+- Fix MuPlusLambda when there is only 1 parent
+- Changed default value in `cgp.safe_divide()` to 0.0 (previously np.nan)
+- ContinuousEnvCollector can now accept `fitness_agg_func`, `best_fitness` and `worst_fitness` during init
+- Plotting:
+    - `snn.plot.plot_intermediate_fitness()` can now plot food counts using `plot_food_counts` tag
+    - plot_intermediate_fitness display fitness type, and removed episode mentions in title and y-labels
+    - Added y_eps to plot_fitness_generation and w_eps to plot_weight_over_time
+
 v1.5.3.1 (2026-11-23)
 - Integrating Foraging task with SNN, FitnessCollector and SNNSimulator
 - `common.base`: Added to `FitnessCollector` the fields: `minimise`, `best_fitness` and `worst_fitness`

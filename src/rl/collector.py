@@ -355,8 +355,12 @@ class ContinuousEnvCollector(BaseFitnessCollector):
         "blue_minus_green": 'maximise',
     }
 
-    def __init__(self, env: gym.Env, *, fitness_type: Literal["green_minus_blue", "blue_minus_green"] = "green_minus_blue",
-                 fitness_t_cutoff: int = None):
+    def __init__(self, env: gym.Env, *, 
+                 fitness_type: Literal["green_minus_blue", "blue_minus_green"] = "green_minus_blue",
+                 fitness_agg_func: Literal["final"] = "final",
+                 fitness_t_cutoff: int = None,
+                 best_fitness: float = None, worst_fitness: float = None,
+                 ):
         super().__init__(env)
         self.episodic = False
         # self.records = []
@@ -366,7 +370,10 @@ class ContinuousEnvCollector(BaseFitnessCollector):
         self.minimise = self._optimise_direction_dict.get(self.fitness_type) == 'minimise'
 
         self.fitness_t_cutoff = fitness_t_cutoff
-        self.fitness_agg_func = "final"
+        self.fitness_agg_func = fitness_agg_func
+
+        self.best_fitness = best_fitness if best_fitness is not None else 100
+        self.worst_fitness = worst_fitness if worst_fitness is not None else 0
 
     def _check_collect_fitness(self, t):
         """

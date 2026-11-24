@@ -106,7 +106,7 @@ class BaseOpenMaze(gym.Env):
     )
 
     def __init__(self, size=None, width=None, height=None, *, 
-                 max_steps=50, 
+                 max_steps: int = None, 
                 #  randomise_start: bool = False, random_spawn_method: Literal["random", "area"] = "random",
                 #  random_spawn_area: List[Tuple[Tuple[int, int], Tuple[int, int]]] = None,
                 #  obs_type: Literal["position", "surroundings", "sensors"] = "sensors",
@@ -156,7 +156,7 @@ class BaseOpenMaze(gym.Env):
         self.height = size if height is None else height
         self.area = self.width * self.height if self.width is not None and self.height is not None else None
         # self.pad = 1
-        self.max_steps = int(max_steps)
+        self.max_steps = int(max_steps) if max_steps is not None else np.inf
 
         # Randomising starting position
         # self.randomise_start = randomise_start

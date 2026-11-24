@@ -15,7 +15,7 @@ from genome.genome import EvolvableLearningRule, SimpleGenome
 
 def safe_divide(x, y):
     if y == 0:
-        return np.nan
+        return 0.0
     else:
         return x / y
 

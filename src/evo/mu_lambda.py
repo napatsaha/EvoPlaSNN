@@ -105,7 +105,7 @@ class MuPlusLambda(BaseSolver):
         if not self.minimise:
             fitnesses = -fitnesses
         idx_best = np.argsort(fitnesses)[:self.mu]
-        self.parents = self.take_solutions(idx_best)
+        self.parents = self.take_solutions(idx_best, simplify=False)
 
         # Moved offspring generation to self.ask()
         # self._generate_offspring()
