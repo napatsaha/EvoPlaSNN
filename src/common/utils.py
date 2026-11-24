@@ -1,3 +1,4 @@
+from copy import deepcopy
 from typing import List, Tuple
 from importlib import import_module
 import warnings
@@ -5,7 +6,7 @@ import yaml
 
 import numpy as np
 
-from common.base import Solver, LearningRule
+from common.base import FitnessCollector, Solver, LearningRule
 
 ## HELPER FUNCTIONS
 
@@ -248,6 +249,20 @@ def make_input_grid(bounds, N):
 
 ## Factory Methods
 
+def _instantiate_from_params(params: dict, ref_dict: dict, id_fields = ("kind", "type", "name")):
+    params = deepcopy(params)
+    for field in id_fields:
+        if field in params:
+            obj_type = params.pop(field)
+            break
+    assert obj_type in ref_dict, f"Class type '{obj_type}' not found. Available options are: {ref_dict.keys()}"
+    module_name, class_name = ref_dict.get(obj_type)
+    module = import_module(module_name)
+    cls_obj = getattr(module, class_name)
+    inst = cls_obj(**params)
+    return inst
+    
+
 ALGO_DICT = {
     "cma_es": ("evo.cma_es", "CMA_ES"),
     "pycma": ("evo.pycma_wrapper", "PyCMAWrapper"),
@@ -260,7 +275,7 @@ ALGO_DICT = {
 
 
 def create_solver(params: dict, **kwargs) -> Solver:
-    params = params.copy()
+    params = deepcopy(params)
     if "type" in params:
         solver_type = params.pop("type")
     else:
@@ -311,6 +326,38 @@ def create_learning_rule(type_: str = None, **kwargs) -> LearningRule:
     else:
         instance = rule_cls(**kwargs)
     return instance
+
+
+# Fitness Collector
+
+COLLECTOR_DICT = {
+    "episodic": ("rl.collector", "EpisodeCollector"),
+    "continuous": ("rl.collector", "ContinuousEnvCollector")
+}
+
+def create_collector(**kwargs) -> FitnessCollector:
+    return _instantiate_from_params(kwargs, ref_dict=COLLECTOR_DICT)
+
+
+
+# Environment
+ENV_DICT = {
+    "t-maze": ("rl.maze", "TMaze"),
+    "adv-t-maze": ("rl.maze", "AdvTMaze"), 
+    "donut-maze": ("rl.maze", "DonutMaze"), 
+    "inverted-t": ("rl.maze", "InvertedTMaze"), 
+    "random-maze": ("rl.maze", "RandomMaze"), 
+    "custom-maze": ("rl.maze", "CustomMaze"), 
+    "water-maze": ("rl.maze", "MorrisWaterMaze"), 
+    "seasonal-obstacle-maze": ("rl.env2", "SeasonalObstacleGridMaze"), 
+    "foraging-task": ("rl.env3", "BaseOpenMaze")
+}
+
+def create_environment(**kwargs):
+    return _instantiate_from_params(kwargs, ref_dict=ENV_DICT)
+
+
+# Dictionary handling functions
 
 
 def parse_config_overrides(overrides: list[str]) -> dict:

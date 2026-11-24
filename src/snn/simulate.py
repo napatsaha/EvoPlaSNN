@@ -1,4 +1,4 @@
-import copy
+import copy, warnings
 from pathlib import Path
 from typing import List, Literal, Optional, Sequence
 from matplotlib import ticker
@@ -31,6 +31,7 @@ class SNNSimulator:
                 #  update_condition: Literal["on-step", "on-end"] = "on-end",
                  modulation: Literal["reward", "td-error"] = None, modulation_params: dict = {},
                  *, 
+                 episodic: bool = True,
                  seasonal: bool = False, seasonal_eps_interval: int = None, 
                 #  params: dict = {},
                 #  decoder_type: Literal["final", "rate", "latency"] = "final", decoder_params: dict = {},
@@ -68,6 +69,10 @@ class SNNSimulator:
 
         # Episode and Trajectory collectors
         self.fitness_collector = fitness_collector
+        self._episodic = bool(episodic)
+        if self.fitness_collector is not None:
+            if self._episodic != self.fitness_collector.episodic:
+                warnings.warn(f"Mismatched episodic tag between `episodic={self._episodic}` and `fitness_collector.episodic={self.fitness_collector.episodic}`")
         self._log_traj = bool(collect_trajectory)
         if self._log_traj and trajectory_params is None:
             trajectory_params = {}
@@ -316,8 +321,10 @@ class SNNSimulator:
                 # signal = self.modulator.signal(locals=locals()) if self._modulation else reward
                 self.network.apply_internal_rule(trigger_info=trigger_info)
 
+            env_step = self.spike_coder.ready and action is not None
+
             # Increment environment step if the spike coder says so
-            if self.spike_coder.ready and action is not None:
+            if env_step:
                 if self._explore and self.epsilon_greedy:
                     if np.random.rand() < self.epsilon:
                         action = self.env.action_space.sample()
@@ -335,6 +342,16 @@ class SNNSimulator:
                         # reward=reward,
                         # done=episode_done,
                         # info=info
+                        )
+
+                if (self.fitness_collector is not None) and (not self._episodic):
+                    # Continuous environment
+                    self.fitness_collector.collect(
+                        t = t, 
+                        season = season_idx if self.seasonal else None,
+                        reward=reward, 
+                        exploration=self._get_exploration_rate(),
+                        info=info,
                         )
                 
                 if update:
@@ -370,7 +387,7 @@ class SNNSimulator:
 
                 # Perform episode reset or proceed to next env step
                 if episode_done:
-                    if self.fitness_collector is not None and self.fitness_collector.episodic:
+                    if (self.fitness_collector is not None) and self._episodic:
                         self.fitness_collector.collect(
                             t=t,
                             episode=self.num_episode,
@@ -405,7 +422,7 @@ class SNNSimulator:
 
 
             # Update softmax temperature / exploration rate
-            if episode_done and self._explore:
+            if self._explore and ((episode_done and self._episodic) or (env_step and not self._episodic)):
                 if self.seasonal and season_change and self.reset_exploration_on_season_change:
                     self._reset_exploration(t=t)
                 else:

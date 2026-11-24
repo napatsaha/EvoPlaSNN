@@ -491,6 +491,9 @@ class FitnessCollector(Protocol):
     episodic: bool
     fitness_type: str
     fitness_agg_func: str
+    minimise: bool
+    best_fitness: float
+    worst_fitness: float
 
     @abstractmethod
     def collect(self, **kwargs):

@@ -1,10 +1,22 @@
-import numpy as np
 from collections import namedtuple
+from copy import deepcopy
 from typing import List, Literal, Dict, Callable, NamedTuple, Any, Tuple
+import numpy as np
+import gymnasium as gym
 from common.base import FitnessCollector
 
 
-# Trajectory = namedtuple("Trajectory", ["t", "state", "observation", "action", "reward", "done", "info"])
+# -------------- #
+# Container for records collection
+
+
+# class PrettyTuplePrinter:
+#     # __slot__ = ()
+
+#     def __repr__(self):
+#         return "EpsInfo(" + \
+#             ", ".join("%s=%s" % (key, val) for key, val in self._asdict().items() if val is not None) + \
+#             ")"
 
 class Trajectory(NamedTuple):
     t: int = None
@@ -18,11 +30,10 @@ class Trajectory(NamedTuple):
     __slot__ = ()
 
     def __repr__(self):
-        return "EpsInfo(" + \
+        return "Trajectory(" + \
             ", ".join("%s=%s" % (key, val) for key, val in self._asdict().items() if val is not None) + \
             ")"
 
-# EpsInfo = namedtuple("EpsInfo", ["t", "episode", "reward", "eps_reward", "length", "starting_state", "exploration", "truncated", "terminated", "trajectory"])
 
 class EpsInfo(NamedTuple):
     t: int = None
@@ -45,7 +56,58 @@ class EpsInfo(NamedTuple):
             ", ".join("%s=%s" % (key, val) for key, val in self._asdict().items() if val is not None) + \
             ")"
 
-class EpisodeCollector(FitnessCollector):
+
+class StepInfo(NamedTuple):
+    t: int = None
+    step: int = None
+    season: int = None
+    reward: float = None
+    exploration: np.ndarray | float = None
+    collect: bool = None
+    green_count: int = None
+    blue_count: int = None
+
+    __slot__ = ()
+
+    def __repr__(self):
+        return "StepInfo(" + \
+            ", ".join("%s=%s" % (key, val) for key, val in self._asdict().items() if val is not None) + \
+            ")"
+
+
+# ---------------------------
+# Fitness collection handlers
+
+
+class BaseFitnessCollector(FitnessCollector):
+    def __init__(self, env: gym.Env, **kwargs):
+        super().__init__()
+        self._extract_env_info(env)
+        self.records = []
+
+    def _extract_env_info(self, env: gym.Env):
+        self.env_min_reward = getattr(env, "min_reward")
+        self.env_max_reward = getattr(env, "max_reward")
+        self.env_max_steps = getattr(env, "max_steps")
+
+    def get_timestamps(self, t_cutoff: int = None, eps_cutoff: int = None) -> list[int]:
+        if t_cutoff is not None:
+            return [r.t for r in self.records if r.t >= t_cutoff]
+        elif eps_cutoff is not None:
+            return [r.t for r in self.records if r.episode >= eps_cutoff]
+        else:
+            return [r.t for r in self.records]
+
+    def get_explorations(self, t_cutoff: int = None, eps_cutoff: int = None) -> list[float]:
+        if t_cutoff is not None:
+            return [r.exploration for r in self.records if r.t >= t_cutoff]
+        elif eps_cutoff is not None:
+            return [r.exploration for r in self.records if r.episode >= eps_cutoff]
+        else:
+            return [r.exploration for r in self.records]
+
+
+class EpisodeCollector(BaseFitnessCollector):
     records: List[EpsInfo]
     # _valid_fitness_types: List[str] = ["reward", "latency"]
     _optimise_direction_dict: dict = {
@@ -67,7 +129,7 @@ class EpisodeCollector(FitnessCollector):
         "success_rate": (0.0, 1.0),
         "latency": (0.0, np.inf)
     }
-    def __init__(self, *, fitness_type: Literal["reward", "latency", "success_rate", "eps_reward"] = "reward",
+    def __init__(self, env: gym.Env, *, fitness_type: Literal["reward", "latency", "success_rate", "eps_reward"] = "reward",
                  fitness_agg_func: Literal["mean", "sum", "min", "max", "median"] = "mean",
                  fitness_t_cutoff: int = None, fitness_eps_cutoff: int = None,
                  fitness_season_t_cutoff: int = None, fitness_season_eps_cutoff: int = None,
@@ -86,10 +148,11 @@ class EpisodeCollector(FitnessCollector):
                 Note that this is controlled externally (i.e. a simulator needs to call `soft_reset()` of this class after training).
                 Default: True
         """
+        super().__init__(env)
         self.episodic = True
         # self.reward_history = []
         # self.episode_lengths = []
-        self.records = []
+        # self.records = []
         if fitness_type not in self._optimise_direction_dict:
             raise ValueError(f"Fitness type {fitness_type} is not supported. Only accepts {self._optimise_direction_dict.keys()}")
         self.fitness_type = fitness_type
@@ -99,10 +162,23 @@ class EpisodeCollector(FitnessCollector):
                 raise ValueError(f"Aggregate function {fitness_agg_func} not supported. \
                                  Only accepts {self._agg_func_dict.keys()} or a Callable.")
         self.fitness_agg_func = fitness_agg_func
-        # TODO: Get min-max fitness from environment
-        self._max_reward = 1.0
-        self.best_fitness = self._bounds.get(self.fitness_type)[1] if best_fitness is None else best_fitness
-        self.worst_fitness = self._bounds.get(self.fitness_type)[0] if worst_fitness is None else worst_fitness
+
+        # self.best_fitness = self._bounds.get(self.fitness_type)[1] if best_fitness is None else best_fitness
+        # self.worst_fitness = self._bounds.get(self.fitness_type)[0] if worst_fitness is None else worst_fitness
+        if self.fitness_type == "reward":
+            self.best_fitness = self.env_max_reward
+            self.worst_fitness = self.env_min_reward
+        elif self.fitness_type == "latency":
+            self.best_fitness = 0.0
+            self.worst_fitness = self.env_max_steps
+        elif self.fitness_type == "eps_reward":
+            self.best_fitness = self.env_max_steps * self.env_max_reward
+            self.worst_fitness = self.env_max_steps * self.env_min_reward
+        elif self.fitness_type == "success_rate":
+            self.best_fitness = 1.0
+            self.worst_fitness = 0.0
+        self.best_fitness = self.best_fitness if best_fitness is None else best_fitness
+        self.worst_fitness = self.worst_fitness if worst_fitness is None else worst_fitness
         self.fitness_on_eval_only = fitness_on_eval_only
 
         # Own cutoff when calculating fitness
@@ -212,31 +288,31 @@ class EpisodeCollector(FitnessCollector):
     def get_season_timestamps(self) -> List[Tuple[int, int]]:
         return [(r.t, r.season) for i, r in enumerate(self.records[:]) if (i==0) or (i > 0 and self.records[i-1].season != r.season)]
     
-    def get_timestamps(self, t_cutoff: int = None, eps_cutoff: int = None) -> list[int]:
-        if t_cutoff is not None:
-            return [r.t for r in self.records if r.t >= t_cutoff]
-        elif eps_cutoff is not None:
-            return [r.t for r in self.records if r.episode >= eps_cutoff]
-        else:
-            return [r.t for r in self.records]
+    # def get_timestamps(self, t_cutoff: int = None, eps_cutoff: int = None) -> list[int]:
+    #     if t_cutoff is not None:
+    #         return [r.t for r in self.records if r.t >= t_cutoff]
+    #     elif eps_cutoff is not None:
+    #         return [r.t for r in self.records if r.episode >= eps_cutoff]
+    #     else:
+    #         return [r.t for r in self.records]
 
-    def get_explorations(self, t_cutoff: int = None, eps_cutoff: int = None) -> list[float]:
-        if t_cutoff is not None:
-            return [r.exploration for r in self.records if r.t >= t_cutoff]
-        elif eps_cutoff is not None:
-            return [r.exploration for r in self.records if r.episode >= eps_cutoff]
-        else:
-            return [r.exploration for r in self.records]
+    # def get_explorations(self, t_cutoff: int = None, eps_cutoff: int = None) -> list[float]:
+    #     if t_cutoff is not None:
+    #         return [r.exploration for r in self.records if r.t >= t_cutoff]
+    #     elif eps_cutoff is not None:
+    #         return [r.exploration for r in self.records if r.episode >= eps_cutoff]
+    #     else:
+    #         return [r.exploration for r in self.records]
     
     def get_success(self, collect_only: bool = True, t_cutoff: int = None, eps_cutoff: int = None) -> list[float]:
         if collect_only:
-            return [1 if r.terminated and r.reward == self._max_reward else 0 for r in self.records if r.collect]
+            return [1 if r.terminated and r.reward == self.env_max_reward else 0 for r in self.records if r.collect]
         elif t_cutoff is not None:
-            return [1 if r.terminated and r.reward == self._max_reward else 0 for r in self.records if r.t >= t_cutoff]
+            return [1 if r.terminated and r.reward == self.env_max_reward else 0 for r in self.records if r.t >= t_cutoff]
         elif eps_cutoff is not None:
-            return [1 if r.terminated and r.reward == self._max_reward else 0 for r in self.records if r.episode >= eps_cutoff]
+            return [1 if r.terminated and r.reward == self.env_max_reward else 0 for r in self.records if r.episode >= eps_cutoff]
         else:
-            return [1 if r.terminated and r.reward == self._max_reward else 0 for r in self.records]
+            return [1 if r.terminated and r.reward == self.env_max_reward else 0 for r in self.records]
 
     def get_intermediate_fitness(self, collect_only: bool = True, t_cutoff: int = None, eps_cutoff: int = None) -> List[float]:
         """
@@ -269,7 +345,96 @@ class EpisodeCollector(FitnessCollector):
             return self.worst_fitness
         agg = self._agg_func_dict.get(self.fitness_agg_func)
         return agg(fitnesses)
-    
+
+
+class ContinuousEnvCollector(BaseFitnessCollector):    
+    records: List[StepInfo]
+
+    _optimise_direction_dict: dict = {
+        "green_minus_blue": 'maximise',
+        "blue_minus_green": 'maximise',
+    }
+
+    def __init__(self, env: gym.Env, *, fitness_type: Literal["green_minus_blue", "blue_minus_green"] = "green_minus_blue",
+                 fitness_t_cutoff: int = None):
+        super().__init__(env)
+        self.episodic = False
+        # self.records = []
+        if fitness_type not in self._optimise_direction_dict:
+            raise ValueError(f"Fitness type {fitness_type} is not supported. Only accepts {self._optimise_direction_dict.keys()}")
+        self.fitness_type = fitness_type
+        self.minimise = self._optimise_direction_dict.get(self.fitness_type) == 'minimise'
+
+        self.fitness_t_cutoff = fitness_t_cutoff
+        self.fitness_agg_func = "final"
+
+    def _check_collect_fitness(self, t):
+        """
+        Determine (based on cutoff method and current t) whether this entry should be included in final fitness calculation
+
+        Args:
+            t (_type_): timestep
+        """
+        if self.fitness_t_cutoff is not None:
+            return t >= self.fitness_t_cutoff
+
+    def collect(self, t: int = None, season: int = None,
+                reward: float = None, 
+                exploration: float = None, 
+                info: dict = None, **kwargs):
+        collect = self._check_collect_fitness(t)
+        self.records.append(StepInfo(
+                t = t,
+                step = info.get("step_count", None),
+                season = season,
+                reward = reward,
+                exploration = exploration,
+                collect = collect,
+                green_count = info.get("green_count"),
+                blue_count = info.get("blue_count"),
+        ))
+
+    def reset(self):
+        self.records.clear()
+
+    def soft_reset(self):
+        raise NotImplementedError
+
+    def get_timestamps(self, t_cutoff: int = None, eps_cutoff: int = None):
+        if t_cutoff is not None:
+            return [r.t for r in self.records if r.t >= t_cutoff]
+        else:
+            return [r.t for r in self.records]
+
+    def get_explorations(self, t_cutoff: int = None, eps_cutoff: int = None):
+        if t_cutoff is not None:
+            return [r.exploration for r in self.records if r.t >= t_cutoff]
+        else:
+            return [r.exploration for r in self.records]
+
+    def get_intermediate_fitness(self, collect_only = True, t_cutoff = None, eps_cutoff = None)-> List[float]:
+        if self.fitness_type == "green_minus_blue":
+            return [rec.green_count - rec.blue_count for rec in self.records]
+        elif self.fitness_type == "blue_minus_green":
+            return [rec.blue_count - rec.green_count for rec in self.records]
+        else:
+            raise ValueError(f"Fitness type {self.fitness_type} not recognised.")
+
+    def get_fitness(self, collect_only = True, t_cutoff = None, eps_cutoff = None) -> float:
+        last_rec = self.records[-1]
+        if self.fitness_type == "green_minus_blue":
+            fts = last_rec.green_count - last_rec.blue_count
+        elif self.fitness_type == "blue_minus_green":
+            fts = last_rec.blue_count - last_rec.green_count
+        else:
+            raise ValueError(f"Fitness type {self.fitness_type} not recognised.")
+        return float(fts)
+
+    def get_green_count(self) -> List[int]:
+        return [rec.green_count for rec in self.records]
+
+    def get_blue_count(self) -> List[int]:
+        return [rec.blue_count for rec in self.records]
 
 
 class TrajectoryCollector:

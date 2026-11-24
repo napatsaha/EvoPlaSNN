@@ -9,7 +9,7 @@ import numpy as np
 from numpy.typing import ArrayLike
 
 from common.base import Genome, LearningRule, Evaluator
-from common.utils import create_learning_rule, make_bc_func
+from common.utils import create_learning_rule, make_bc_func, create_collector, create_environment
 from snn import SNN, SNNSimulator
 # from snn.spikegen import BinaryClassGenerator
 import snn.spikegen as spkgen
@@ -19,8 +19,8 @@ from rl.spike_coding import StateCoder
 # import snn.spikegen
 # from lrule import LearningRule
 from lrule.arithmetic import MultiplyLearningRule
-from rl import ENV_DICT, BaseMaze
-from rl.collector import EpisodeCollector
+from rl import BaseMaze
+
 from common.base import SpikeCoder
 
 class RL_Evaluator(Evaluator):
@@ -71,11 +71,12 @@ class RL_Evaluator(Evaluator):
             env_params = params.get("env_params", {})
         else:
             env_params = copy.deepcopy(env_params)
-        env_name = env_params.pop("name", None)
-        if env_name not in ENV_DICT:
-            raise ValueError(f"Environment '{env_name}' not yet supported. "
-                             f"Supported environments: {list(ENV_DICT.keys())}")
-        self.env: BaseMaze = ENV_DICT.get(env_name)(**env_params)
+        # env_name = env_params.pop("name", None)
+        # if env_name not in ENV_DICT:
+        #     raise ValueError(f"Environment '{env_name}' not yet supported. "
+        #                      f"Supported environments: {list(ENV_DICT.keys())}")
+        # self.env: BaseMaze = ENV_DICT.get(env_name)(**env_params)
+        self.env: BaseMaze = create_environment(**env_params)
         # num_states = self.env.observation_space.n
         # num_actions = self.env.action_space.n
         if "input_delay" in params["spike_coder_params"]:
@@ -114,7 +115,7 @@ class RL_Evaluator(Evaluator):
             self.snn.learning_rule = ext_rule
 
         ## Episode info collector for calculating fitness 
-        self.fitness_collector = EpisodeCollector(**params["collector_params"])
+        self.fitness_collector = create_collector(env=self.env, **params["collector_params"])
         # Update min and max fitness from environment
         # self.reward_collector.min_fitness = self.env.get_min_reward()
         # self.reward_collector.max_fitness = self.env.get_max_reward()

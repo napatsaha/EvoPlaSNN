@@ -2,6 +2,38 @@
 v1.5
 ----
 
+v1.5.3.1 (2026-11-23)
+- Integrating Foraging task with SNN, FitnessCollector and SNNSimulator
+- `common.base`: Added to `FitnessCollector` the fields: `minimise`, `best_fitness` and `worst_fitness`
+- `common.utils`:
+    - Added factory methods for `create_environment()` and `create_collector()`
+    - Added shared factory structure in `_instantiate_from_params()` (currently only applied to above two object constructors)
+    - ENV_DICT now lives in here, in addition to `rl.__init__` (This version will be more update-to-date from now)
+- Foraging env (`BaseOpenMaze`):
+    - Added `desired_obj`, `undesired_obj` args in init, and corresponding `_desired_objtype`, `_undesired_objtype` attributes
+    - Removed other `reward_*` args from init except `reward_func_params`
+    - `_get_observation()` will return an array
+    - `_get_reward()` now calculates food reward based on which object is set as desired/undesired instead of comparing to blue/green
+    - Added 'item_displaced' field to info dict passed in reset() and step()
+    - Added/updated attributes `min_reward`, `max_reward` and `reward_list` (previously `get_min_reward()` and `get_max_reward()`)
+- Added a base class `BaseFitnessCollector` in `rl.collector` which accepts `env` during init to extract important info, e.g. max/min reward, max steps
+    - Also has base implementations of `get_timestamps()` and `get_explorations()`
+- Updated `EpisodeCollector` to derive from `BaseFitnessCollector`, and its best_fitness/worst_fitness to be based on fitness_type and extract env information
+- New `StepsInfo` named tuple
+- New `ContinuousEnvCollector` in `rl.collector`:
+    - Non episodic
+    - Records information using `StepsInfo` namedtuple, including blue_count and green_count
+    - Has two fitness_type: 'green_minus_blue' and 'blue_minus_green'
+    - Has methods `get_green_count()` and `get_blue_count()`
+- SNNSimulator:
+    - Added `episodic` tag which can be specified during init, but must match same tag of fitness collector
+    - New local flag `env_step` during run loop which tells which step the environment should be incremented
+    - Exploration operations (reset, update) is based on `episodic` tag:
+        - If `episodic=True`, it looks whether `episode_done=True`
+        - If `episodic=False`, it looks whether `env_step=True`
+    - fitness_collector will collect record every env step if `episodic=False`
+- RL_Evaluator now creates env and fitness_collector using `common.utils` `create_environment()` and `create_collector()` respectively
+
 v1.5.3.0 (2026-11-23)
 - Fitness Collector refactoring
 - Added ABC protocol `FitnessCollector` to `common.base`

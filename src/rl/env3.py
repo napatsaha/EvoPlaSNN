@@ -111,10 +111,12 @@ class BaseOpenMaze(gym.Env):
                 #  random_spawn_area: List[Tuple[Tuple[int, int], Tuple[int, int]]] = None,
                 #  obs_type: Literal["position", "surroundings", "sensors"] = "sensors",
                  num_green: int = 1, num_blue: int = 1,
+                 desired_obj: Literal["green", "blue"] = "green",
+                 undesired_obj: Literal["green", "blue"] = "blue",
                 #  include_agent_pos: bool = False,
                 #  terminate_on_crash: bool = False,
-                 penalty: float = -0.1, reward_inter: float = 0.1, reward_null: float | NoneType = 0.0,
-                 reward_bad: float = -1.0, reward_good: float = 1.0, reward_trunc: float = 0.0,
+                #  penalty: float = -0.1, reward_inter: float = 0.1, reward_null: float | NoneType = 0.0,
+                #  reward_bad: float = -1.0, reward_good: float = 1.0, reward_trunc: float = 0.0,
                  reward_func_params: Dict[str, float | int] = None,
                  **kwargs):
         """
@@ -164,13 +166,13 @@ class BaseOpenMaze(gym.Env):
         self.reward_function = self._base_reward_function
         if reward_func_params is not None:
             self.reward_function.update(reward_func_params)
-        self.reward_bad = reward_bad
-        self.reward_good = reward_good
-        self.reward_trunc = reward_trunc
+        # self.reward_bad = reward_bad
+        # self.reward_good = reward_good
+        # self.reward_trunc = reward_trunc
         # Intermediate reward
-        self.penalty = penalty
-        self.reward_inter = reward_inter
-        self.reward_null = reward_null
+        # self.penalty = penalty
+        # self.reward_inter = reward_inter
+        # self.reward_null = reward_null
         # Controls for reward function
         # self.terminate_on_crash = terminate_on_crash
 
@@ -180,6 +182,22 @@ class BaseOpenMaze(gym.Env):
         # Food settings
         self._num_green = num_green
         self._num_blue = num_blue
+        # Initialise which object is the desired/good object
+        if desired_obj == "green":
+            self._desired_objtype = ObjType.GREEN
+        elif desired_obj == "blue":
+            self._desired_objtype = ObjType.BLUE
+        else:
+            raise ValueError(f"Invalid 'desired_obj'={desired_obj}")
+        # Same for undesired/bad object
+        if undesired_obj == "green":
+            self._undesired_objtype = ObjType.GREEN
+        elif undesired_obj == "blue":
+            self._undesired_objtype = ObjType.BLUE
+        else:
+            raise ValueError(f"Invalid 'undesired_obj'={undesired_obj}")
+        assert self._desired_objtype != self._undesired_objtype, "Desired and Undesired objects must not be the same. Got " + \
+            f"desired object: {self._desired_objtype}, and undesired object: {self._undesired_objtype}"
 
         # Agent descriptors
         self._agent_pos: np.ndarray = None
@@ -259,26 +277,26 @@ class BaseOpenMaze(gym.Env):
         self._initialise_positions()
         
 
-    def _get_observation(self):
+    def _get_observation(self) -> np.ndarray:
         """Take item type for each sensor direction from the agent position"""
         obs = []
         for sensor in self._sensor_direction:
             cell_pos = self._agent_pos + rotate(self._agent_direction + sensor)
             item_type = self.maze[*cell_pos]
             obs.append(item_type)
-        return obs
+        return np.array(obs)
 
     def _get_reward(self, obs, action) -> float | int:
         """Calculate reward from current observation and supposed action"""
         item_displaced = obs[action]
 
-        if ObjType.GREEN in obs:
-            if item_displaced == ObjType.GREEN:
+        if self._desired_objtype in obs:
+            if item_displaced == self._desired_objtype:
                 reward = self.reward_function["desired_eat"]
             else:
                 reward = self.reward_function["desired_avoid"]
-        elif ObjType.BLUE in obs:
-            if item_displaced == ObjType.BLUE:
+        elif self._undesired_objtype in obs:
+            if item_displaced == self._undesired_objtype:
                 reward = self.reward_function["undesired_eat"]
             else:
                 reward = self.reward_function["undesired_avoid"]
@@ -334,10 +352,8 @@ class BaseOpenMaze(gym.Env):
         if displaced_item == ObjType.WALL:
             # Bumping into wall
             self._agent_direction = (self._agent_direction + ACTION_MAP[action]) % 4
-            # reward = self.penalty
         # elif displaced_item == ObjType.AGENT:
         #     # Stationary case
-        #     reward = self.reward_null
         else:
             if (displaced_item == ObjType.BLUE) or (displaced_item == ObjType.GREEN):
                 # If displaced object is a food object, find new position before last one is replaced
@@ -353,12 +369,10 @@ class BaseOpenMaze(gym.Env):
 
             # Calculate reward and terminate for non-empty cells
             if displaced_item == ObjType.GREEN:
-                # reward = self.reward_good
                 # Respawn food object
                 self.maze[*pos] = ObjType.GREEN
 
             elif displaced_item == ObjType.BLUE:
-                # reward = self.reward_bad
                 # Respawn food object
                 self.maze[*pos] = ObjType.BLUE
 
@@ -397,6 +411,7 @@ class BaseOpenMaze(gym.Env):
             'agent_position': self.get_agent_position(),
             'green_count': self._green_count,
             'blue_count': self._blue_count,
+            'item_displaced': None,
         }
         return obs, info
 
@@ -422,6 +437,7 @@ class BaseOpenMaze(gym.Env):
             'agent_position': self.get_agent_position(),
             'green_count': self._green_count,
             'blue_count': self._blue_count,
+            'item_displaced': item_displaced,
         }
         return obs, reward, terminated, truncated, info
 
@@ -433,14 +449,16 @@ class BaseOpenMaze(gym.Env):
     def get_agent_position(self):
         return np.array(self._agent_pos)
 
-    def get_min_reward(self):
-        return min(self.reward_bad, self.reward_good, self.penalty, self.reward_trunc, self.reward_inter)
-    
-    def get_max_reward(self):
-        return max(self.reward_bad, self.reward_good, self.penalty, self.reward_trunc, self.reward_inter)
+    @property
+    def min_reward(self):
+        return min(self.reward_function.values())
+
+    @property
+    def max_reward(self):
+        return max(self.reward_function.values())
 
     @property
     def reward_list(self):
-        return sorted(set([0.0, self.reward_bad, self.reward_good, self.penalty, self.reward_trunc, self.reward_inter]))
+        return sorted(set(self.reward_function.values()))
 
 
