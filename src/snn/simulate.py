@@ -32,7 +32,7 @@ class SNNSimulator:
                  modulation: Literal["reward", "td-error"] = None, modulation_params: dict = {},
                  *, 
                  episodic: bool = True,
-                 seasonal: bool = False, seasonal_eps_interval: int = None, 
+                 seasonal: bool = False, seasonal_eps_interval: int = None, seasonal_t_interval: int = None,
                 #  params: dict = {},
                 #  decoder_type: Literal["final", "rate", "latency"] = "final", decoder_params: dict = {},
                 #  fitnessor_type: Literal["accuracy", "reward", "cross-entropy", "mse"] = "accuracy", fitnessor_params: dict = {},
@@ -63,9 +63,10 @@ class SNNSimulator:
         if self.seasonal:
             assert isinstance(self.env, SeasonalEnvProtocol), "To perform seasonal simulation, the env must be derived from `SeasonalEnvProtocol`. " + f"Got env mro: {type(self.env).mro()}"
             # self.env: SeasonalEnvProtocol
-            self.n_seasons = self.env.n_seasons
+            # self.n_seasons = self.env.n_seasons
             self._season_count = 0
             self.seasonal_eps_interval = max(1, int(seasonal_eps_interval)) if seasonal_eps_interval is not None else None
+            self.seasonal_t_interval = max(1, int(seasonal_t_interval)) if seasonal_t_interval is not None else None
 
         # Episode and Trajectory collectors
         self.fitness_collector = fitness_collector
@@ -285,11 +286,12 @@ class SNNSimulator:
         
         # Begin simulation
         if self.seasonal and isinstance(self.env, SeasonalEnvProtocol):
-            self.env.reset_season()
+            season_idx = self.env.reset_season()
             self._season_count = 0
             season_change = False
-            season_idx = self._season_count % self.n_seasons
-            self.env.change_season(season_idx=season_idx)
+            # season_idx = self._season_count % self.n_seasons
+            # self.env.change_season(season_idx=season_idx)
+            # season_idx = self.env.change_season(season_count=self._season_count)
 
         state, info = self.env.reset()
         starting_state = info.get("current_state", None)
@@ -353,6 +355,15 @@ class SNNSimulator:
                         exploration=self._get_exploration_rate(),
                         info=info,
                         )
+
+                # Check if season needs to be changed, for non-episodic task
+                if (not self._episodic) and self.seasonal:
+                    season_change = (t + 1) % self.seasonal_t_interval == 0
+                    if season_change:
+                        self._season_count += 1
+                        # season_idx = self._season_count % self.n_seasons
+                        # self.env.change_season(season_idx=season_idx)
+                        season_idx = self.env.change_season(season_count=self._season_count)
                 
                 if update:
                     # Apply external learning rule
@@ -408,8 +419,9 @@ class SNNSimulator:
                         season_change = (self.num_episode + 1) % self.seasonal_eps_interval == 0
                         if season_change:
                             self._season_count += 1
-                            season_idx = self._season_count % self.n_seasons
-                            self.env.change_season(season_idx=season_idx)
+                            # season_idx = self._season_count % self.n_seasons
+                            # self.env.change_season(season_idx=season_idx)
+                            season_idx = self.env.change_season(season_count=self._season_count)
                     state, info = self.env.reset()
                     starting_state = info.get("current_state", None)
                     self.num_episode += 1

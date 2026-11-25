@@ -2,7 +2,28 @@
 v1.5
 ----
 
-v1.5.3.2 (2026-11)
+v1.5.4.0 (2026-11-25)
+- Added Seasonal change to foraging task
+- New environment `SeasonalForagingMaze` in `rl.env3`
+    - New field 'seasonal-foraging-task' in `common.utils.ENV_DICT`
+- Changed default arg and return values of SeasonalEnvProtocol
+    - `change_season()` takes in `season_count` and return season_idx
+    - `reset_season()` will return season_idx and call change_season with season_count=0
+- Adapt `rl.env2.SeasonalObstacleGridMaze` to match new behaviour: added `starting_season` arg
+- ContinuousEnvCollector has new fitness_type="seasonal" which performs different calculations based on season_idx
+    - StepsInfo collect new fields `season_green_counts` and `season_blue_counts` which are kept track of by ContinuousEnvCollector
+    - new helper function `_get_season_end_record_idx()`
+- In BaseFitnessCollector:
+    - Moved `get_season_timestamps()` from EpisodeCollector
+    - Has default implementation of `reset()` 
+- Simulator can update season based on time interval when episodic=False
+    - Added arg `seasonal_t_interval` to init
+    - No longer has `n_seasons` attribute
+    - Since season_idx is returned by `env.change_season()`, the simulator no longer needs to calculate the index itself, only check count against interval
+- Changes to `plot_intermediate_fitness()`:
+    - Added `season_labels` and `fts_yaxis_line` to function args
+
+v1.5.3.2 (2026-11-24)
 - `env3.BaseOpenMaze` can accept max_steps=None (in which case it will be infinity)
 - Fix MuPlusLambda when there is only 1 parent
 - Changed default value in `cgp.safe_divide()` to 0.0 (previously np.nan)
@@ -12,7 +33,7 @@ v1.5.3.2 (2026-11)
     - plot_intermediate_fitness display fitness type, and removed episode mentions in title and y-labels
     - Added y_eps to plot_fitness_generation and w_eps to plot_weight_over_time
 
-v1.5.3.1 (2026-11-23)
+v1.5.3.1 (2026-11-24)
 - Integrating Foraging task with SNN, FitnessCollector and SNNSimulator
 - `common.base`: Added to `FitnessCollector` the fields: `minimise`, `best_fitness` and `worst_fitness`
 - `common.utils`:

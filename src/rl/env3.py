@@ -462,3 +462,56 @@ class BaseOpenMaze(gym.Env):
         return sorted(set(self.reward_function.values()))
 
 
+class SeasonalForagingMaze(BaseOpenMaze, SeasonalEnvProtocol):
+    _season_index_order = ("summer", "winter")
+    def __init__(self, size=None, width=None, height=None, *, 
+                 starting_season: Literal["summer", "winter"] = "summer",
+                 max_steps = None, num_green = 1, num_blue = 1, 
+                 reward_func_params = None, **kwargs):
+        # Seasonal params
+        self._n_seasons = len(self._season_index_order)
+        assert starting_season in self._season_index_order, "Invalid starting season, must be one of " + str(self._season_index_order)
+        if starting_season == "summer":
+            self._starting_season_idx = 0
+            desired_obj = "green"
+            undesired_obj = "blue"
+        elif starting_season == "winter":
+            self._starting_season_idx = 1
+            desired_obj = "blue"
+            undesired_obj = "green"
+        self._season_idx = self._starting_season_idx
+        super().__init__(size, width, height, 
+                         max_steps=max_steps, num_green=num_green, num_blue=num_blue, desired_obj=desired_obj, undesired_obj=undesired_obj, 
+                         reward_func_params=reward_func_params, **kwargs)
+
+
+    def change_season(self, season_count: int) -> int:
+        new_season_idx = (season_count + self._starting_season_idx) % self._n_seasons
+        if new_season_idx == self._season_idx:
+            # Do nothing
+            return self._season_idx
+        else:
+            self._season_idx = new_season_idx
+            season = self._season_index_order[self._season_idx]
+            if season == "summer":
+                self._desired_objtype = ObjType.GREEN
+                self._undesired_objtype = ObjType.BLUE
+            elif season == "winter":
+                self._desired_objtype = ObjType.BLUE
+                self._undesired_objtype = ObjType.GREEN
+
+
+            return self._season_idx
+
+    def reset_season(self):
+        # self._season_idx = self._starting_season_idx
+        self.change_season(season_count=0)
+        return self._season_idx
+
+    @property
+    def n_seasons(self) -> int:
+        return self._n_seasons
+
+    @property
+    def current_season(self):
+        return self._season_index_order[self._season_idx]

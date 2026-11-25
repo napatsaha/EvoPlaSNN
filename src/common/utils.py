@@ -350,7 +350,8 @@ ENV_DICT = {
     "custom-maze": ("rl.maze", "CustomMaze"), 
     "water-maze": ("rl.maze", "MorrisWaterMaze"), 
     "seasonal-obstacle-maze": ("rl.env2", "SeasonalObstacleGridMaze"), 
-    "foraging-task": ("rl.env3", "BaseOpenMaze")
+    "foraging-task": ("rl.env3", "BaseOpenMaze"),
+    "seasonal-foraging-task": ("rl.env3", "SeasonalForagingMaze"),
 }
 
 def create_environment(**kwargs):

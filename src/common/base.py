@@ -550,18 +550,29 @@ class FitnessCollector(Protocol):
 
 @runtime_checkable
 class SeasonalEnvProtocol(Protocol):
-    def change_season(self, season_count: int):
+    def change_season(self, season_count: int) -> int:
         """
-        Change season of the environment.
+        Change season of the environment, based on a season counter passed in. The final season to be landed on depends on the
+        season count, the starting season and total number of season.
+
+        If it is determined the season to be changed to is the same as the current season, then nothing is performed.
 
         Args:
             season_count (int): external counter for season
+
+        Returns:
+            int: season_idx, i.e. which season (based on internal environment order) it is currently on
         """
         pass
 
-    def reset_season(self):
+    def reset_season(self) -> int:
         """
-        Reset any internal representations of season (as if just re-init the environment). Should be called at the beginning of simulation
+        Reset any internal representations of season (as if just re-init the environment). Should be called at the beginning of simulation.
+
+        Warning: external season_count should also be reset to 0, to avoid non-syncing.
+
+        Returns:
+            int: season_idx, index of current season
         """
         pass
 

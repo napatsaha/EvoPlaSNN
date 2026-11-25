@@ -66,6 +66,8 @@ class StepInfo(NamedTuple):
     collect: bool = None
     green_count: int = None
     blue_count: int = None
+    season_green_count: int = None
+    season_blue_count: int = None
 
     __slot__ = ()
 
@@ -90,6 +92,9 @@ class BaseFitnessCollector(FitnessCollector):
         self.env_max_reward = getattr(env, "max_reward")
         self.env_max_steps = getattr(env, "max_steps")
 
+    def reset(self):
+        self.records.clear()
+
     def get_timestamps(self, t_cutoff: int = None, eps_cutoff: int = None) -> list[int]:
         if t_cutoff is not None:
             return [r.t for r in self.records if r.t >= t_cutoff]
@@ -105,6 +110,9 @@ class BaseFitnessCollector(FitnessCollector):
             return [r.exploration for r in self.records if r.episode >= eps_cutoff]
         else:
             return [r.exploration for r in self.records]
+
+    def get_season_timestamps(self) -> List[Tuple[int, int]]:
+        return [(r.t, r.season) for i, r in enumerate(self.records[:]) if (i==0) or (i > 0 and self.records[i-1].season != r.season)]
 
 
 class EpisodeCollector(BaseFitnessCollector):
@@ -285,8 +293,7 @@ class EpisodeCollector(BaseFitnessCollector):
         else:
             return [r.length for r in self.records]
 
-    def get_season_timestamps(self) -> List[Tuple[int, int]]:
-        return [(r.t, r.season) for i, r in enumerate(self.records[:]) if (i==0) or (i > 0 and self.records[i-1].season != r.season)]
+
     
     # def get_timestamps(self, t_cutoff: int = None, eps_cutoff: int = None) -> list[int]:
     #     if t_cutoff is not None:
@@ -353,10 +360,11 @@ class ContinuousEnvCollector(BaseFitnessCollector):
     _optimise_direction_dict: dict = {
         "green_minus_blue": 'maximise',
         "blue_minus_green": 'maximise',
+        "seasonal": 'maximise'
     }
 
     def __init__(self, env: gym.Env, *, 
-                 fitness_type: Literal["green_minus_blue", "blue_minus_green"] = "green_minus_blue",
+                 fitness_type: Literal["green_minus_blue", "blue_minus_green", "seasonal"] = "green_minus_blue",
                  fitness_agg_func: Literal["final"] = "final",
                  fitness_t_cutoff: int = None,
                  best_fitness: float = None, worst_fitness: float = None,
@@ -375,6 +383,9 @@ class ContinuousEnvCollector(BaseFitnessCollector):
         self.best_fitness = best_fitness if best_fitness is not None else 100
         self.worst_fitness = worst_fitness if worst_fitness is not None else 0
 
+        self._last_season_green_count = 0
+        self._last_season_blue_count = 0
+
     def _check_collect_fitness(self, t):
         """
         Determine (based on cutoff method and current t) whether this entry should be included in final fitness calculation
@@ -385,11 +396,22 @@ class ContinuousEnvCollector(BaseFitnessCollector):
         if self.fitness_t_cutoff is not None:
             return t >= self.fitness_t_cutoff
 
+    def _get_season_end_record_idx(self, add_final_rec: bool = True):
+        idx = [i for i, (rec1, rec2) in enumerate(zip(self.records[:-1], self.records[1:])) if rec1.season != rec2.season]
+        if add_final_rec:
+            return idx + [len(self.records) - 1]
+        return idx
+
     def collect(self, t: int = None, season: int = None,
                 reward: float = None, 
                 exploration: float = None, 
                 info: dict = None, **kwargs):
         collect = self._check_collect_fitness(t)
+        # Detect if this season changes from the last
+        if len(self.records) > 0 and (season != self.records[-1].season):
+            self._last_season_green_count = self.records[-1].green_count
+            self._last_season_blue_count = self.records[-1].blue_count
+        
         self.records.append(StepInfo(
                 t = t,
                 step = info.get("step_count", None),
@@ -399,10 +421,14 @@ class ContinuousEnvCollector(BaseFitnessCollector):
                 collect = collect,
                 green_count = info.get("green_count"),
                 blue_count = info.get("blue_count"),
+                season_green_count = info.get("green_count") - self._last_season_green_count,
+                season_blue_count = info.get("blue_count") - self._last_season_blue_count
         ))
 
     def reset(self):
-        self.records.clear()
+        super().reset()
+        self._last_season_green_count = 0
+        self._last_season_blue_count = 0
 
     def soft_reset(self):
         raise NotImplementedError
@@ -424,8 +450,12 @@ class ContinuousEnvCollector(BaseFitnessCollector):
             return [rec.green_count - rec.blue_count for rec in self.records]
         elif self.fitness_type == "blue_minus_green":
             return [rec.blue_count - rec.green_count for rec in self.records]
+        elif self.fitness_type == "seasonal":
+            return [rec.season_green_count - rec.season_blue_count if rec.season == 0 else 
+                    rec.season_blue_count - rec.season_green_count if rec.season == 1 else 0
+                     for rec in self.records]
         else:
-            raise ValueError(f"Fitness type {self.fitness_type} not recognised.")
+            raise ValueError(f"Fitness type '{self.fitness_type}' not recognised.")
 
     def get_fitness(self, collect_only = True, t_cutoff = None, eps_cutoff = None) -> float:
         last_rec = self.records[-1]
@@ -433,8 +463,13 @@ class ContinuousEnvCollector(BaseFitnessCollector):
             fts = last_rec.green_count - last_rec.blue_count
         elif self.fitness_type == "blue_minus_green":
             fts = last_rec.blue_count - last_rec.green_count
+        elif self.fitness_type == "seasonal":
+            end_season_idx = self._get_season_end_record_idx(add_final_rec=True)
+            return sum([self.records[i].season_green_count - self.records[i].season_blue_count if self.records[i].season == 0 else 
+                    self.records[i].season_blue_count - self.records[i].season_green_count if self.records[i].season == 1 else 0
+                     for i in end_season_idx])
         else:
-            raise ValueError(f"Fitness type {self.fitness_type} not recognised.")
+            raise ValueError(f"Fitness type '{self.fitness_type}' not recognised.")
         return float(fts)
 
     def get_green_count(self) -> List[int]:

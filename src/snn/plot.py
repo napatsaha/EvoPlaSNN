@@ -911,8 +911,8 @@ def plot_eligibility_traces(simulator: 'SNNSimulator' = None, values: np.ndarray
 def plot_intermediate_fitness(simulator: 'SNNSimulator' = None, values: np.ndarray = None, fitness_collector: base.FitnessCollector = None, *, 
                               plot_exploration: bool = False, exploration_labels: List[str] = None,
                               plot_collect_fitness: bool = True, plot_food_counts: bool = False,
-                              plot_seasonal_bands: bool = False, season_cmap: str = "Set2",
-                              t_cutoff: int = None, eps_cutoff: int = None,
+                              plot_seasonal_bands: bool = False, season_cmap: str = "Set2", season_labels: List[str] = None,
+                              t_cutoff: int = None, eps_cutoff: int = None, fts_yaxis_line: float = None,
                               num_steps: int = None, timestamps: np.ndarray = None,
                               x_scale: float = 0.01, y_scale: float = 1.0, x_eps: int = 1,
                               t_min: int = None, t_max: int = None, t_range: int = None, window_size: int = 10, 
@@ -998,13 +998,19 @@ def plot_intermediate_fitness(simulator: 'SNNSimulator' = None, values: np.ndarr
         # Get timestamps for first occurence of each season change
         season_ts = fitness_collector.get_season_timestamps()
         if simulator is not None:
-            n_seasons = simulator.n_seasons
+            n_seasons = simulator.env.n_seasons
         else:
             n_seasons = len(set([s for t, s in season_ts]))
         s_cmap = mpl.colormaps[season_cmap]
         for (xmin, s0), (xmax, s1) in zip(season_ts, season_ts[1:] + [(ts[-1], None)]): # Add final xmax timestamp for final band
             ax.axvspan(xmin, xmax, facecolor=s_cmap.colors[s0], alpha=0.5)
-        ax.legend(handles=[mpl.patches.Patch(facecolor=s_cmap.colors[i], label="Season %d" % i) for i in range(n_seasons)], loc="lower left")
+        if season_labels is None:
+            season_labels = ["Season %d" % i for i in range(n_seasons)]
+        ax.legend(handles=[mpl.patches.Patch(facecolor=s_cmap.colors[i], label=season_labels[i]) for i in range(n_seasons)], 
+                  loc="lower left", title="Season")
+
+    if fts_yaxis_line is not None:
+        ax.axhline(y=fts_yaxis_line, color="gray", linestyle="--", linewidth=1.5)
     
     ax.set_xlim(t_min - x_eps, t_max + x_eps)
     ax.set_xlabel("Time (steps)")
