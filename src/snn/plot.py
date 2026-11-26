@@ -915,7 +915,8 @@ def plot_intermediate_fitness(simulator: 'SNNSimulator' = None, values: np.ndarr
                               t_cutoff: int = None, eps_cutoff: int = None, fts_yaxis_line: float = None,
                               num_steps: int = None, timestamps: np.ndarray = None,
                               x_scale: float = 0.01, y_scale: float = 1.0, x_eps: int = 1,
-                              t_min: int = None, t_max: int = None, t_range: int = None, window_size: int = 10, 
+                              t_min: int = None, t_max: int = None, t_range: int = None, 
+                              plot_running_avg_fts: bool = True, window_size: int = 10, 
                               figsize: tuple = None, dpi: int = 100, title: str = None,
                               savepath: str | Path = None, show: bool = True):
     if (simulator is not None) or (fitness_collector is not None):
@@ -954,8 +955,7 @@ def plot_intermediate_fitness(simulator: 'SNNSimulator' = None, values: np.ndarr
         assert len(timestamps) == len(fts), "Timestamps must match the length of fitness values."
         ts = timestamps
     # ts = np.arange(simulator.spike_generator.pattern_length - 1, T, simulator.spike_generator.length)
-    window_size = min(window_size, len(fts))
-    runavg = np.convolve(fts, np.ones(window_size) / window_size, mode='same')
+
 
     # Extract food counts if applicable
     if plot_food_counts:
@@ -987,7 +987,10 @@ def plot_intermediate_fitness(simulator: 'SNNSimulator' = None, values: np.ndarr
         linewidth=1, label="Intermediate Fitness",
         marker="o", markersize=5
     )
-    ax.plot(ts, runavg, color="blue", linewidth=2, label=f"Running Average ({window_size})", markersize=10, marker="o")
+    if plot_running_avg_fts:
+        window_size = min(window_size, len(fts))
+        runavg = np.convolve(fts, np.ones(window_size) / window_size, mode='same')
+        ax.plot(ts, runavg, color="blue", linewidth=2, label=f"Running Average ({window_size})", markersize=10, marker="o")
     # Make sure line legend is not removed when plotting season legend
     line_legend = ax.legend(loc="lower right", fontsize=12)
     ax.add_artist(line_legend)

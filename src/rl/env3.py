@@ -10,7 +10,7 @@ Key differences are:
 from types import NoneType
 from typing import List, Literal, Tuple, Dict
 from functools import partial
-import warnings
+import warnings, copy
 from enum import IntEnum
 
 import gymnasium as gym
@@ -118,6 +118,7 @@ class BaseOpenMaze(gym.Env):
                 #  penalty: float = -0.1, reward_inter: float = 0.1, reward_null: float | NoneType = 0.0,
                 #  reward_bad: float = -1.0, reward_good: float = 1.0, reward_trunc: float = 0.0,
                  reward_func_params: Dict[str, float | int] = None,
+                 reward_func_version: Literal["v1", "v2"] = "v1",
                  **kwargs):
         """
         Initializes the environment with the given parameters.
@@ -163,18 +164,10 @@ class BaseOpenMaze(gym.Env):
 
         # Reward parameters
         # Final episode reward
-        self.reward_function = self._base_reward_function
+        self.reward_function = copy.copy(self._base_reward_function)
         if reward_func_params is not None:
             self.reward_function.update(reward_func_params)
-        # self.reward_bad = reward_bad
-        # self.reward_good = reward_good
-        # self.reward_trunc = reward_trunc
-        # Intermediate reward
-        # self.penalty = penalty
-        # self.reward_inter = reward_inter
-        # self.reward_null = reward_null
-        # Controls for reward function
-        # self.terminate_on_crash = terminate_on_crash
+        self.reward_func_version = reward_func_version
 
         # Observation type
         self._sensor_direction = (Rotation.LEFT, Rotation.STRAIGHT, Rotation.RIGHT)
@@ -290,43 +283,75 @@ class BaseOpenMaze(gym.Env):
         """Calculate reward from current observation and supposed action"""
         item_displaced = obs[action]
 
-        if self._desired_objtype in obs:
-            if item_displaced == self._desired_objtype:
-                reward = self.reward_function["desired_eat"]
-            else:
-                reward = self.reward_function["desired_avoid"]
-        elif self._undesired_objtype in obs:
-            if item_displaced == self._undesired_objtype:
-                reward = self.reward_function["undesired_eat"]
-            else:
-                reward = self.reward_function["undesired_avoid"]
-        elif ObjType.WALL in obs:
-            if obs[Rotation.STRAIGHT+1] == ObjType.WALL:
+        # Default reward in case there are scenarios not covered
+        reward = 0.0
+
+        # Version 1: Check by type of object present in obs (this version was used in my previous code)
+        if self.reward_func_version == "v1":
+            if self._desired_objtype in obs:
+                if item_displaced == self._desired_objtype:
+                    reward = self.reward_function["desired_eat"]
+                else:
+                    reward = self.reward_function["desired_avoid"]
+            elif self._undesired_objtype in obs:
+                if item_displaced == self._undesired_objtype:
+                    reward = self.reward_function["undesired_eat"]
+                else:
+                    reward = self.reward_function["undesired_avoid"]
+            elif ObjType.WALL in obs:
+                if obs[Rotation.STRAIGHT+1] == ObjType.WALL:
+                    if (action-1) == Rotation.STRAIGHT:
+                        reward = self.reward_function["wall_eat"]
+                    else:
+                        reward = self.reward_function["wall_avoid"]
+                elif obs[Rotation.LEFT+1] == ObjType.WALL:
+                    if (action-1) == Rotation.RIGHT:
+                        reward = self.reward_function["wall_avoid"]
+                    elif (action-1) == Rotation.STRAIGHT:
+                        reward = self.reward_function["wall_hug"]
+                    else:
+                        reward = self.reward_function["wall_eat"]
+                elif obs[Rotation.RIGHT+1] == ObjType.WALL:
+                    if (action-1) == Rotation.LEFT:
+                        reward = self.reward_function["wall_avoid"]
+                    elif (action-1) == Rotation.STRAIGHT:
+                        reward = self.reward_function["wall_hug"]
+                    else:
+                        reward = self.reward_function["wall_eat"]
+            elif ObjType.EMPTY in obs:
                 if (action-1) == Rotation.STRAIGHT:
-                    reward = self.reward_function["wall_eat"]
+                    reward = self.reward_function["empty_straight"]
                 else:
-                    reward = self.reward_function["wall_avoid"]
-            elif obs[Rotation.LEFT+1] == ObjType.WALL:
-                if (action-1) == Rotation.RIGHT:
-                    reward = self.reward_function["wall_avoid"]
-                elif (action-1) == Rotation.STRAIGHT:
-                    reward = self.reward_function["wall_hug"]
-                else:
-                    reward = self.reward_function["wall_eat"]
-            elif obs[Rotation.RIGHT+1] == ObjType.WALL:
-                if (action-1) == Rotation.LEFT:
-                    reward = self.reward_function["wall_avoid"]
-                elif (action-1) == Rotation.STRAIGHT:
-                    reward = self.reward_function["wall_hug"]
-                else:
-                    reward = self.reward_function["wall_eat"]
-        elif ObjType.EMPTY in obs:
-            if (action-1) == Rotation.STRAIGHT:
-                reward = self.reward_function["empty_straight"]
-            else:
-                reward = self.reward_function["empty_turn"]
-        else:
-            reward = 0.0
+                    reward = self.reward_function["empty_turn"]
+
+        # Version 2: Check by type of object consumed first before checking avoidance behaviours
+        elif self.reward_func_version == "v2":
+            # Give reward based on which object was eaten first, 
+            if item_displaced == ObjType.WALL:
+                reward = self.reward_function["wall_eat"]
+            elif item_displaced == self._desired_objtype:
+                reward = self.reward_function["desired_eat"]
+            elif item_displaced == self._undesired_objtype:
+                reward = self.reward_function["undesired_eat"]
+            # Then check for cases of avoidance (when no object is eaten)
+            elif item_displaced == ObjType.EMPTY:
+                if self._desired_objtype in obs:
+                    # Assumed to avoid
+                    reward = self.reward_function["desired_avoid"]
+                elif self._undesired_objtype in obs:
+                    reward = self.reward_function["undesired_avoid"]
+                elif ObjType.WALL in obs:
+                    # If follows that if the agent goes straight and doesn't collide into wall, then wall must be on either left or right. So 'wall_hug' applies
+                    if (action-1) == Rotation.STRAIGHT:
+                        reward = self.reward_function["wall_hug"]
+                    # In all other cases, it is either turning left when wall is right, turning right when wall is left, or either direction when wall is straight, i.e. 'wall_avoid'
+                    else:
+                        reward = self.reward_function["wall_avoid"]
+                elif all(o == ObjType.EMPTY for o in obs):
+                    if (action-1) == Rotation.STRAIGHT:
+                        reward = self.reward_function["empty_straight"]
+                    else:
+                        reward = self.reward_function["empty_turn"]
 
         return reward
 

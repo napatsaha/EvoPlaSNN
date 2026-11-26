@@ -2,6 +2,13 @@
 v1.5
 ----
 
+v1.5.4.1 (2026-11-26)
+- A few improvement changes
+- SNNSimulator can render environment by specifying `render=` and `render_time_delay=` during `run()` (assume IPython display)
+- Added option to turn on/off running average line in `plot_intermediate_fitness()`
+- New reward function system in env3.BaseOpenMaze based on which item was consumed, and ability to specify version via `reward_func_version=` during init
+- Made `ContinuousEnvCollector.soft_reset()` same as `reset()`
+
 v1.5.4.0 (2026-11-25)
 - Added Seasonal change to foraging task
 - New environment `SeasonalForagingMaze` in `rl.env3`

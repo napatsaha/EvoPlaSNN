@@ -1,11 +1,11 @@
-import copy, warnings
+import copy, warnings, time
 from pathlib import Path
 from typing import List, Literal, Optional, Sequence
 from matplotlib import ticker
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib as mpl
-from .base import SpikeGenerator
+from IPython.display import clear_output
 
 from .utils import LayerRecorder, MatrixRecorder
 from .snn import SNN
@@ -272,7 +272,7 @@ class SNNSimulator:
             self._decay = False
             self._explore = False
 
-    def run(self, num_steps: int = None, num_eps: int = None, update: bool = True, record: bool = True):
+    def run(self, num_steps: int = None, num_eps: int = None, update: bool = True, record: bool = True, render: bool = False, render_time_delay: float = 0.1):
         t_start = self.num_steps
         eps_start = self.num_episode
         if num_steps is None and num_eps is None:
@@ -327,6 +327,12 @@ class SNNSimulator:
 
             # Increment environment step if the spike coder says so
             if env_step:
+
+                if render:
+                    self.env.render()
+                    time.sleep(render_time_delay)
+                    clear_output(wait=True)
+
                 if self._explore and self.epsilon_greedy:
                     if np.random.rand() < self.epsilon:
                         action = self.env.action_space.sample()

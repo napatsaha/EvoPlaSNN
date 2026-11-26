@@ -431,7 +431,7 @@ class ContinuousEnvCollector(BaseFitnessCollector):
         self._last_season_blue_count = 0
 
     def soft_reset(self):
-        raise NotImplementedError
+        self.reset()
 
     def get_timestamps(self, t_cutoff: int = None, eps_cutoff: int = None):
         if t_cutoff is not None:
