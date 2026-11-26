@@ -283,15 +283,16 @@ class EvoManager:
         msg = ""
         msg += "Results:"
         try:
-            if isinstance(global_best_solution, Genome):
-                global_best_solution = global_best_solution.parameters.round(4)
-            msg += f"\nAll-Time Best solution: \n\t{global_best_solution}"
-            msg += f"\n\tFitness: {global_best_fitness:.3f}"
-            best_gen_idx, best_indiv_idx = self.solver.all_time_best_idx
-            msg += f"\n\tAt Generation number: {best_gen_idx}\n\tIndividual number: {best_indiv_idx}"
             msg += f"\nTotal time taken: {dt // 3600} hours, {(dt % 3600) // 60} minutes, {dt % 60:.2f} seconds"
             msg += f"\nTotal generations: {gen_count}"
             msg += f"\nResults saved to directory: {self.results_path}"
+            msg += f"\nAll-Time Best Solution: \n\t{global_best_solution}"
+            if isinstance(global_best_solution, Genome):
+                global_best_genome = global_best_solution.parameters.round(4)
+                msg += f"\n\Genome: {global_best_genome}"
+            msg += f"\n\tFitness: {global_best_fitness:.3f}"
+            best_gen_idx, best_indiv_idx = self.solver.all_time_best_idx
+            msg += f"\n\tAt Generation number: {best_gen_idx}\n\tIndividual number: {best_indiv_idx}"
         finally: 
             self.logger.info(msg)
 

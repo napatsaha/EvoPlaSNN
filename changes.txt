@@ -2,6 +2,11 @@
 v1.5
 ----
 
+v1.5.4.2 (2026-11-26)
+- Fixed issue with `SpikeCoderEnvWrapper.get_env_info()` return a np.int8 dtype when space is MultiDiscrete, which caused multiplication issues down the line
+- NeuronLayer converts input size to int
+- Better reporting of best solution as phenotype during log_generation in EvoManager
+
 v1.5.4.1 (2026-11-26)
 - A few improvement changes
 - SNNSimulator can render environment by specifying `render=` and `render_time_delay=` during `run()` (assume IPython display)

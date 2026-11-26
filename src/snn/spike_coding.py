@@ -239,9 +239,9 @@ class SpikeCoderEnvWrapper(CompositeSpikeCoder):
             dtype = "discrete"
         elif isinstance(space, gym.spaces.MultiDiscrete):
             n_channels = sum(space.shape)
-            n_neurons = space.nvec
+            n_neurons = np.asarray(space.nvec, dtype=int)
             lower_bounds = np.zeros((n_channels, ), dtype=int)
-            upper_bounds = np.asarray(space.nvec) - 1
+            upper_bounds = n_neurons - 1
             dtype = "discrete"
         else:
             raise ValueError(f"Space type {type(space)} not yet supported. Please use CompositeSpikeCoder class directly")

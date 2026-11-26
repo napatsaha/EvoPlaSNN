@@ -152,7 +152,7 @@ class NeuronLayer(NeuronLayerProtocol):
 
         """
         # Simulation parameters
-        self.size = size
+        self.size = int(size)
         self.dt = dt
         self.sim_method = sim_method
         self._event_driven = sim_method == "event-driven"
